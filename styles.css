@@ -424,3 +424,5 @@ button.bucket{text-align:left;font:inherit;color:inherit;cursor:pointer}
 .weeksince small{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
 .weeksince b{font:800 18px var(--display)}
 .kh+.owedline{margin-top:-8px}
+
+.lede{text-wrap:balance}

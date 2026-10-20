@@ -207,7 +207,7 @@ function authHTML() {
   const code = S.authStep === 'code';
   return `<section class="screen-center">
     <h1 class="logo-h"><img src="logo-900.png" alt="${esc(APP)}" width="900" height="304"></h1>
-    <p class="lede">Allowance, chores, reading and screen time for kids. One weekly number they can see and trust.</p>
+    <p class="lede">Allowance, chores, reading and screen time, all in one place kids can see and trust.</p>
     <div class="card form">
       ${code ? `<div class="field"><label class="label" for="codeIn">Enter the 6-digit code we sent to ${esc(S.authEmail)}</label>
         <input id="codeIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>
