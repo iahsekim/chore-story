@@ -426,3 +426,61 @@ button.bucket{text-align:left;font:inherit;color:inherit;cursor:pointer}
 .kh+.owedline{margin-top:-8px}
 
 .lede{text-wrap:balance}
+
+/* ---------- responsive hardening ---------- */
+main>*,.card>*,.sect>*,.list>*,.kcard>*,.board>*,.hero>*,.sheet>*{min-width:0}
+.weeksince{max-width:100%}
+.link{display:inline-flex;align-items:center;min-height:40px;padding:0 4px;margin:0 -4px}
+.tog{flex:none}
+.tog::before{content:"";position:absolute;inset:-9px -4px}
+.step button{width:36px;height:36px}
+.chip{min-height:40px}
+.kact{grid-template-columns:repeat(3,minmax(0,1fr))}
+.kact .pill{min-width:0;white-space:normal;line-height:1.1;text-align:center}
+.decide{flex-wrap:wrap}
+.row .t b,.row .t span{overflow-wrap:anywhere}
+.bline>*{min-width:0;overflow-wrap:anywhere}
+.digits{font-size:clamp(44px,17vw,72px)}
+.big{font-size:clamp(52px,19vw,76px)}
+.bankbig{font-size:clamp(40px,14vw,52px)}
+.tile .v{font-size:clamp(28px,10vw,40px)}
+h1{font-size:clamp(28px,9vw,38px);overflow-wrap:anywhere}
+header{min-width:0}
+.hello{min-width:0}
+.lock{flex:none}
+.sheet{max-height:min(92%,calc(100% - env(safe-area-inset-top,0px) - 12px));-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.toast{bottom:calc(env(safe-area-inset-bottom,0px) + 100px)}
+input,select,textarea{font-size:16px}
+@media (max-width:360px){
+  body{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+  .card,.board,.hero{padding:16px}
+  .kstats div{padding:8px 4px}
+  .kstats b{font-size:15px}
+  .kstats span{font-size:10px;letter-spacing:.03em}
+  .tabbar button{font-size:11px}
+  .tabbar .ic{width:44px}
+  .row{padding:12px 14px;gap:10px}
+  .ico{width:34px;height:34px}
+  .price{min-width:56px;font-size:14px}
+  .buckets,.tiles{gap:10px}
+  .bucket b{font-size:28px}
+  .who{gap:10px}
+  .who .avatar{width:60px;height:60px;font-size:30px}
+  .eq .op{font-size:15px}
+  .opt-h h2{font-size:22px}
+}
+@media (max-height:560px) and (orientation:landscape){
+  .screen-center{min-height:0;padding-block:12px}
+  .tabbar{padding-top:10px}
+  .tabbar .ic{height:24px}
+  .tabbar svg{width:20px;height:20px}
+}
+@media (min-width:700px){
+  .wrap,.tabbar .in{max-width:600px}
+  .sheet{max-width:600px;border-radius:28px;margin-bottom:24px}
+  .scrim{align-items:center}
+}
+.row2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.row2>.pill,.row2>.save,.row2>.go,.row2>.ghost{min-width:0;white-space:normal;line-height:1.15;text-align:center;height:auto;min-height:44px;padding:8px 10px}
+.ptools .pill{white-space:normal;height:auto;min-height:40px;padding:8px 14px;line-height:1.15}
+@media (max-width:360px){.kact .pill,.row2>.pill{font-size:13px;padding:6px}}
