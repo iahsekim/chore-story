@@ -1,12 +1,12 @@
 /* Layout: a phone app in a "storybook toybox" look — rounded friendly type, chunky buttons that press down, bright page colors on a warm paper ground. Each area owns a color: money green, jobs blue, reading violet, screen sunshine. */
 :root{
-  --bg:#FFF6E8; --surface:#FFFFFF; --sunk:#FFEBD2; --ink:#2A1E3B; --muted:#6E5F7E; --line:#F1DFC6; --edge:#2A1E3B;
+  --bg:#FFFAEB; --surface:#FFFFFF; --sunk:#FFF0C7; --ink:#10224A; --muted:#55627F; --line:#F1E3B8; --edge:#0F3F86;
   --money:#1FA34A; --money-deep:#147A36; --money-soft:#DCF5D9; --hero:#1FA34A;
-  --jobs:#FF6B1A; --jobs-soft:#FFE3D0;
+  --jobs:#1A5FD0; --jobs-soft:#E1EBFF;
   --read:#7A3FF2; --read-soft:#ECE2FF;
-  --screen:#FFC81F; --board:#2A1E3B; --board-raise:#3B2D50; --board-line:#4E3F66; --board-ink:#FFF6E8; --board-muted:#C3B6D3;
-  --danger:#E8423B; --danger-soft:#FFE1DD;
-  --press:rgba(36,33,58,.18);
+  --screen:#FFD31A; --board:#0F2A5C; --board-raise:#1B3A74; --board-line:#2B4C8A; --board-ink:#FFFAEB; --board-muted:#AFC0E0;
+  --danger:#E3192F; --danger-soft:#FFE0E3;
+  --press:rgba(15,63,134,.22);
   --shadow:0 2px 0 rgba(36,33,58,.06),0 6px 18px rgba(36,33,58,.06);
   --display:"Baloo 2","Fredoka","Arial Rounded MT Bold",system-ui,sans-serif;
   --body:"Nunito","Segoe UI",system-ui,-apple-system,sans-serif;
@@ -14,18 +14,18 @@
   --r:24px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#1A1426; --surface:#251D35; --sunk:#30263F; --ink:#FFF3E2; --muted:#BBAFCB; --line:#3A2F4C; --edge:#08050D;
+  --bg:#0B1430; --surface:#13204A; --sunk:#1A2A5A; --ink:#FFF7DE; --muted:#AEBBDD; --line:#25386E; --edge:#040A1C;
   --money:#4BD873; --money-deep:#11592A; --money-soft:#173A22; --hero:#178A3D;
-  --jobs:#FF8B45; --jobs-soft:#45281A;
+  --jobs:#5B91FF; --jobs-soft:#1D2F66;
   --read:#AE8BFF; --read-soft:#30244F;
-  --screen:#FFD24D; --board:#0F0A18; --board-raise:#241B33; --board-line:#3A2F4C;
+  --screen:#FFD84A; --board:#060E26; --board-raise:#15224A; --board-line:#25386E;
   --danger:#FF7A6E; --danger-soft:#43211F; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#1A1426; --surface:#251D35; --sunk:#30263F; --ink:#FFF3E2; --muted:#BBAFCB; --line:#3A2F4C; --edge:#08050D;
+  --bg:#0B1430; --surface:#13204A; --sunk:#1A2A5A; --ink:#FFF7DE; --muted:#AEBBDD; --line:#25386E; --edge:#040A1C;
   --money:#4BD873; --money-deep:#11592A; --money-soft:#173A22; --hero:#178A3D;
-  --jobs:#FF8B45; --jobs-soft:#45281A;
+  --jobs:#5B91FF; --jobs-soft:#1D2F66;
   --read:#AE8BFF; --read-soft:#30244F;
-  --screen:#FFD24D; --board:#0F0A18; --board-raise:#241B33; --board-line:#3A2F4C;
+  --screen:#FFD84A; --board:#060E26; --board-raise:#15224A; --board-line:#25386E;
   --danger:#FF7A6E; --danger-soft:#43211F; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body);
@@ -307,8 +307,8 @@ input,select{border-width:2px;border-radius:14px}
 h1,.sheet h2,.sect-h h3,.kcard .kh h3,.big,.tile .v,.bucket b,.digits,.kcard .kh .wk,.progress .top .v{font-weight:800!important;letter-spacing:-.01em}
 h1{font-size:38px}
 .brand h1{font-size:46px;line-height:1}
-.brand .story{color:var(--jobs);display:inline-block;transform:rotate(-3deg)}
-.brand img{border:2.5px solid var(--edge);box-shadow:var(--pop);border-radius:16px}
+
+
 .hero .big{text-shadow:3px 3px 0 rgba(0,0,0,.22)}
 .hero::after{border:none;width:120px;height:120px;right:-24px;top:-24px;background:radial-gradient(circle,rgba(255,255,255,.18) 30%,transparent 31%) 0 0/24px 24px}
 .tabbar{border-top:2.5px solid var(--edge)}
@@ -320,3 +320,12 @@ input,select{border:2.5px solid var(--edge);background:var(--surface)}
 .tog[aria-pressed="true"]::after{left:19px}
 .badge{border:2px solid var(--edge)}
 .toast{border:2.5px solid var(--edge);box-shadow:var(--pop)}
+
+/* ---------- Chore Story logo ---------- */
+.logo-h{margin:0;display:block}
+.logo-h img{display:block;width:100%;max-width:420px;height:auto;margin:0 auto 4px;filter:drop-shadow(0 3px 0 rgba(15,63,134,.18))}
+.screen-center .lede{text-align:center;margin-inline:auto}
+.save{background:var(--jobs);color:#fff}
+.go{background:var(--screen);color:#10224A}
+.tabbar button[aria-selected="true"] .ic{background:var(--screen);color:#10224A}
+.brand{justify-content:center}
