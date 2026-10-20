@@ -366,3 +366,39 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:2.5px so
 .eq .term{min-width:0}
 .eq .term b{font-size:clamp(17px,5.4vw,28px);white-space:nowrap}
 .eq .op{font-size:18px}
+
+/* ---------- playroom touches (subtle) ---------- */
+:root{--hand:"Gochi Hand","Comic Neue","Segoe Print",cursive;--doodle:#3E7BE0;--wood-a:#C98E55;--wood-b:#B47A44;--wood-line:#8E5A2E;--tape:rgba(255,211,26,.75)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--doodle:#9DB8FF;--wood-a:#6E4A2C;--wood-b:#5E3E24;--wood-line:#3B2414;--tape:rgba(255,216,74,.55)}}
+:root[data-theme="dark"]{--doodle:#9DB8FF;--wood-a:#6E4A2C;--wood-b:#5E3E24;--wood-line:#3B2414;--tape:rgba(255,216,74,.55)}
+body{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .4 0 0 0 0 .3 0 0 0 0 .2 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+.playroom{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;color:var(--doodle)}
+.wrap,#layer{position:relative;z-index:1}
+.pr{position:absolute;opacity:.13;transform:rotate(var(--r))}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pr{opacity:.10}}
+:root[data-theme="dark"] .pr{opacity:.10}
+@media (prefers-reduced-motion:no-preference){
+  .pr-a{animation:drift-a 48s ease-in-out infinite alternate}
+  .pr-b{animation:drift-b 62s ease-in-out infinite alternate}
+  .pr-c{animation:drift-c 70s ease-in-out infinite alternate}
+}
+@keyframes drift-a{from{transform:translate(0,0) rotate(var(--r))}to{transform:translate(28px,-14px) rotate(calc(var(--r) + 6deg))}}
+@keyframes drift-b{from{transform:translate(0,0) rotate(var(--r))}to{transform:translate(-22px,12px) rotate(calc(var(--r) - 8deg))}}
+@keyframes drift-c{from{transform:translate(0,0) rotate(var(--r))}to{transform:translate(18px,16px) rotate(var(--r))}}
+/* a strip of wood floor under the tab bar */
+.tabbar{border-top:0;padding-top:16px}
+.tabbar::before{content:"";position:absolute;left:0;right:0;top:0;height:9px;border-top:2.5px solid var(--edge);border-bottom:2px solid var(--wood-line);
+  background:repeating-linear-gradient(90deg,var(--wood-a) 0 118px,var(--wood-line) 118px 120px,var(--wood-b) 120px 238px,var(--wood-line) 238px 240px)}
+.playroom .floor{display:none}
+/* kid handwriting for small friendly text */
+.hello small{font:400 19px/1 var(--hand);color:var(--muted);letter-spacing:.01em}
+.sect-h h3{font:400 26px/1 var(--hand);letter-spacing:.01em}
+.who button{font:400 24px/1.1 var(--hand)}
+.empty{font:400 19px/1.35 var(--hand)}
+.screen-center .lede{font:400 21px/1.35 var(--hand)}
+.kidform-h b{font:400 26px/1.1 var(--hand)}
+/* a strip of tape on the bank card and boards */
+.hero::before,.board::before{content:"";position:absolute;top:-10px;left:22px;width:70px;height:20px;background:var(--tape);transform:rotate(-4deg);border-radius:2px;box-shadow:0 1px 0 rgba(0,0,0,.08);z-index:2}
+.hero,.board{position:relative;overflow:visible}
+.hero::after{border-radius:0 28px 0 0}
+.hero::after{right:12px;top:12px;width:96px;height:96px}

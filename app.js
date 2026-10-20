@@ -164,6 +164,16 @@ const supportHTML = (open = false) => `<details class="support" ${open ? 'open' 
   <span class="support-note">Free forever. Tips keep it running.</span></div></details>`;
 
 const brandName = () => { const w = APP.split(' '); return w.length > 1 ? `${esc(w.slice(0, -1).join(' '))} <span class="story">${esc(w[w.length - 1])}</span>` : esc(APP) };
+/* ---------- playroom backdrop: a few faint paper airplanes, stars and crayon loops drifting slowly behind everything ---------- */
+(function playroom() {
+  const plane = '<path d="M2 14 30 2 20 30 15 19z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M15 19 30 2" stroke="currentColor" stroke-width="2"/>';
+  const star = '<path d="m16 3 3.6 8 8.4.8-6.4 5.6 1.9 8.4L16 21.4 8.5 25.8l1.9-8.4L4 11.8l8.4-.8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>';
+  const loop = '<path d="M2 20c6-14 12 6 16-6s8 4 12-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>';
+  const items = [[plane, 8, 14, 46, -8, 'a'], [star, 82, 9, 30, 12, 'b'], [loop, 74, 40, 54, 0, 'c'], [plane, 14, 58, 38, 14, 'b'], [star, 88, 72, 26, -10, 'a'], [loop, 6, 86, 48, 8, 'c'], [star, 46, 30, 18, 0, 'b']];
+  const el = document.createElement('div'); el.className = 'playroom'; el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = items.map(([svg, x, y, size, rot, anim], i) => `<svg class="pr pr-${anim}" style="left:${x}%;top:${y}%;width:${size}px;--r:${rot}deg;animation-delay:-${i * 7}s" viewBox="0 0 32 32">${svg}</svg>`).join('') + '<div class="floor"></div>';
+  document.body.prepend(el);
+})();
 /* ---------- top-level render ---------- */
 const app = $('app');
 function render() {
