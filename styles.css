@@ -1,31 +1,31 @@
 /* Layout: a phone app in a "storybook toybox" look — rounded friendly type, chunky buttons that press down, bright page colors on a warm paper ground. Each area owns a color: money green, jobs blue, reading violet, screen sunshine. */
 :root{
-  --bg:#F6F2EA; --surface:#FFFFFF; --sunk:#EFE9DE; --ink:#24213A; --muted:#6A6478; --line:#E4DCCD;
-  --money:#159A62; --money-deep:#0E7149; --money-soft:#DDF3E7; --hero:#159A62;
-  --jobs:#3767E8; --jobs-soft:#E3EAFE;
-  --read:#7B4BE6; --read-soft:#EDE5FD;
-  --screen:#FFB21E; --board:#24213A; --board-raise:#33304D; --board-line:#45415F; --board-ink:#FBF7EF; --board-muted:#B5AFC6;
-  --danger:#E04A3F; --danger-soft:#FCE6E3;
+  --bg:#FFF6E8; --surface:#FFFFFF; --sunk:#FFEBD2; --ink:#2A1E3B; --muted:#6E5F7E; --line:#F1DFC6; --edge:#2A1E3B;
+  --money:#1FA34A; --money-deep:#147A36; --money-soft:#DCF5D9; --hero:#1FA34A;
+  --jobs:#FF6B1A; --jobs-soft:#FFE3D0;
+  --read:#7A3FF2; --read-soft:#ECE2FF;
+  --screen:#FFC81F; --board:#2A1E3B; --board-raise:#3B2D50; --board-line:#4E3F66; --board-ink:#FFF6E8; --board-muted:#C3B6D3;
+  --danger:#E8423B; --danger-soft:#FFE1DD;
   --press:rgba(36,33,58,.18);
   --shadow:0 2px 0 rgba(36,33,58,.06),0 6px 18px rgba(36,33,58,.06);
-  --display:"Fredoka","Baloo 2","Arial Rounded MT Bold",system-ui,sans-serif;
+  --display:"Baloo 2","Fredoka","Arial Rounded MT Bold",system-ui,sans-serif;
   --body:"Nunito","Segoe UI",system-ui,-apple-system,sans-serif;
-  --mono:"Fredoka","Nunito",ui-rounded,system-ui,sans-serif;
+  --mono:"Baloo 2","Nunito",ui-rounded,system-ui,sans-serif;
   --r:24px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#17152A; --surface:#221F38; --sunk:#2B2845; --ink:#F4EFE6; --muted:#ADA6C2; --line:#36324F;
-  --money:#3FD08F; --money-deep:#0E5A3B; --money-soft:#173A2C; --hero:#128353;
-  --jobs:#7E9CFF; --jobs-soft:#232C55;
-  --read:#B497FF; --read-soft:#2E2552;
-  --screen:#FFC24D; --board:#100E1F; --board-raise:#26233D; --board-line:#3A3656;
+  --bg:#1A1426; --surface:#251D35; --sunk:#30263F; --ink:#FFF3E2; --muted:#BBAFCB; --line:#3A2F4C; --edge:#08050D;
+  --money:#4BD873; --money-deep:#11592A; --money-soft:#173A22; --hero:#178A3D;
+  --jobs:#FF8B45; --jobs-soft:#45281A;
+  --read:#AE8BFF; --read-soft:#30244F;
+  --screen:#FFD24D; --board:#0F0A18; --board-raise:#241B33; --board-line:#3A2F4C;
   --danger:#FF7A6E; --danger-soft:#43211F; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#17152A; --surface:#221F38; --sunk:#2B2845; --ink:#F4EFE6; --muted:#ADA6C2; --line:#36324F;
-  --money:#3FD08F; --money-deep:#0E5A3B; --money-soft:#173A2C; --hero:#128353;
-  --jobs:#7E9CFF; --jobs-soft:#232C55;
-  --read:#B497FF; --read-soft:#2E2552;
-  --screen:#FFC24D; --board:#100E1F; --board-raise:#26233D; --board-line:#3A3656;
+  --bg:#1A1426; --surface:#251D35; --sunk:#30263F; --ink:#FFF3E2; --muted:#BBAFCB; --line:#3A2F4C; --edge:#08050D;
+  --money:#4BD873; --money-deep:#11592A; --money-soft:#173A22; --hero:#178A3D;
+  --jobs:#FF8B45; --jobs-soft:#45281A;
+  --read:#AE8BFF; --read-soft:#30244F;
+  --screen:#FFD24D; --board:#0F0A18; --board-raise:#241B33; --board-line:#3A2F4C;
   --danger:#FF7A6E; --danger-soft:#43211F; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body);
@@ -289,3 +289,34 @@ input,select{border-width:2px;border-radius:14px}
 .opt{border-width:2px;border-radius:16px;font-weight:700}
 .opt[aria-pressed="true"]{box-shadow:0 3px 0 rgba(0,0,0,.25)}
 @media (prefers-reduced-motion:reduce){.pill,.save,.go{transition:none}}
+
+/* ---------- sticker style: ink outlines + hard offset shadows ---------- */
+:root{--pop:3px 3px 0 var(--edge);--pop-lg:5px 5px 0 var(--edge)}
+.card,.list,.kcard,.who button,.tile,.bucket,.hero,.board,.sheet .list{border:2.5px solid var(--edge)!important;box-shadow:var(--pop-lg)!important}
+.sheet .card{border:2.5px solid var(--edge);box-shadow:none}
+.pill,.save,.go,.chip,.lock,.opt,.ghost,.price,.sw{border:2.5px solid var(--edge)!important;box-shadow:var(--pop)!important}
+.pill:active,.save:active,.go:active,.chip:active,.opt:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--edge)!important}
+.pill.soft{background:var(--surface);color:var(--ink)}
+.save{background:var(--jobs)} .go{color:var(--edge)}
+.board .opt{border-color:var(--edge)!important;box-shadow:3px 3px 0 #000!important}
+.row+.row{border-top:2px dashed var(--line)}
+.avatar{border:2.5px solid var(--edge);box-shadow:2px 2px 0 var(--edge)}
+.who .avatar{transform:rotate(-4deg)}
+.who button:nth-child(even) .avatar{transform:rotate(4deg)}
+.who button:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--edge)!important}
+h1,.sheet h2,.sect-h h3,.kcard .kh h3,.big,.tile .v,.bucket b,.digits,.kcard .kh .wk,.progress .top .v{font-weight:800!important;letter-spacing:-.01em}
+h1{font-size:38px}
+.brand h1{font-size:46px;line-height:1}
+.brand .story{color:var(--jobs);display:inline-block;transform:rotate(-3deg)}
+.brand img{border:2.5px solid var(--edge);box-shadow:var(--pop);border-radius:16px}
+.hero .big{text-shadow:3px 3px 0 rgba(0,0,0,.22)}
+.hero::after{border:none;width:120px;height:120px;right:-24px;top:-24px;background:radial-gradient(circle,rgba(255,255,255,.18) 30%,transparent 31%) 0 0/24px 24px}
+.tabbar{border-top:2.5px solid var(--edge)}
+.tabbar button[aria-selected="true"] .ic{background:var(--screen);color:var(--edge);border:2px solid var(--edge)}
+.label{font-weight:900}
+input,select{border:2.5px solid var(--edge);background:var(--surface)}
+.tog{border:2.5px solid var(--edge)}
+.tog::after{top:1px;left:1px;border:2px solid var(--edge);box-shadow:none}
+.tog[aria-pressed="true"]::after{left:19px}
+.badge{border:2px solid var(--edge)}
+.toast{border:2.5px solid var(--edge);box-shadow:var(--pop)}

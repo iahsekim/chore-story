@@ -3,7 +3,7 @@ const CFG = window.CHORE_JAR_CONFIG;
 const APP = CFG.appName || 'Chore Story';
 const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
-const COLORS = { green: '#0E7A4A', blue: '#2453D6', purple: '#7340D0', orange: '#C2570C', pink: '#B8327A', teal: '#0F766E' };
+const COLORS = { green: '#1FA34A', blue: '#2F6BFF', purple: '#7A3FF2', orange: '#FF6B1A', pink: '#F0418C', teal: '#0FA3A3' };
 const S = {
   user: null, family: null, members: [], invites: [], kids: [], jobs: [], weeks: [], credits: [], reading: [], screen: [], adjust: [],
   view: 'loading', profile: null, parentOk: false, tab: 'home', ptab: 'kids', jobKid: null, jobFilter: 'All',

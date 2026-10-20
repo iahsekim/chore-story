@@ -3,8 +3,8 @@
   "short_name": "Chore Story",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F6F2EA",
-  "theme_color": "#159A62",
+  "background_color": "#FFF6E8",
+  "theme_color": "#FF6B1A",
   "icons": [
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" },
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
