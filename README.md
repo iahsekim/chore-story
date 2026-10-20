@@ -4,7 +4,7 @@ A free web app for families: a weekly allowance, a job board with prices, a read
 
 - **Parents** sign in with just an email (a 6-digit code or magic link, no password), add their kids, and set up each kid's job board, allowance and screen-time rules.
 - **Kids** sign in on the same email, pick their profile, and see their week: the allowance, every job and bonus with the reason, what's waiting to be paid, and what's been paid.
-- **Money only goes up.** Every Monday each kid's week starts at their allowance. Parents add jobs and bonuses during the week, then mark the week paid. Unpaid weeks pile up as **Owed**.
+- **A bank for each kid.** Every Monday the kid earns their allowance, plus any jobs and bonuses. It all builds up as a balance, which is what you owe them. Money only comes out when you record a payment (cash or a transfer) or a purchase you made for them with their money. Every entry needs an explanation, and nothing is ever taken away as a punishment.
 
 The site is plain HTML, CSS and JavaScript with no build step. It's hosted on Netlify, and Supabase handles sign-in and the database.
 
@@ -61,9 +61,10 @@ That's it. Visit the site, sign in with your email, and set up your family.
 | Allowance | Each Monday a kid's week starts at their weekly allowance. A change applies from the next Monday. |
 | Jobs | A parent taps **Log a job** and picks from that kid's board. The price is added to this week. |
 | Bonuses | **Add money** with a reason the kid can see. |
-| Removing money | Not possible. A parent can **undo** an entry made by mistake while its week is still unpaid. |
-| Payday | **Payday → Mark paid** moves a week to Paid. Past unpaid weeks show as Owed. After this week is paid, new entries count toward next week. |
-| Totals per kid | This week, this month, lifetime, owed and paid. |
+| Paying out | **Bank → Paid [kid]**: type the amount you handed over and an explanation. It comes off the balance you owe. |
+| Purchases | **Bank → Bought something**: what you bought for them with their money, with an explanation. You can't go below their balance. |
+| Taking money away | Not possible. A parent can **undo** an entry made by mistake (this week's jobs and bonuses, or any payment or purchase). |
+| Totals per kid | Balance (what you owe), this week, this month, lifetime earned, paid out, and spent. Each entry shows the running balance, like a bank statement. |
 | Reading | The kid starts a timer and types the book. Each minute adds a screen minute that week, up to the kid's limit. A forgotten timer stops itself. |
 | Screen time | Base minutes plus reading minutes, used on the kid's screen days. Each session runs without pausing. Parents can log screen time used without the clock, and it comes off the next week. |
 | Parent PIN | Kids share the parent's sign-in, so parent tools sit behind a 4-digit PIN. After signing in fresh with the email code, a parent can reset a forgotten PIN. |

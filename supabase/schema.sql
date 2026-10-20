@@ -58,6 +58,7 @@ create table if not exists public.jobs (
 );
 
 -- One row per kid per week. "allowance" is fixed when the week starts (Monday).
+-- paid_at / paid_total are unused (kept for older installs); payments live in transactions.
 create table if not exists public.weeks (
   family_id   uuid not null references public.families on delete cascade,
   kid_id      uuid not null references public.kids on delete cascade,
@@ -68,7 +69,7 @@ create table if not exists public.weeks (
   primary key (kid_id, week_start)
 );
 
--- Money only ever goes up: completed jobs and bonuses. No negative amounts.
+-- Money in: completed jobs and bonuses. Amounts are always positive.
 create table if not exists public.credits (
   id          uuid primary key default gen_random_uuid(),
   family_id   uuid not null references public.families on delete cascade,
@@ -77,6 +78,21 @@ create table if not exists public.credits (
   kind        text not null check (kind in ('job','bonus')),
   title       text not null check (char_length(title) between 1 and 120),
   amount      numeric(8,2) not null check (amount > 0 and amount <= 1000),
+  created_at  timestamptz not null default now(),
+  created_by  uuid default auth.uid()
+);
+
+-- Money out of a kid's balance: cash or a transfer the parent handed over ('payout'),
+-- or something the parent bought for the kid with their money ('purchase').
+-- Every entry needs an explanation. There is no way to take money away as a punishment.
+create table if not exists public.transactions (
+  id          uuid primary key default gen_random_uuid(),
+  family_id   uuid not null references public.families on delete cascade,
+  kid_id      uuid not null references public.kids on delete cascade,
+  kind        text not null check (kind in ('payout','purchase')),
+  amount      numeric(8,2) not null check (amount > 0 and amount <= 10000),
+  note        text not null check (char_length(trim(note)) between 1 and 120),
+  local_date  date not null,
   created_at  timestamptz not null default now(),
   created_by  uuid default auth.uid()
 );
@@ -116,6 +132,7 @@ create table if not exists public.screen_adjust (
 
 create index if not exists jobs_kid on public.jobs (kid_id);
 create index if not exists credits_kid on public.credits (kid_id, week_start);
+create index if not exists tx_kid on public.transactions (kid_id);
 create index if not exists reading_kid on public.reading_sessions (kid_id, week_start);
 create index if not exists screen_kid on public.screen_sessions (kid_id, week_start);
 create index if not exists members_user on public.family_members (user_id);
@@ -183,6 +200,7 @@ alter table public.kids             enable row level security;
 alter table public.jobs             enable row level security;
 alter table public.weeks            enable row level security;
 alter table public.credits          enable row level security;
+alter table public.transactions     enable row level security;
 alter table public.reading_sessions enable row level security;
 alter table public.screen_sessions  enable row level security;
 alter table public.screen_adjust    enable row level security;
@@ -216,15 +234,16 @@ create policy wk_select on public.weeks for select to authenticated using (famil
 create policy wk_insert on public.weeks for insert to authenticated with check (family_id in (select public.my_family_ids()));
 create policy wk_update on public.weeks for update to authenticated using (family_id in (select public.my_family_ids())) with check (family_id in (select public.my_family_ids()));
 
--- Credits: add only to a week that is not paid yet; an entry made by mistake can be
--- undone only while its week is still unpaid. No updates, so amounts can't be lowered.
-drop policy if exists cr_select on public.credits;
-drop policy if exists cr_insert on public.credits;
-drop policy if exists cr_delete on public.credits;
-create policy cr_select on public.credits for select to authenticated using (family_id in (select public.my_family_ids()));
-create policy cr_insert on public.credits for insert to authenticated with check (
-  family_id in (select public.my_family_ids())
-  and not exists (select 1 from public.weeks w where w.kid_id = credits.kid_id and w.week_start = credits.week_start and w.paid_at is not null));
-create policy cr_delete on public.credits for delete to authenticated using (
-  family_id in (select public.my_family_ids())
-  and not exists (select 1 from public.weeks w where w.kid_id = credits.kid_id and w.week_start = credits.week_start and w.paid_at is not null));
+-- Credits and transactions: read, add, and undo (delete) a mistake. No edits, so amounts can't be changed later.
+do $$
+declare t text;
+begin
+  foreach t in array array['credits','transactions'] loop
+    execute format('drop policy if exists cr_select on public.%I', t);
+    execute format('drop policy if exists cr_insert on public.%I', t);
+    execute format('drop policy if exists cr_delete on public.%I', t);
+    execute format('create policy cr_select on public.%I for select to authenticated using (family_id in (select public.my_family_ids()))', t);
+    execute format('create policy cr_insert on public.%I for insert to authenticated with check (family_id in (select public.my_family_ids()))', t);
+    execute format('create policy cr_delete on public.%I for delete to authenticated using (family_id in (select public.my_family_ids()))', t);
+  end loop;
+end $$;

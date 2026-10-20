@@ -329,3 +329,13 @@ input,select{border:2.5px solid var(--edge);background:var(--surface)}
 .go{background:var(--screen);color:#10224A}
 .tabbar button[aria-selected="true"] .ic{background:var(--screen);color:#10224A}
 .brand{justify-content:center}
+
+/* ---------- bank ledger ---------- */
+.stack{display:grid;justify-items:end;gap:1px;flex:none}
+.bal{font-size:12px;font-weight:700;color:var(--muted)}
+.amt.out{color:var(--ink)}
+.bucket.sp{background:var(--read-soft)} .bucket.sp b{color:var(--read)}
+.bankcard{gap:12px}
+.bankbig{font:800 52px/1 var(--display);letter-spacing:-.01em;color:var(--money)}
+.kstats.flat{border:2px dashed var(--line);border-radius:14px}
+.kstats.flat div+div{border-left:2px dashed var(--line)}
