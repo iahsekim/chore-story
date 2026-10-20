@@ -68,8 +68,8 @@ That's it. Visit the site, sign in with your email, and set up your family.
 | Purchases | **Bank → Bought something**: what you bought for them with their money, with an explanation. You can't go below their balance. |
 | Taking money away | Not possible. A parent can **undo** an entry made by mistake (this week's jobs and bonuses, or any payment or purchase). |
 | Totals per kid | Balance (what you owe), this week, this month, lifetime earned, paid out, and spent. Each entry shows the running balance, like a bank statement. |
-| Reading | The kid starts a timer and types the book. Each minute adds a screen minute that week, up to the kid's limit. A forgotten timer stops itself. |
-| Screen time | Base minutes plus reading minutes, used on the kid's screen days. Each session runs without pausing. Parents can log screen time used without the clock, and it comes off the next week. |
+| Reading | The kid starts a timer and types the book, and can pause and resume it. Time is kept to the second, so 10:40 + 10:20 = 21 minutes, and each full minute adds a screen minute that week, up to the kid's limit. A forgotten timer stops itself. Parents can add reading by hand. |
+| Screen time | Base minutes plus reading minutes, used on the kid's screen days. The clock counts down the week's time to the second and can be paused. It stops itself at zero. Parents can add screen time used by hand (it counts this week), or take minutes off next week. Base minutes, screen days and reading limit are in **Settings → Screen time**. |
 | Parent PIN | Kids share the parent's sign-in, so parent tools sit behind a 4-digit PIN. After signing in fresh with the email code, a parent can reset a forgotten PIN. |
 | Second parent | Settings → **Invite another parent**. They sign in with that email and join automatically. |
 | Delete | Settings → **Delete account and all data** removes the family and the login. |

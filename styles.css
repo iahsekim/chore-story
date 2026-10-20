@@ -362,3 +362,7 @@ input,select{border:2.5px solid var(--edge);background:var(--surface)}
 textarea{font:inherit;color:var(--ink);background:var(--surface);border:2.5px solid var(--edge);border-radius:14px;padding:12px 14px;width:100%;min-height:120px;resize:vertical}
 .foot>span{font-size:13px}
 @media (prefers-reduced-motion:reduce){.sw{transition:none}}
+.eq{flex-wrap:nowrap;gap:4px}
+.eq .term{min-width:0}
+.eq .term b{font-size:clamp(17px,5.4vw,28px);white-space:nowrap}
+.eq .op{font-size:18px}

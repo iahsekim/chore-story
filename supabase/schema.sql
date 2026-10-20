@@ -98,25 +98,34 @@ create table if not exists public.transactions (
 );
 
 create table if not exists public.reading_sessions (
-  id          uuid primary key default gen_random_uuid(),
-  family_id   uuid not null references public.families on delete cascade,
-  kid_id      uuid not null references public.kids on delete cascade,
-  book        text not null check (char_length(book) between 1 and 100),
-  local_date  date not null,
-  week_start  date not null,
-  started_at  timestamptz not null default now(),
-  ended_at    timestamptz,
-  minutes     int not null default 0 check (minutes between 0 and 240)
+  id            uuid primary key default gen_random_uuid(),
+  family_id     uuid not null references public.families on delete cascade,
+  kid_id        uuid not null references public.kids on delete cascade,
+  book          text not null check (char_length(book) between 1 and 100),
+  local_date    date not null,
+  week_start    date not null,
+  started_at    timestamptz not null default now(),
+  ended_at      timestamptz,
+  -- seconds saved so far; while running, add the time since running_since. Null running_since = paused.
+  seconds       int not null default 0 check (seconds between 0 and 36000),
+  running_since timestamptz,
+  source        text not null default 'timer' check (source in ('timer','manual')),
+  minutes       int not null default 0
 );
 
 create table if not exists public.screen_sessions (
-  id          uuid primary key default gen_random_uuid(),
-  family_id   uuid not null references public.families on delete cascade,
-  kid_id      uuid not null references public.kids on delete cascade,
-  local_date  date not null,
-  week_start  date not null,
-  started_at  timestamptz not null default now(),
-  minutes     int not null check (minutes between 1 and 600)
+  id            uuid primary key default gen_random_uuid(),
+  family_id     uuid not null references public.families on delete cascade,
+  kid_id        uuid not null references public.kids on delete cascade,
+  local_date    date not null,
+  week_start    date not null,
+  started_at    timestamptz not null default now(),
+  ended_at      timestamptz,
+  seconds       int not null default 0 check (seconds between 0 and 36000),
+  running_since timestamptz,
+  source        text not null default 'clock' check (source in ('clock','manual')),
+  note          text check (char_length(note) <= 120),
+  minutes       int not null default 0
 );
 
 -- Screen minutes used without the clock, taken off a later weekend.
@@ -129,6 +138,19 @@ create table if not exists public.screen_adjust (
   note        text not null default 'Screens without the clock' check (char_length(note) <= 120),
   created_at  timestamptz not null default now()
 );
+
+-- Upgrades for databases created from an earlier version of this file (safe to re-run).
+alter table public.reading_sessions add column if not exists seconds int not null default 0;
+alter table public.reading_sessions add column if not exists running_since timestamptz;
+alter table public.reading_sessions add column if not exists source text not null default 'timer';
+alter table public.screen_sessions add column if not exists seconds int not null default 0;
+alter table public.screen_sessions add column if not exists running_since timestamptz;
+alter table public.screen_sessions add column if not exists ended_at timestamptz;
+alter table public.screen_sessions add column if not exists source text not null default 'clock';
+alter table public.screen_sessions add column if not exists note text;
+alter table public.screen_sessions alter column minutes set default 0;
+alter table public.screen_sessions drop constraint if exists screen_sessions_minutes_check;
+alter table public.reading_sessions drop constraint if exists reading_sessions_minutes_check;
 
 create index if not exists jobs_kid on public.jobs (kid_id);
 create index if not exists credits_kid on public.credits (kid_id, week_start);

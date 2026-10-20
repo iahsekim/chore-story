@@ -117,17 +117,23 @@ function statement(kid) {
 /* New money goes to this week, or next week if this week is already paid. */
 function creditWeek() { return thisWeek() }
 /* ---------- reading + screen math ---------- */
-const readMin = (r, kid) => r.ended_at ? Number(r.minutes) || 0 : Math.min(Math.floor((Date.now() - ms(r.started_at)) / 60000), Number(kid.max_read_session) || 60);
-const activeRead = kid => S.reading.find(r => r.kid_id === kid.id && !r.ended_at && Date.now() - ms(r.started_at) < (Number(kid.max_read_session) || 60) * 60000);
-function readWeek(kid, ws = thisWeek()) { const m = S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws).reduce((a, r) => a + readMin(r, kid), 0); return { minutes: m, bonus: Math.min(m, Number(kid.reading_cap) || 0) } }
+/* Everything is counted in seconds, so 10:40 + 10:20 = 21:00. A timer can be paused;
+   its saved seconds plus the running stretch since running_since is the live total. */
+const liveSec = r => (Number(r.seconds) || 0) + (r.running_since && !r.ended_at ? Math.max(0, Math.floor((Date.now() - ms(r.running_since)) / 1000)) : 0);
+const capSec = kid => (Number(kid.max_read_session) || 60) * 60;
+const readSec = (r, kid) => r.source === 'manual' ? Number(r.seconds) || 0 : Math.min(liveSec(r), capSec(kid));
+const activeRead = kid => S.reading.find(r => r.kid_id === kid.id && !r.ended_at && r.source !== 'manual' && r.week_start === thisWeek());
+function readWeek(kid, ws = thisWeek()) { const sec = S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws).reduce((a, r) => a + readSec(r, kid), 0); const minutes = Math.floor(sec / 60); return { sec, minutes, bonus: Math.min(minutes, Number(kid.reading_cap) || 0) } }
 function screenWeek(kid, ws = thisWeek()) {
   const base = Number(kid.base_screen_minutes) || 0, bonus = readWeek(kid, ws).bonus;
   const adj = S.adjust.filter(a => a.kid_id === kid.id && a.week_start === ws).reduce((a, x) => a + Number(x.minutes), 0);
   const sess = S.screen.filter(x => x.kid_id === kid.id && x.week_start === ws).sort((a, b) => ms(a.started_at) - ms(b.started_at));
-  const used = sess.reduce((a, x) => a + Number(x.minutes), 0), total = Math.max(0, base + bonus - adj);
-  const active = sess.find(x => ms(x.started_at) + x.minutes * 60000 > Date.now());
-  return { base, bonus, adj, used, total, left: Math.max(0, total - used), sess, active };
+  const usedSec = sess.reduce((a, x) => a + liveSec(x), 0), totalSec = Math.max(0, (base + bonus - adj) * 60), leftSec = Math.max(0, totalSec - usedSec);
+  const active = sess.find(x => !x.ended_at && x.source !== 'manual');
+  return { base, bonus, adj, sess, active, usedSec, totalSec, leftSec, left: Math.floor(leftSec / 60) };
 }
+const hms = sec => { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60; return h ? `${h}:${pad(m)}:${pad(x)}` : `${pad(m)}:${pad(x)}` };
+const dur = sec => { sec = Math.max(0, Math.floor(sec)); const m = Math.floor(sec / 60), x = sec % 60; return m && x ? `${m} min ${x} sec` : m ? `${m} min` : `${x} sec` };
 const isScreenDay = kid => (kid.screen_days || [6, 0]).includes(dow(today()));
 const screenDayNames = kid => { const d = (kid.screen_days || [6, 0]).slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)); return d.map(x => DAYS[x]).join(' & ') || 'no days' };
 
@@ -313,58 +319,60 @@ function kidJobs(kid) {
 }
 function kidRead(kid) {
   const rw = readWeek(kid), a = activeRead(kid), cap = Number(kid.reading_cap) || 1;
-  const mine = S.reading.filter(r => r.kid_id === kid.id && r !== a).slice(0, 30);
+  const mine = S.reading.filter(r => r.kid_id === kid.id && r !== a).sort((x, y) => ms(y.started_at) - ms(x.started_at)).slice(0, 30);
   return `<section class="board rdb" id="readBoard">${readBoardHTML(kid)}</section>
     <section class="card progress"><div class="top"><span class="label">Bonus screen minutes</span><span class="v num" style="color:var(--read)">+${rw.bonus}<small> of ${cap}</small></span></div>
     <div class="meter"><i style="width:${Math.min(100, 100 * rw.bonus / cap)}%;background:var(--read)"></i></div>
-    <p class="hint">${rw.minutes} minutes read this week. 1 minute reading = 1 screen minute this week. Chapter books and graphic novels count. Starts over every Monday.</p></section>
-    <section class="sect"><div class="sect-h"><h3>Reading log</h3></div><div class="list">${mine.length ? mine.map(r => readRow(r, kid, false)).join('') : '<div class="empty">Nothing logged yet. Tap Start reading and the minutes count themselves.</div>'}</div></section>`;
+    <p class="hint"><b>${dur(rw.sec)}</b> read this week. Every second counts, and each full minute adds a screen minute. Chapter books and graphic novels count. Starts over every Monday.</p>
+    <div class="ptools"><button class="pill soft" type="button" data-manual="read">+ Add reading by hand</button></div></section>
+    <section class="sect"><div class="sect-h"><h3>Reading log</h3></div><div class="list">${mine.length ? mine.map(r => readRow(r, kid, false)).join('') : '<div class="empty">Nothing logged yet. Tap Start reading and the time counts itself.</div>'}</div></section>`;
 }
 function readRow(r, kid, parent) {
-  const tg = parent ? 'button' : 'div';
-  return `<${tg} ${parent ? `type="button" data-delread="${r.id}"` : ''} class="row"><span class="ico r">${I.read}</span><span class="t"><b>${esc(r.book)}</b><span>${short(r.local_date)} · ${clockTime(ms(r.started_at))}${r.ended_at ? '' : ' · stopped itself'}${parent ? ' · tap to remove' : ''}</span></span><span class="amt rd">+${readMin(r, kid)} min</span></${tg}>`;
+  const tg = parent ? 'button' : 'div', st = r.source === 'manual' ? 'Added by a parent' : !r.ended_at ? (r.running_since ? 'Reading now' : 'Paused') : clockTime(ms(r.started_at));
+  return `<${tg} ${parent ? `type="button" data-delread="${r.id}"` : ''} class="row"><span class="ico r">${I.read}</span><span class="t"><b>${esc(r.book)}</b><span>${short(r.local_date)} · ${st}${parent ? ' · tap to remove' : ''}</span></span><span class="amt rd">+${dur(readSec(r, kid))}</span></${tg}>`;
 }
 function readBoardHTML(kid) {
   const a = activeRead(kid);
-  if (a) return `<div class="bline"><span class="label">Reading now</span><b>${esc(a.book)}</b></div>
-    <div class="digits num" id="readDigits">${fmt(Date.now() - ms(a.started_at))}</div>
-    <p class="note">Stops itself after ${kid.max_read_session} minutes.</p><button class="go white" id="stopRead" type="button">I'm done reading</button>`;
+  if (a) { const run = !!a.running_since, sec = readSec(a, kid);
+    return `<div class="bline"><span class="label">${run ? 'Reading now' : 'Paused'}</span><b>${esc(a.book)}</b></div>
+    <div class="digits num ${run ? '' : 'idle'}" id="readDigits">${hms(sec)}</div>
+    <p class="note">${run ? `Stops itself at ${kid.max_read_session}:00. Pause any time.` : 'Your time is saved. Tap Resume when you pick the book back up.'}</p>
+    <div class="row2">${run ? '<button class="ghost" id="pauseRead" type="button">Pause</button>' : '<button class="ghost" id="resumeRead" type="button">Resume</button>'}<button class="go white" id="stopRead" type="button">I'm done</button></div>`; }
   return `<div class="bline"><span class="label">Reading timer</span><span>1 min = <b>1 screen min</b></span></div>
     <div class="digits idle num">00:00</div><button class="go white" id="startRead" type="button">Start reading</button>`;
 }
 let pick = null, confirming = false;
+function screenRow(x) {
+  const man = x.source === 'manual', st = man ? 'Added by a parent' : !x.ended_at ? (x.running_since ? 'Running now' : 'Paused') : clockTime(ms(x.started_at));
+  return `<div class="row"><span class="ico s">${I.screen}</span><span class="t"><b>${man ? esc(x.note || 'Screen time') : 'Screen session'}</b><span>${short(x.local_date)} · ${st}</span></span><span class="amt">${dur(liveSec(x))}</span></div>`;
+}
 function kidScreen(kid) {
   const x = screenWeek(kid);
-  const rows = [...x.sess].reverse().map(s => `<div class="row"><span class="ico s">${I.screen}</span><span class="t"><b>${s.minutes}-minute session</b><span>${short(s.local_date)} · ${clockTime(ms(s.started_at))}–${clockTime(ms(s.started_at) + s.minutes * 60000)}</span></span><span class="amt">${s.minutes} min</span></div>`)
-    .concat(S.adjust.filter(a => a.kid_id === kid.id && a.week_start === thisWeek()).map(a => `<div class="row"><span class="ico d">${I.clock}</span><span class="t"><b>${esc(a.note)}</b><span>Logged ${short(localDate(ms(a.created_at)))}</span></span><span class="amt down">−${a.minutes} min</span></div>`));
-  return `<section class="board" id="board">${boardHTML(kid)}</section>${eqHTML(kid, x)}
+  const rows = [...x.sess].reverse().map(screenRow)
+    .concat(S.adjust.filter(a => a.kid_id === kid.id && a.week_start === thisWeek()).map(a => `<div class="row"><span class="ico d">${I.clock}</span><span class="t"><b>${esc(a.note)}</b><span>Logged ${short(localDate(ms(a.created_at)))}</span></span><span class="amt down">\u2212${a.minutes} min</span></div>`));
+  return `<section class="board" id="board">${boardHTML(kid)}</section>${eqHTML(kid, x, '<div class="ptools"><button class="pill soft" type="button" data-manual="screen">+ Add screen time by hand</button></div>')}
     <section class="sect"><div class="sect-h"><h3>Sessions</h3></div><div class="list">${rows.length ? rows.join('') : '<div class="empty">No sessions yet this week.</div>'}</div></section>`;
 }
 function eqHTML(kid, x, extra = '') {
   return `<section class="card"><span class="label">This week · ${screenDayNames(kid)}</span>
     <div class="eq"><span class="term"><b class="num">${x.base}</b><span>Base</span></span><span class="op">+</span><span class="term"><b class="num" style="color:var(--read)">${x.bonus}</b><span>Reading</span></span>
-    ${x.adj ? `<span class="op">−</span><span class="term"><b class="num" style="color:var(--danger)">${x.adj}</b><span>No clock</span></span>` : ''}
-    ${x.used ? `<span class="op">−</span><span class="term"><b class="num">${x.used}</b><span>Used</span></span>` : ''}
-    <span class="op">=</span><span class="term res"><b class="num">${x.left}</b><span>Left</span></span></div>${extra}</section>`;
+    ${x.adj ? `<span class="op">\u2212</span><span class="term"><b class="num" style="color:var(--danger)">${x.adj}</b><span>No clock</span></span>` : ''}
+    ${x.usedSec ? `<span class="op">\u2212</span><span class="term"><b class="num" id="eqUsed">${hms(x.usedSec)}</b><span>Used</span></span>` : ''}
+    <span class="op">=</span><span class="term res"><b class="num" id="eqLeft">${hms(x.leftSec)}</b><span>Left</span></span></div>${extra}</section>`;
 }
 function boardHTML(kid) {
-  const x = screenWeek(kid), now = Date.now();
-  if (x.active) {
-    const end = ms(x.active.started_at) + x.active.minutes * 60000, rem = end - now, pct = 100 * (1 - rem / (x.active.minutes * 60000));
-    return `<div class="bline"><span class="label">Clock running</span><span>Ends <b>${clockTime(end)}</b></span></div>
-      <div class="digits num" id="digits">${fmt(rem)}</div><div class="bar"><i id="barfill" style="width:${pct}%"></i></div><p class="note">The clock doesn't pause. At zero, screens go off.</p>`;
-  }
+  const x = screenWeek(kid), a = x.active;
+  if (a) { const run = !!a.running_since;
+    return `<div class="bline"><span class="label">${run ? 'Clock running' : 'Paused'}</span><span>This session <b id="sessUsed">${hms(liveSec(a))}</b></span></div>
+      <div class="digits num ${run ? '' : 'idle'}" id="digits">${hms(x.leftSec)}</div><div class="bar"><i id="barfill" style="width:${x.totalSec ? 100 * x.usedSec / x.totalSec : 100}%"></i></div>
+      <p class="note">${run ? 'Time left this week. Pause whenever you stop. At zero, screens go off.' : 'Clock is paused, so screens are off. Tap Resume to keep going.'}</p>
+      <div class="row2">${run ? '<button class="ghost" id="pauseScr" type="button">Pause</button>' : '<button class="go" id="resumeScr" type="button">Resume</button>'}<button class="ghost" id="doneScr" type="button">I'm done</button></div>`; }
   if (!isScreenDay(kid)) return `<div class="bline"><span class="label">Screen clock</span><span>Opens <b>${screenDayNames(kid)}</b></span></div>
-    <div class="digits idle num">${x.left}<span style="font-size:.4em"> min</span></div><p class="note">That's your total so far. Reading this week adds more.</p>`;
-  if (!x.left) return `<div class="bline"><span class="label">Screen clock</span></div><div class="digits idle num">00:00</div><p class="note">All of this week's minutes are used. New minutes start Monday.</p>`;
-  const opts = [15, 30, 60].filter(m => m < x.left); opts.push(x.left);
-  if (pick == null || !opts.includes(pick)) pick = opts[Math.min(1, opts.length - 1)];
-  return `<div class="bline"><span class="label">Ready</span><span><b>${x.left} min</b> left this week</span></div><div class="digits num">${fmt(pick * 60000)}</div>
-    ${confirming ? `<p class="note">It won't pause once it starts. It ends at <b style="color:var(--board-ink)">${clockTime(now + pick * 60000)}</b>.</p><div class="row2"><button class="ghost" id="startNo" type="button">Not yet</button><button class="go" id="startYes" type="button">Start now</button></div>`
-      : `<div class="opts" style="grid-template-columns:repeat(${opts.length},1fr)">${opts.map(m => `<button class="opt" type="button" data-pick="${m}" aria-pressed="${m === pick}">${m === x.left && opts.length > 1 ? `All<small>${m} min</small>` : `${m}<small>min</small>`}</button>`).join('')}</div>
-      <button class="go" id="startBtn" type="button">Start ${pick}-minute clock</button>`}`;
+    <div class="digits idle num">${hms(x.leftSec)}</div><p class="note">That's your time so far. Reading this week adds more.</p>`;
+  if (!x.leftSec) return `<div class="bline"><span class="label">Screen clock</span></div><div class="digits idle num">00:00</div><p class="note">All of this week's time is used. New time starts Monday.</p>`;
+  return `<div class="bline"><span class="label">Ready</span><span><b>${dur(x.leftSec)}</b> left this week</span></div><div class="digits num">${hms(x.leftSec)}</div>
+    <p class="note">Start the clock when screens go on. Pause it when you stop.</p><button class="go" id="startBtn" type="button">Start clock</button>`;
 }
-
 /* ---------- parent app ---------- */
 const PTABS = [['kids', 'Kids', 'kids'], ['jobs', 'Job boards', 'jobs'], ['pay', 'Bank', 'pay'], ['settings', 'Settings', 'gear']];
 function parentAppHTML() {
@@ -381,7 +389,7 @@ function pKids() {
     const st = stats(k), sw = screenWeek(k), rw = readWeek(k);
     return `<article class="kcard"><div class="kh">${avatar(k)}<h3>${esc(k.name)}</h3><span class="wk num" style="color:color-mix(in srgb, ${COLORS[k.color]} 78%, var(--ink))">${money(st.balance)}<small>You owe</small></span></div>
       <div class="kstats"><div><b class="num">${money(st.week)}</b><span>This week</span></div><div><b class="num">${money(st.month)}</b><span>Month</span></div><div><b class="num">${money(st.lifetime)}</b><span>Lifetime</span></div></div>
-      <div class="kstats"><div><b class="num">${sw.left}</b><span>Screen min left</span></div><div><b class="num" style="color:var(--read)">+${rw.bonus}</b><span>Reading bonus</span></div><div><b class="num">${rw.minutes}</b><span>Min read</span></div></div>
+      <div class="kstats"><div><b class="num">${hms(sw.leftSec)}</b><span>Screen left</span></div><div><b class="num" style="color:var(--read)">+${rw.bonus}</b><span>Reading bonus</span></div><div><b class="num">${hms(rw.sec)}</b><span>Read</span></div></div>
       <div class="kact"><button class="pill" type="button" data-logjob="${k.id}">Log a job</button><button class="pill ok" type="button" data-bonus="${k.id}">Add money</button><button class="pill soft" type="button" data-more="${k.id}">More</button></div></article>`;
   }).join('') + `<button class="pill soft" id="addKidBtn" type="button" style="justify-self:start">+ Add a kid</button>`;
 }
@@ -413,6 +421,12 @@ function pSettings() {
   const F = S.family;
   return `<section class="sect"><div class="sect-h"><h3>Kids</h3></div><div class="list">${S.kids.map(k => `<button class="row" type="button" data-editkid="${k.id}">${avatar(k)}<span class="t"><b>${esc(k.name)}</b><span>${money(Number(k.weekly_allowance))} a week · ${k.base_screen_minutes} screen min · reading up to +${k.reading_cap}</span></span></button>`).join('')}</div>
     <button class="pill soft" id="addKidBtn" type="button" style="justify-self:start">+ Add a kid</button></section>
+    ${S.kids.length ? `<section class="sect"><div class="sect-h"><h3>Screen time</h3></div>${S.kids.map(k => `<div class="card scrset">
+      <div class="kidform-h">${avatar(k)}<b>${esc(k.name)}</b></div>
+      <div class="row2"><div class="field"><label class="label" for="sb-${k.id}">Base minutes / week</label><input id="sb-${k.id}" type="number" inputmode="numeric" min="0" step="5" value="${k.base_screen_minutes}"></div>
+      <div class="field"><label class="label" for="sr-${k.id}">Reading bonus limit</label><input id="sr-${k.id}" type="number" inputmode="numeric" min="0" step="5" value="${k.reading_cap}"></div></div>
+      <div class="field"><span class="label">Screen days</span><div class="chips daychips">${[1, 2, 3, 4, 5, 6, 0].map(d => `<button class="chip" type="button" data-sday="${k.id}|${d}" aria-pressed="${(k.screen_days || []).includes(d)}">${DOW[d]}</button>`).join('')}</div></div>
+      <button class="pill" type="button" data-savescr="${k.id}" style="justify-self:start">Save ${esc(k.name)}'s screen time</button></div>`).join('')}</section>` : ''}
     <section class="card"><span class="label">Family</span>
       <div class="field"><label class="label" for="sFam">Family name</label><input id="sFam" maxlength="60" autocapitalize="words" value="${esc(F.name)}"></div>
       <div class="field"><label class="label" for="sTz">Time zone (weeks reset Monday here)</label><select id="sTz">${tzOptions(F.timezone)}</select></div>
@@ -466,6 +480,7 @@ function bindAll() {
   // tabs
   each('[data-tab]', el => { if (S.view === 'parent') S.ptab = el.dataset.tab; else S.tab = el.dataset.tab; confirming = false; render(); window.scrollTo(0, 0) });
   each('[data-cat]', el => { S.jobFilter = el.dataset.cat; render() });
+  each('[data-manual]', el => manualGate(kidById(el.dataset.kid || S.profile), el.dataset.manual));
   on('rulesBtn', () => rulesSheet(kidById(S.profile)));
   // kid boards
   bindBoards();
@@ -491,27 +506,32 @@ function bindAll() {
   on('signOutWho', async () => { await sb.auth.signOut(); store.set('profile', null); store.set('signed-in', null); location.reload() });
   on('signOut', async () => { await sb.auth.signOut(); store.set('profile', null); location.reload() });
   on('delAcct', deleteSheet);
+  each('[data-sday]', el => el.setAttribute('aria-pressed', el.getAttribute('aria-pressed') !== 'true'));
+  each('[data-savescr]', el => { const id = el.dataset.savescr, days = [...app.querySelectorAll(`[data-sday^="${id}|"]`)].filter(b => b.getAttribute('aria-pressed') === 'true').map(b => Number(b.dataset.sday.split('|')[1]));
+    if (!days.length) return toast('Pick at least one screen day.');
+    act(() => q(sb.from('kids').update({ base_screen_minutes: Math.max(0, parseInt($('sb-' + id).value) || 0), reading_cap: Math.max(0, parseInt($('sr-' + id).value) || 0), screen_days: days }).eq('id', id)), 'Screen time saved') });
   each('[data-fb]', el => feedbackSheet(el.dataset.fb));
 }
 function bindBoards() {
   const kid = kidById(S.profile); if (!kid) return;
-  document.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { pick = Number(b.dataset.pick); rerenderBoards() });
   const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn };
-  on('startBtn', () => { confirming = true; rerenderBoards() });
-  on('startNo', () => { confirming = false; rerenderBoards() });
-  on('startYes', () => startScreen(kid));
-  on('startRead', () => readStartSheet(kid));
-  on('stopRead', () => stopRead(kid));
+  on('startBtn', () => startScreen(kid)); on('pauseScr', () => pauseTimer('screen_sessions', screenWeek(kid).active));
+  on('resumeScr', () => { unlockAudio(); resumeTimer('screen_sessions', screenWeek(kid).active) }); on('doneScr', () => doneTimer('screen_sessions', screenWeek(kid).active, 'Clock stopped'));
+  on('startRead', () => readStartSheet(kid)); on('pauseRead', () => pauseTimer('reading_sessions', activeRead(kid), kid));
+  on('resumeRead', () => resumeTimer('reading_sessions', activeRead(kid))); on('stopRead', () => stopRead(kid));
 }
 function rerenderBoards() { const kid = kidById(S.profile); if (!kid) return; const b = $('board'); if (b) b.innerHTML = boardHTML(kid); const r = $('readBoard'); if (r) r.innerHTML = readBoardHTML(kid); bindBoards() }
 async function startScreen(kid) {
-  confirming = false; const x = screenWeek(kid), m = Math.min(pick || x.left, x.left); if (!m) return rerenderBoards();
-  unlockAudio(); const d = today();
-  await act(() => q(sb.from('screen_sessions').insert({ family_id: S.family.id, kid_id: kid.id, local_date: d, week_start: monday(d), started_at: new Date().toISOString(), minutes: m })));
+  if (screenWeek(kid).active) return; unlockAudio(); const d = today(), now = new Date().toISOString();
+  await act(() => q(sb.from('screen_sessions').insert({ family_id: S.family.id, kid_id: kid.id, local_date: d, week_start: monday(d), started_at: now, running_since: now, seconds: 0, source: 'clock' })));
 }
+const timerSec = (row, kid) => kid ? Math.min(liveSec(row), capSec(kid)) : liveSec(row);
+async function pauseTimer(table, row, kid) { if (!row || !row.running_since) return; await act(() => q(sb.from(table).update({ seconds: timerSec(row, kid), running_since: null }).eq('id', row.id)), 'Paused. Your time is saved.') }
+async function resumeTimer(table, row) { if (!row || row.running_since) return; await act(() => q(sb.from(table).update({ running_since: new Date().toISOString() }).eq('id', row.id))) }
+async function doneTimer(table, row, msg, kid, secOverride) { if (!row) return; const sec = secOverride ?? timerSec(row, kid); await act(() => q(sb.from(table).update({ seconds: sec, running_since: null, ended_at: new Date().toISOString() }).eq('id', row.id)), msg) }
 async function stopRead(kid) {
-  const a = activeRead(kid); if (!a) return; const m = Math.min(Math.floor((Date.now() - ms(a.started_at)) / 60000), Number(kid.max_read_session) || 60);
-  await act(() => q(sb.from('reading_sessions').update({ ended_at: new Date().toISOString(), minutes: m }).eq('id', a.id)), m ? `+${m} screen minute${m > 1 ? 's' : ''}` : 'Under a minute, so nothing added');
+  const a = activeRead(kid); if (!a) return; const sec = timerSec(a, kid);
+  await doneTimer('reading_sessions', a, sec >= 60 ? `+${dur(sec)} of reading` : `+${sec} sec. It all adds up.`, kid);
 }
 function txSheet(kid, kind) {
   const st = stats(kid), pay = kind === 'payout';
@@ -544,15 +564,20 @@ function bindUndo(root) {
     confirmSheet('Undo this entry?', `${isTx ? row.note : row.title} · ${money(Number(row.amount))}. Use this only to fix a mistake.`, 'Undo entry', () => q(sb.from(isTx ? 'transactions' : 'credits').delete().eq('id', id)), 'Entry removed');
   });
 }
-/* ticking: display only, no writes */
-let wasActive = null, wakeLock = null, audio = null;
+/* ticking: updates the display; it only writes to stop a timer that has run out */
+let wasActive = null, wakeLock = null, audio = null, autoStopping = false;
 setInterval(() => {
   if (S.view !== 'kid') return; const kid = kidById(S.profile); if (!kid) return;
-  const x = screenWeek(kid), id = x.active ? x.active.id : null;
-  if (id !== wasActive) { if (wasActive && !id) { beep(); releaseWake() } if (id) holdWake(); wasActive = id; render(); return }
-  if (x.active) { const end = ms(x.active.started_at) + x.active.minutes * 60000, rem = end - Date.now(); const d = $('digits'); if (d) d.textContent = fmt(rem); const f = $('barfill'); if (f) f.style.width = (100 * (1 - rem / (x.active.minutes * 60000))) + '%' }
-  const a = activeRead(kid), rd = $('readDigits'); if (rd && a) rd.textContent = fmt(Date.now() - ms(a.started_at));
-  if (S.tab === 'read' && !!rd !== !!a) render();
+  const x = screenWeek(kid), a = x.active, id = a && a.running_since ? a.id : null;
+  if (id !== wasActive) { if (id) holdWake(); else releaseWake(); wasActive = id }
+  if (a && a.running_since && x.leftSec <= 0 && !autoStopping) {
+    autoStopping = true; beep();
+    doneTimer('screen_sessions', a, 'Time\u2019s up for this week', null, Math.max(0, liveSec(a) - (x.usedSec - x.totalSec))).finally(() => { autoStopping = false });
+    return;
+  }
+  if (a && a.running_since) { const d = $('digits'); if (d) d.textContent = hms(x.leftSec); const su = $('sessUsed'); if (su) su.textContent = hms(liveSec(a)); const f = $('barfill'); if (f) f.style.width = (x.totalSec ? 100 * x.usedSec / x.totalSec : 100) + '%'; const el = $('eqLeft'); if (el) el.textContent = hms(x.leftSec); const eu = $('eqUsed'); if (eu) eu.textContent = hms(x.usedSec) }
+  const r = activeRead(kid);
+  if (r && r.running_since) { if (liveSec(r) >= capSec(kid) && !autoStopping) { autoStopping = true; doneTimer('reading_sessions', r, `Reading timer stopped at ${kid.max_read_session}:00`, kid).finally(() => { autoStopping = false }); return } const rd = $('readDigits'); if (rd) rd.textContent = hms(readSec(r, kid)) }
 }, 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.family && (S.view === 'kid' || S.view === 'parent')) refresh() });
 setInterval(() => { if (!document.hidden && S.family && (S.view === 'kid' || S.view === 'parent') && !$('scrim')) refresh() }, 60000);
@@ -595,7 +620,8 @@ function rulesSheet(kid) {
     <li><span><b>Money is never taken away as a punishment.</b></span></li>
     <li><span><b>${kid.base_screen_minutes} screen minutes each week</b> on ${screenDayNames(kid)}.</span></li>
     <li><span><b>1 minute reading = 1 screen minute,</b> up to ${kid.reading_cap} a week. Chapter books and graphic novels count.</span></li>
-    <li><span><b>Screens only while the clock runs.</b> Minutes without the clock come off next week.</span></li>
+    <li><span><b>Screens only while the clock runs.</b> Pause it whenever you stop. Minutes without the clock come off next week.</span></li>
+    <li><span><b>Every second counts.</b> Reading and screen time add up to the second.</span></li>
     <li><span><b>If it's not written here, it's not a rule.</b></span></li></ol><button class="save" data-close type="button">Got it</button>`);
 }
 function readStartSheet(kid) {
@@ -605,9 +631,32 @@ function readStartSheet(kid) {
     <p class="hint">Chapter books and graphic novels count. Audiobooks don't.</p><button class="save" id="rdGo" type="button" style="background:var(--read)">Start the timer</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
     layer.querySelectorAll('[data-book]').forEach(b => b.onclick = () => { $('bookIn').value = b.dataset.book });
     $('rdGo').onclick = async () => { const book = $('bookIn').value.trim(); if (!book) return toast('Type the book’s title.'); if (activeRead(kid)) return closeSheet(); closeSheet(); const d = today();
-      await act(() => q(sb.from('reading_sessions').insert({ family_id: S.family.id, kid_id: kid.id, book, local_date: d, week_start: monday(d), started_at: new Date().toISOString() }))) };
+      const now = new Date().toISOString(); await act(() => q(sb.from('reading_sessions').insert({ family_id: S.family.id, kid_id: kid.id, book, local_date: d, week_start: monday(d), started_at: now, running_since: now, seconds: 0, source: 'timer' }))) };
   });
 }
+function manualSheet(kid, kind) {
+  const read = kind === 'read', books = [...new Set(S.reading.filter(r => r.kid_id === kid.id).map(r => r.book))].slice(0, 6);
+  openSheet(`<span class="label">Parent · ${esc(kid.name)}</span><h2>${read ? 'Add reading time' : 'Add screen time used'}</h2>
+    <p class="hint">${read ? 'For reading that happened without the timer.' : 'For screen time that happened without the clock, like a family movie. It counts toward this week\u2019s time.'}</p>
+    ${read ? `<div class="field"><label class="label" for="mBook">Book</label><input id="mBook" maxlength="100" placeholder="Book title" value="${esc(books[0] || '')}">${books.length ? `<div class="chips">${books.map(b => `<button class="chip" type="button" data-book="${esc(b)}">${esc(b)}</button>`).join('')}</div>` : ''}</div>`
+      : `<div class="field"><label class="label" for="mNote">What was it?</label><input id="mNote" maxlength="120" placeholder="Family movie night"></div>`}
+    <div class="row2"><div class="field"><label class="label" for="mMin">Minutes</label><input id="mMin" type="number" inputmode="numeric" min="0" max="600" placeholder="0"></div>
+    <div class="field"><label class="label" for="mSec">Seconds</label><input id="mSec" type="number" inputmode="numeric" min="0" max="59" placeholder="0"></div></div>
+    <div class="field"><label class="label" for="mDate">Day</label><input id="mDate" type="date" value="${today()}" min="${thisWeek()}" max="${today()}"></div>
+    <button class="save" id="mGo" type="button" ${read ? 'style="background:var(--read)"' : ''}>Add ${read ? 'reading' : 'screen time'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+    layer.querySelectorAll('[data-book]').forEach(b => b.onclick = () => { $('mBook').value = b.dataset.book });
+    $('mGo').onclick = async () => {
+      const sec = Math.max(0, parseInt($('mMin').value) || 0) * 60 + Math.min(59, Math.max(0, parseInt($('mSec').value) || 0)), d = $('mDate').value || today();
+      if (!sec) return toast('Enter the minutes and seconds.'); if (sec > 600 * 60) return toast('That\u2019s more than 10 hours. Check the minutes.');
+      const label = read ? $('mBook').value.trim() : $('mNote').value.trim(); if (!label) return toast(read ? 'Type the book\u2019s title.' : 'Say what it was.');
+      closeSheet(); const now = new Date().toISOString();
+      const row = { family_id: S.family.id, kid_id: kid.id, local_date: d, week_start: monday(d), started_at: now, ended_at: now, seconds: sec, source: 'manual' };
+      await act(() => q(sb.from(read ? 'reading_sessions' : 'screen_sessions').insert(read ? { ...row, book: label } : { ...row, note: label })), `Added ${dur(sec)}`);
+    };
+  });
+}
+/* In a kid's view, manual entry needs the parent PIN each time, and doesn't leave parent mode unlocked. */
+function manualGate(kid, kind) { if (S.view === 'parent') return manualSheet(kid, kind); pinSheet(() => { S.parentOk = false; try { sessionStorage.removeItem('cj-parent') } catch (e) { } manualSheet(kid, kind) }) }
 function logJobSheet(kid) {
   const on = S.jobs.filter(j => j.kid_id === kid.id && j.enabled).sort((a, b) => a.title.localeCompare(b.title)), ws = creditWeek();
   openSheet(`<span class="label">Log a job for ${esc(kid.name)}</span><h2>What did ${esc(kid.name)} do?</h2>
@@ -638,15 +687,15 @@ function kidMoreSheet(kid) {
     <div class="sect"><div class="sect-h"><h3>This week's money</h3></div><div class="list" style="box-shadow:none;border:1px solid var(--line)">
       <div class="row"><span class="ico m">${I.coin}</span><span class="t"><b>Weekly allowance</b><span>Monday</span></span><span class="amt up">+${money(Number(weekRow(kid, cur)?.allowance ?? kid.weekly_allowance))}</span></div>
       ${cr.map(c => `<button class="row" type="button" data-undo="${c.id}" ${paid ? 'disabled' : ''}><span class="ico ${c.kind === 'job' ? 'j' : 'm'}">${c.kind === 'job' ? I.check : I.star}</span><span class="t"><b>${esc(c.title)}</b><span>${paid ? 'Paid' : 'Tap to undo a mistake'}</span></span><span class="amt up">+${money(Number(c.amount))}</span></button>`).join('')}</div></div>
-    ${eqHTML(kid, x, `<div class="ptools"><button class="pill soft" id="logOver" type="button">Log screens without the clock</button>${x.sess.length ? '<button class="pill soft" id="undoSess" type="button">Undo last session</button>' : ''}</div>`)}
-    <div class="sect"><div class="sect-h"><h3>Reading this week</h3></div><div class="list" style="box-shadow:none;border:1px solid var(--line)">${reads.length ? reads.map(r => readRow(r, kid, true)).join('') : '<div class="empty">No reading yet this week.</div>'}</div></div>
+    ${eqHTML(kid, x, `<div class="ptools"><button class="pill soft" id="addScr" type="button">+ Add screen time used</button><button class="pill soft" id="logOver" type="button">Take minutes off next week</button>${x.sess.length ? '<button class="pill soft" id="undoSess" type="button">Undo last session</button>' : ''}</div>`)}
+    <div class="sect"><div class="sect-h"><h3>Reading this week</h3><button class="link" id="addRead" type="button">+ Add reading</button></div><div class="list" style="box-shadow:none;border:1px solid var(--line)">${reads.length ? reads.map(r => readRow(r, kid, true)).join('') : '<div class="empty">No reading yet this week.</div>'}</div></div>
     <button class="pill soft" id="editThisKid" type="button" style="justify-self:start">Edit ${esc(kid.name)}'s settings</button>
     <button class="cancel" data-close type="button">Close</button>`, () => {
     layer.querySelectorAll('[data-undo]').forEach(b => b.onclick = () => { const c = S.credits.find(x => x.id === b.dataset.undo); confirmSheet('Undo this entry?', `${c.title} · ${money(Number(c.amount))}. Use this only to fix a mistake.`, 'Undo entry', () => q(sb.from('credits').delete().eq('id', c.id)), 'Entry removed') });
     layer.querySelectorAll('[data-delread]').forEach(b => b.onclick = () => confirmSheet('Remove this reading session?', 'Its minutes come off this week’s bonus.', 'Remove', () => q(sb.from('reading_sessions').delete().eq('id', b.dataset.delread)), 'Removed'));
     const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn };
-    on('logOver', () => overSheet(kid));
-    on('undoSess', () => { const l = x.sess[x.sess.length - 1]; confirmSheet('Undo the last session?', `${l.minutes} minutes go back to this week.`, 'Undo', () => q(sb.from('screen_sessions').delete().eq('id', l.id)), 'Minutes returned') });
+    on('logOver', () => overSheet(kid)); on('addScr', () => manualSheet(kid, 'screen')); on('addRead', () => manualSheet(kid, 'read'));
+    on('undoSess', () => { const l = x.sess[x.sess.length - 1]; confirmSheet('Undo the last session?', `${dur(liveSec(l))} goes back to this week.`, 'Undo', () => q(sb.from('screen_sessions').delete().eq('id', l.id)), 'Minutes returned') });
     on('editThisKid', () => kidSheet(kid));
   });
 }
