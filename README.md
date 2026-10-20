@@ -90,8 +90,8 @@ supabase/schema.sql   database tables, security rules and functions
 netlify.toml          Netlify settings and security headers
 ```
 
-To rename the app, change `appName` in `config.js` and the `<title>`/manifest text. To change the donation handles, edit `venmo` and `cashapp` in `config.js`.
+To rename the app, change `appName` in `config.js` and the `<title>`/manifest text. To change the donation handles, edit `venmo`, `cashapp` and `paypal` in `config.js`.
 
 ## Support
 
-Chore Story is free. If it helps your family: **Venmo [@mike-shai](https://venmo.com/u/mike-shai)** · **Cash App [$mikeshai](https://cash.app/$mikeshai)**
+Chore Story is free. If it helps your family: **Venmo [@mike-shai](https://venmo.com/u/mike-shai)** · **Cash App [$mikeshai](https://cash.app/$mikeshai)** · **PayPal [mikeshai](https://www.paypal.com/paypalme/mikeshai)**

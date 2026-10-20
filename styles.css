@@ -346,7 +346,7 @@ input,select{border:2.5px solid var(--edge);background:var(--surface)}
 .support-links{display:grid;gap:8px;margin-top:10px}
 .support-links a{display:flex;align-items:center;justify-content:center;gap:6px;height:38px;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none;color:#fff;border:2.5px solid var(--edge)}
 .support-links a b{font-weight:900}
-.support-links a.venmo{background:#008CFF} .support-links a.cash{background:#00B341}
+.support-links a.venmo{background:#008CFF} .support-links a.cash{background:#00B341} .support-links a.paypal{background:#FFC439;color:#003087}
 .support-note{font-size:12px;color:var(--muted);text-align:center}
 .card .support{max-width:none}
 @media (prefers-reduced-motion:reduce){.support summary::after{transition:none}}
