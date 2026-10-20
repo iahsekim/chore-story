@@ -5,7 +5,7 @@ const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, { 
 
 const COLORS = { green: '#1FA34A', blue: '#2F6BFF', purple: '#7A3FF2', orange: '#FF6B1A', pink: '#F0418C', teal: '#0FA3A3' };
 const S = {
-  user: null, family: null, members: [], invites: [], kids: [], jobs: [], weeks: [], credits: [], tx: [], reading: [], screen: [], adjust: [],
+  user: null, family: null, members: [], invites: [], kids: [], jobs: [], weeks: [], credits: [], tx: [], reading: [], screen: [], sbonus: [],
   view: 'loading', profile: null, parentOk: false, tab: 'home', ptab: 'kids', jobKid: null, jobFilter: 'All',
   authEmail: '', authStep: 'email', onboard: null
 };
@@ -48,7 +48,7 @@ function bindSwatches(root, attr, onPick) { root.querySelectorAll(`[${attr}]`).f
 async function q(p) { const { data, error } = await p; if (error) throw error; return data }
 async function loadAll() {
   const fid = S.family.id, since = addDays(today(), -70);
-  const [fam, members, invites, kids, jobs, weeks, credits, tx, reading, screen, adjust] = await Promise.all([
+  const [fam, members, invites, kids, jobs, weeks, credits, tx, reading, screen, sbonus] = await Promise.all([
     q(sb.from('families').select('*').eq('id', fid).single()),
     q(sb.from('family_members').select('email,user_id').eq('family_id', fid)),
     q(sb.from('family_invites').select('email').eq('family_id', fid)),
@@ -59,9 +59,9 @@ async function loadAll() {
     q(sb.from('transactions').select('*').eq('family_id', fid).order('created_at', { ascending: false })),
     q(sb.from('reading_sessions').select('*').eq('family_id', fid).gte('local_date', since).order('started_at', { ascending: false })),
     q(sb.from('screen_sessions').select('*').eq('family_id', fid).gte('local_date', since)),
-    q(sb.from('screen_adjust').select('*').eq('family_id', fid).gte('week_start', since)),
+    q(sb.from('screen_bonus').select('*').eq('family_id', fid).gte('week_start', since)),
   ]);
-  Object.assign(S, { family: fam, members, invites, kids, jobs, weeks, credits, tx, reading, screen, adjust });
+  Object.assign(S, { family: fam, members, invites, kids, jobs, weeks, credits, tx, reading, screen, sbonus });
   await ensureWeeks();
 }
 /* Each Monday a kid's week starts fresh at their allowance. Rows are created lazily. */
@@ -86,7 +86,10 @@ async function act(fn, ok) { try { await fn(); if (ok) toast(ok); await refresh(
 /* ---------- money math ---------- */
 const kidById = id => S.kids.find(k => k.id === id);
 const weekRow = (kid, ws) => S.weeks.find(w => w.kid_id === kid.id && w.week_start === ws);
-const weekCredits = (kid, ws) => S.credits.filter(c => c.kid_id === kid.id && c.week_start === ws);
+const isApproved = c => (c.status || 'approved') === 'approved';
+const approvedCredits = kid => S.credits.filter(c => c.kid_id === kid.id && isApproved(c));
+const pendingClaims = kid => S.credits.filter(c => (!kid || c.kid_id === kid.id) && c.status === 'pending');
+const weekCredits = (kid, ws) => approvedCredits(kid).filter(c => c.week_start === ws);
 function weekTotal(kid, ws) {
   const w = weekRow(kid, ws);
   const base = w ? Number(w.allowance) : (ws === thisWeek() ? Number(kid.weekly_allowance) : 0);
@@ -104,11 +107,22 @@ function stats(kid) {
   const spent = tx.filter(t => t.kind === 'purchase').reduce((a, t) => a + Number(t.amount), 0);
   return { week: weekTotal(kid, cur), month: r2(monthT), lifetime: r2(earned), paid: r2(paid), spent: r2(spent), balance: r2(earned - paid - spent) };
 }
+/* How long the balance has been building: last payment, and what each week since added. */
+function owedInfo(kid) {
+  const st = stats(kid), pays = S.tx.filter(t => t.kid_id === kid.id && t.kind === 'payout').sort((a, b) => b.local_date.localeCompare(a.local_date));
+  const last = pays[0]?.local_date || null, since = last ? monday(last) : (kidWeeks(kid).slice(-1)[0]?.week_start || thisWeek());
+  const weeks = kidWeeks(kid).filter(w => w.week_start >= since).map(w => ({ ws: w.week_start, amt: weekTotal(kid, w.week_start) })).filter(w => w.amt > 0);
+  const days = Math.round((parseD(today()) - parseD(last || since)) / 864e5);
+  const saving = goalOf(kid) && st.balance <= Number(kid.goal_amount);
+  return { balance: st.balance, last, days, weeks, nudge: st.balance > 0 && days >= 14 && !saving, saving };
+}
+const goalOf = kid => kid.goal_name && Number(kid.goal_amount) > 0 ? { name: kid.goal_name, amount: Number(kid.goal_amount) } : null;
+const ago = d => d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 14 ? `${d} days ago` : `${Math.round(d / 7)} weeks ago`;
 /* Every entry in a kid's bank, newest first, each with the balance after it. */
 function statement(kid) {
   const L = [];
   for (const w of kidWeeks(kid)) L.push({ date: w.week_start, ts: ms(w.week_start + 'T00:00:00Z'), title: 'Weekly allowance', kind: 'Allowance', v: Number(w.allowance), type: 'allow' });
-  for (const c of S.credits.filter(c => c.kid_id === kid.id)) L.push({ date: localDate(ms(c.created_at)), ts: ms(c.created_at), title: c.title, kind: c.kind === 'job' ? 'Job' : 'Bonus', v: Number(c.amount), type: c.kind, id: c.id, week: c.week_start });
+  for (const c of approvedCredits(kid)) L.push({ date: localDate(ms(c.created_at)), ts: ms(c.created_at), title: c.title, kind: c.kind === 'job' ? 'Job' : 'Bonus', v: Number(c.amount), type: c.kind, id: c.id, week: c.week_start });
   for (const t of S.tx.filter(t => t.kid_id === kid.id)) L.push({ date: t.local_date, ts: ms(t.created_at), title: t.note, kind: t.kind === 'payout' ? 'Paid to ' + kid.name : 'Bought for ' + kid.name, v: -Number(t.amount), type: t.kind, id: t.id });
   L.sort((a, b) => a.date.localeCompare(b.date) || a.ts - b.ts);
   let run = 0; for (const l of L) { run = r2(run + l.v); l.bal = run }
@@ -126,11 +140,11 @@ const activeRead = kid => S.reading.find(r => r.kid_id === kid.id && !r.ended_at
 function readWeek(kid, ws = thisWeek()) { const sec = S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws).reduce((a, r) => a + readSec(r, kid), 0); const minutes = Math.floor(sec / 60); return { sec, minutes, bonus: Math.min(minutes, Number(kid.reading_cap) || 0) } }
 function screenWeek(kid, ws = thisWeek()) {
   const base = Number(kid.base_screen_minutes) || 0, bonus = readWeek(kid, ws).bonus;
-  const adj = S.adjust.filter(a => a.kid_id === kid.id && a.week_start === ws).reduce((a, x) => a + Number(x.minutes), 0);
+  const extra = S.sbonus.filter(a => a.kid_id === kid.id && a.week_start === ws).reduce((a, x) => a + Number(x.minutes), 0) + weekCredits(kid, ws).reduce((a, c) => a + (Number(c.minutes) || 0), 0);
   const sess = S.screen.filter(x => x.kid_id === kid.id && x.week_start === ws).sort((a, b) => ms(a.started_at) - ms(b.started_at));
-  const usedSec = sess.reduce((a, x) => a + liveSec(x), 0), totalSec = Math.max(0, (base + bonus - adj) * 60), leftSec = Math.max(0, totalSec - usedSec);
+  const usedSec = sess.reduce((a, x) => a + liveSec(x), 0), totalSec = Math.max(0, (base + bonus + extra) * 60), leftSec = Math.max(0, totalSec - usedSec);
   const active = sess.find(x => !x.ended_at && x.source !== 'manual');
-  return { base, bonus, adj, sess, active, usedSec, totalSec, leftSec, left: Math.floor(leftSec / 60) };
+  return { base, bonus, extra, sess, active, usedSec, totalSec, leftSec, left: Math.floor(leftSec / 60) };
 }
 const hms = sec => { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60; return h ? `${h}:${pad(m)}:${pad(x)}` : `${pad(m)}:${pad(x)}` };
 const dur = sec => { sec = Math.max(0, Math.floor(sec)); const m = Math.floor(sec / 60), x = sec % 60; return m && x ? `${m} min ${x} sec` : m ? `${m} min` : `${x} sec` };
@@ -227,7 +241,7 @@ function onboardHTML() {
   const steps = `<div class="steps">${[0, 1, 2].map(i => `<i class="${i <= O.step ? 'on' : ''}"></i>`).join('')}</div>`;
   if (O.step === 0) return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Welcome</h2>
     <p class="lede">Set up your family in about a minute.</p>
-    <div class="card form"><div class="field"><label class="label" for="famName">Family name</label><input id="famName" maxlength="60" placeholder="The Smiths" autocapitalize="words" value="${esc(O.name)}"></div>
+    <div class="card form"><div class="field"><label class="label" for="famName">Family name</label><input id="famName" maxlength="60" placeholder="Family name" autocapitalize="words" value="${esc(O.name)}"></div>
     <p class="hint">Weeks start Monday in your time zone: <b>${esc(O.tz)}</b>.</p>
     <button class="save" id="ob0" type="button">Next</button></div></section>`;
   if (O.step === 1) return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Parent PIN</h2>
@@ -241,7 +255,7 @@ function onboardHTML() {
     ${n ? `<div class="card form"><span class="label">Your kids · ${n}</span>${O.kids.map((k, i) => `<div class="kidrow">${avatar(k)}<span><b>${esc(k.name)}</b><span class="hint" style="display:block">${money(Number(k.allowance))} a week</span></span><button class="link" type="button" data-rmkid="${i}">Remove</button></div>`).join('')}</div>` : ''}
     <div class="card form kidform">
       <div class="kidform-h"><span class="avatar" id="kPrev" style="background:${COLORS[D.color]}">${esc((D.name || '?').slice(0, 1).toUpperCase())}</span><span><span class="label">${n ? 'Add another kid' : 'Your first kid'}</span><b id="kPrevName">${esc(D.name || 'First name')}</b></span></div>
-      <div class="row2"><div class="field"><label class="label" for="kName">First name</label><input id="kName" maxlength="40" autocomplete="off" autocapitalize="words" value="${esc(D.name)}" placeholder="Eli"></div>
+      <div class="row2"><div class="field"><label class="label" for="kName">First name</label><input id="kName" maxlength="40" autocomplete="off" autocapitalize="words" value="${esc(D.name)}" placeholder="Name"></div>
       <div class="field"><label class="label" for="kAllow">Weekly allowance ($)</label><input id="kAllow" type="number" inputmode="decimal" min="0" step="0.5" value="${esc(D.allowance)}"></div></div>
       <div class="field"><span class="label">Color</span>${swatchesHTML(D.color)}</div>
       <button class="pill soft" id="kAdd" type="button" style="justify-self:start">+ Save and add another kid</button></div>
@@ -307,10 +321,17 @@ function stmtRow(l, kid, parent) {
   return `<${tg} ${undoable ? `type="button" data-undo="${l.type}|${l.id}"` : ''} class="row">${ico}<span class="t"><b>${esc(l.title)}</b><span>${esc(l.kind)} · ${short(l.date)}</span></span><span class="stack"><span class="amt ${l.v >= 0 ? 'up' : 'out'}">${l.v >= 0 ? '+' : '\u2212'}${money(Math.abs(l.v))}</span><span class="bal num">${money(l.bal)}</span></span></${tg}>`;
 }
 function kidHome(kid) {
-  const st = stats(kid), sw = screenWeek(kid), rw = readWeek(kid), cur = thisWeek(), L = statement(kid);
-  return `<section class="hero" style="--hero:${COLORS[kid.color]}"><div class="label">In your bank</div><div class="big num">${money(st.balance)}</div>
+  const st = stats(kid), sw = screenWeek(kid), rw = readWeek(kid), L = statement(kid), g = goalOf(kid), mine = pendingClaims(kid);
+  const pct = g ? Math.min(100, Math.round(100 * st.balance / g.amount)) : 0;
+  return `<section class="hero" style="--hero:${COLORS[kid.color]}"><div class="label">Held for you</div><div class="big num">${money(st.balance)}</div>
     <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span><span>Lifetime <b>${money(st.lifetime)}</b></span></div></section>
-    <section class="buckets"><div class="bucket pd ${st.paid ? '' : 'zero'}"><span class="label">Paid to you</span><b class="num">${money(st.paid)}</b></div><div class="bucket sp ${st.spent ? '' : 'zero'}"><span class="label">Spent on things</span><b class="num">${money(st.spent)}</b></div></section>
+    <section class="card goal">${g ? `<div class="goal-h"><span class="ico m">${I.star}</span><span class="t"><span class="label">Saving for</span><b>${esc(g.name)}</b></span><span class="num goal-n">${money(Math.min(st.balance, g.amount))} <small>of ${money(g.amount)}</small></span></div>
+      <div class="meter"><i style="width:${pct}%;background:var(--money)"></i></div>
+      <p class="hint">${st.balance >= g.amount ? `You have enough! Ask a grown-up to buy ${esc(g.name)} with your money.` : `${money(g.amount - st.balance)} to go. Money you leave in your bank counts toward it.`}</p>
+      <button class="link" type="button" id="goalBtn" style="justify-self:start">Change goal</button>`
+      : `<div class="goal-h"><span class="ico m">${I.star}</span><span class="t"><span class="label">Saving goal</span><b>Saving for something?</b></span></div><p class="hint">Pick something you want and watch your bank fill up toward it.</p><button class="pill" type="button" id="goalBtn" style="justify-self:start">Set a goal</button>`}</section>
+    <section class="buckets"><button class="bucket pd ${st.paid ? '' : 'zero'}" type="button" data-txlist="payout"><span class="label">Paid to you</span><b class="num">${money(st.paid)}</b><span class="see">See list</span></button><button class="bucket sp ${st.spent ? '' : 'zero'}" type="button" data-txlist="purchase"><span class="label">Spent on things</span><b class="num">${money(st.spent)}</b><span class="see">See list</span></button></section>
+    ${mine.length ? `<section class="sect"><div class="sect-h"><h3>Waiting for a parent</h3></div><div class="list">${mine.map(c => `<div class="row wait-row"><span class="ico j">${I.clock}</span><span class="t"><b>${esc(c.title)}</b><span>You said you did this · ${short(localDate(ms(c.created_at)))}</span></span><span class="amt">+${money(Number(c.amount))}</span></div>`).join('')}</div></section>` : ''}
     <section class="tiles">
       <button class="tile scr" type="button" data-tab="screen"><span class="label">Screen left</span><span class="v num">${sw.left}<small> min</small></span><span class="s">${screenDayNames(kid)}</span></button>
       <button class="tile rdg" type="button" data-tab="read"><span class="label">Reading bonus</span><span class="v num">+${rw.bonus}<small> min</small></span><span class="s">${rw.bonus >= kid.reading_cap ? 'Maxed out this week!' : `${kid.reading_cap - rw.bonus} more to earn`}</span></button>
@@ -320,12 +341,39 @@ function kidHome(kid) {
     <section class="ptools"><button class="pill soft" id="rulesBtn" type="button">How it works</button></section>`;
 }
 function kidJobs(kid) {
-  const on = S.jobs.filter(j => j.kid_id === kid.id && j.enabled);
+  const on = S.jobs.filter(j => j.kid_id === kid.id && j.enabled), mine = pendingClaims(kid);
   const cats = ['All', ...new Set(on.map(j => j.category))]; if (!cats.includes(S.jobFilter)) S.jobFilter = 'All';
-  return `<section class="card"><p class="hint" style="font-size:15px;color:var(--ink)">Pick any job. When it's done, tell a parent and they'll add the money to this week.</p></section>
+  return `<section class="card"><p class="hint" style="font-size:15px;color:var(--ink)">Pick any job and do it. Then tap it and press <b>I did it</b>. A parent checks, and the money goes in your bank.</p></section>
+    ${mine.length ? `<section class="sect"><div class="sect-h"><h3>Waiting for a parent</h3></div><div class="list">${mine.map(c => `<div class="row wait-row"><span class="ico j">${I.clock}</span><span class="t"><b>${esc(c.title)}</b><span>${short(localDate(ms(c.created_at)))}</span></span><span class="amt">+${money(Number(c.amount))}</span></div>`).join('')}</div></section>` : ''}
     ${on.length ? `<section class="sect"><div class="filters">${cats.map(c => `<button class="chip" type="button" data-cat="${esc(c)}" aria-pressed="${c === S.jobFilter}">${esc(c)}</button>`).join('')}</div>
-    <div class="list">${on.filter(j => S.jobFilter === 'All' || j.category === S.jobFilter).sort((a, b) => a.price - b.price).map(j => `<div class="row"><span class="t"><b>${esc(j.title)}</b><span>${esc(j.done_means)}</span></span><span class="price num">${money(Number(j.price))}</span></div>`).join('')}</div></section>`
+    <div class="list">${on.filter(j => S.jobFilter === 'All' || j.category === S.jobFilter).sort((a, b) => a.price - b.price).map(j => `<button class="row" type="button" data-claim="${j.id}"><span class="t"><b>${esc(j.title)}</b><span>${esc(j.done_means)}</span></span><span class="stack"><span class="price num">${money(Number(j.price))}</span>${Number(j.bonus_minutes) ? `<span class="bal">+${j.bonus_minutes} screen min</span>` : ''}</span></button>`).join('')}</div></section>`
       : `<div class="list"><div class="empty">No jobs on your board yet.</div></div>`}`;
+}
+function claimSheet(kid, job) {
+  openSheet(`<span class="label">${esc(job.category)}</span><h2>${esc(job.title)}</h2>
+    <div class="done-box"><span class="label">Done means</span><b>${esc(job.done_means || 'Finished all the way')}</b></div>
+    <p class="hint">A parent will check it. Then <b>${money(Number(job.price))}</b>${Number(job.bonus_minutes) ? ` and <b>${job.bonus_minutes} screen minutes</b>` : ''} go to you.</p>
+    <button class="save" id="clGo" type="button" style="background:var(--money)">I did it</button><button class="cancel" data-close type="button">Not yet</button>`, () => {
+    $('clGo').onclick = async () => { closeSheet(); await act(() => q(sb.from('credits').insert({ family_id: S.family.id, kid_id: kid.id, week_start: thisWeek(), kind: 'job', title: job.title, amount: Number(job.price), minutes: Number(job.bonus_minutes) || 0, job_id: job.id, status: 'pending' })), 'Sent to a parent to check') };
+  });
+}
+function goalSheet(kid) {
+  const g = goalOf(kid);
+  openSheet(`<h2>${g ? 'Change your goal' : 'Set a saving goal'}</h2><p class="hint">What are you saving for? Money you leave in your bank counts toward it.</p>
+    <div class="field"><label class="label" for="gName">I'm saving for</label><input id="gName" maxlength="60" placeholder="Something you want" value="${esc(g?.name || '')}"></div>
+    <div class="field"><label class="label" for="gAmt">It costs ($)</label><input id="gAmt" type="number" inputmode="decimal" min="1" step="0.01" placeholder="0.00" value="${g ? g.amount : ''}"></div>
+    <button class="save" id="gGo" type="button" style="background:var(--money)">Save goal</button>${g ? '<button class="cancel danger-link" id="gClear" type="button">Remove goal</button>' : ''}<button class="cancel" data-close type="button">Cancel</button>`, () => {
+    $('gGo').onclick = async () => { const name = capFirst($('gName').value), amt = r2(parseFloat($('gAmt').value) || 0); if (!name) return toast('What are you saving for?'); if (amt <= 0) return toast('How much does it cost?'); closeSheet();
+      await act(() => q(sb.from('kids').update({ goal_name: name, goal_amount: amt }).eq('id', kid.id)), 'Goal saved') };
+    if ($('gClear')) $('gClear').onclick = async () => { closeSheet(); await act(() => q(sb.from('kids').update({ goal_name: null, goal_amount: null }).eq('id', kid.id)), 'Goal removed') };
+  });
+}
+function txListSheet(kid, kind) {
+  const rows = S.tx.filter(t => t.kid_id === kid.id && t.kind === kind).sort((a, b) => b.local_date.localeCompare(a.local_date) || ms(b.created_at) - ms(a.created_at));
+  const total = rows.reduce((a, t) => a + Number(t.amount), 0);
+  openSheet(`<span class="label">${esc(kid.name)} · ${money(total)} total</span><h2>${kind === 'payout' ? 'Paid to you' : 'Spent on things'}</h2>
+    <div class="list">${rows.length ? rows.map(t => `<div class="row"><span class="ico ${kind === 'payout' ? 's' : 'r'}">${kind === 'payout' ? I.cash : I.bag}</span><span class="t"><b>${esc(t.note)}</b><span>${short(t.local_date)}</span></span><span class="amt">${money(Number(t.amount))}</span></div>`).join('') : `<div class="empty">${kind === 'payout' ? 'Nothing paid out yet. Your money is waiting in your bank.' : 'Nothing bought yet.'}</div>`}</div>
+    <button class="cancel" data-close type="button">Close</button>`);
 }
 function kidRead(kid) {
   const rw = readWeek(kid), a = activeRead(kid), cap = Number(kid.reading_cap) || 1;
@@ -359,14 +407,15 @@ function screenRow(x) {
 function kidScreen(kid) {
   const x = screenWeek(kid);
   const rows = [...x.sess].reverse().map(screenRow)
-    .concat(S.adjust.filter(a => a.kid_id === kid.id && a.week_start === thisWeek()).map(a => `<div class="row"><span class="ico d">${I.clock}</span><span class="t"><b>${esc(a.note)}</b><span>Logged ${short(localDate(ms(a.created_at)))}</span></span><span class="amt down">\u2212${a.minutes} min</span></div>`));
+    .concat(S.sbonus.filter(a => a.kid_id === kid.id && a.week_start === thisWeek()).map(a => `<div class="row"><span class="ico m">${I.star}</span><span class="t"><b>${esc(a.note)}</b><span>Bonus minutes · ${short(localDate(ms(a.created_at)))}</span></span><span class="amt up">+${a.minutes} min</span></div>`))
+    .concat(weekCredits(kid, thisWeek()).filter(c => Number(c.minutes) > 0).map(c => `<div class="row"><span class="ico j">${I.check}</span><span class="t"><b>${esc(c.title)}</b><span>Job bonus minutes</span></span><span class="amt up">+${c.minutes} min</span></div>`));
   return `<section class="board" id="board">${boardHTML(kid)}</section>${eqHTML(kid, x, '<div class="ptools"><button class="pill soft" type="button" data-manual="screen">+ Add screen time by hand</button></div>')}
     <section class="sect"><div class="sect-h"><h3>Sessions</h3></div><div class="list">${rows.length ? rows.join('') : '<div class="empty">No sessions yet this week.</div>'}</div></section>`;
 }
 function eqHTML(kid, x, extra = '') {
   return `<section class="card"><span class="label">This week · ${screenDayNames(kid)}</span>
     <div class="eq"><span class="term"><b class="num">${x.base}</b><span>Base</span></span><span class="op">+</span><span class="term"><b class="num" style="color:var(--read)">${x.bonus}</b><span>Reading</span></span>
-    ${x.adj ? `<span class="op">\u2212</span><span class="term"><b class="num" style="color:var(--danger)">${x.adj}</b><span>No clock</span></span>` : ''}
+    ${x.extra ? `<span class="op">+</span><span class="term"><b class="num" style="color:var(--money)">${x.extra}</b><span>Bonus</span></span>` : ''}
     ${x.usedSec ? `<span class="op">\u2212</span><span class="term"><b class="num" id="eqUsed">${hms(x.usedSec)}</b><span>Used</span></span>` : ''}
     <span class="op">=</span><span class="term res"><b class="num" id="eqLeft">${hms(x.leftSec)}</b><span>Left</span></span></div>${extra}</section>`;
 }
@@ -387,20 +436,25 @@ function boardHTML(kid) {
 const PTABS = [['kids', 'Kids', 'kids'], ['jobs', 'Job boards', 'jobs'], ['pay', 'Bank', 'pay'], ['settings', 'Settings', 'gear']];
 function parentAppHTML() {
   
-  const greet = { kids: 'Parent', jobs: 'Edit each kid’s board', pay: 'Balances, payments and purchases', settings: 'Family settings' }[S.ptab];
+  const greet = { kids: 'Parent', jobs: 'Edit each kid’s board', pay: 'What you owe', settings: 'Family settings' }[S.ptab];
   return `<header><div class="hello"><small>${greet}</small><h1>${esc(S.family.name || APP)}</h1></div>
     <button class="lock on" id="swapBtn" type="button">${I.swap} Switch</button></header>
     <main>${({ kids: pKids, jobs: pJobs, pay: pPay, settings: pSettings })[S.ptab]()}</main>
-    ${tabbar(PTABS, S.ptab)}`;
+    ${tabbar(PTABS, S.ptab, { kids: pendingClaims().length })}`;
 }
 function pKids() {
   if (!S.kids.length) return `<div class="card"><p class="hint">Add your first kid to get started.</p><button class="save" id="addKidBtn" type="button">+ Add a kid</button></div>`;
-  return S.kids.map(k => {
-    const st = stats(k), sw = screenWeek(k), rw = readWeek(k);
+  const pend = pendingClaims();
+  let h = pend.length ? `<section class="sect"><div class="sect-h"><h3>Needs your OK</h3><span class="label">${pend.length}</span></div><div class="list">${pend.map(c => { const k = kidById(c.kid_id); return `<div class="row wait-row">${avatar(k)}<span class="t"><b>${esc(c.title)}</b><span>${esc(k?.name || '')} says it's done · ${short(localDate(ms(c.created_at)))}</span></span>
+      <span class="decide"><button class="pill soft" type="button" data-notyet="${c.id}">Not yet</button><button class="pill ok" type="button" data-approve="${c.id}">OK +${money(Number(c.amount))}${Number(c.minutes) ? ` +${c.minutes}m` : ''}</button></span></div>` }).join('')}</div></section>` : '';
+  for (const k of S.kids) { const o = owedInfo(k); if (o.nudge) h += `<div class="nudge"><span><b>You owe ${esc(k.name)} ${money(o.balance)}</b> · ${o.last ? `last paid ${ago(o.days)}` : `nothing paid yet, ${o.weeks.length} week${o.weeks.length === 1 ? '' : 's'} of earnings`}</span><button class="pill" type="button" data-payall="${k.id}">Paid all ${money(o.balance)}</button></div>` }
+  return h + S.kids.map(k => {
+    const st = stats(k), sw = screenWeek(k), rw = readWeek(k), o = owedInfo(k), g = goalOf(k);
     return `<article class="kcard"><div class="kh">${avatar(k)}<h3>${esc(k.name)}</h3><span class="wk num" style="color:color-mix(in srgb, ${COLORS[k.color]} 78%, var(--ink))">${money(st.balance)}<small>You owe</small></span></div>
+      <div class="owedline">${o.saving ? `Saving for ${esc(g.name)} · ${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}` : o.last ? `Last paid ${short(o.last)} (${ago(o.days)})` : 'Not paid out yet'}</div>
       <div class="kstats"><div><b class="num">${money(st.week)}</b><span>This week</span></div><div><b class="num">${money(st.month)}</b><span>Month</span></div><div><b class="num">${money(st.lifetime)}</b><span>Lifetime</span></div></div>
       <div class="kstats"><div><b class="num">${hms(sw.leftSec)}</b><span>Screen left</span></div><div><b class="num" style="color:var(--read)">+${rw.bonus}</b><span>Reading bonus</span></div><div><b class="num">${hms(rw.sec)}</b><span>Read</span></div></div>
-      <div class="kact"><button class="pill" type="button" data-logjob="${k.id}">Log a job</button><button class="pill ok" type="button" data-bonus="${k.id}">Add money</button><button class="pill soft" type="button" data-more="${k.id}">More</button></div></article>`;
+      <div class="kact"><button class="pill" type="button" data-logjob="${k.id}">Log a job</button><button class="pill ok" type="button" data-bonus="${k.id}">Add bonus</button><button class="pill soft" type="button" data-more="${k.id}">More</button></div></article>`;
   }).join('') + `<button class="pill soft" id="addKidBtn" type="button" style="justify-self:start">+ Add a kid</button>`;
 }
 function pJobs() {
@@ -420,7 +474,8 @@ function pPay() {
   return S.kids.map(k => {
     const st = stats(k), L = statement(k);
     return `<section class="sect"><div class="sect-h"><h3 style="display:flex;align-items:center;gap:10px">${avatar(k)}${esc(k.name)}</h3></div>
-      <div class="card bankcard"><span class="label">${esc(k.name)}'s balance · what you owe</span><b class="bankbig num">${money(st.balance)}</b>
+      <div class="card bankcard"><span class="label">You owe ${esc(k.name)}</span><b class="bankbig num">${money(st.balance)}</b>
+        ${(() => { const o = owedInfo(k), g = goalOf(k); return `<p class="hint owedhint">${o.last ? `Last paid <b>${short(o.last)}</b>, ${ago(o.days)}.` : 'Nothing paid out yet.'}${g ? ` Saving for <b>${esc(g.name)}</b> (${money(g.amount)}).` : ''}</p>${o.weeks.length ? `<div class="weeksince">${o.weeks.map(w => `<span><small>Week of ${md(w.ws)}</small><b class="num">${money(w.amt)}</b></span>`).join('')}</div>` : ''}` })()}
         <div class="kstats flat"><div><b class="num">${money(st.lifetime)}</b><span>Earned</span></div><div><b class="num">${money(st.paid)}</b><span>Paid out</span></div><div><b class="num">${money(st.spent)}</b><span>Spent</span></div></div>
         <div class="row2"><button class="pill" type="button" data-payout="${k.id}">Paid ${esc(k.name)}</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button></div></div>
       <div class="list">${L.slice(0, 10).map(l => stmtRow(l, k, true)).join('')}</div>
@@ -445,7 +500,7 @@ function pSettings() {
     <section class="card"><span class="label">Parents on this family</span>
       ${S.members.map(m => `<div class="hint" style="color:var(--ink)">${esc(m.email || 'Parent')}${m.user_id === S.user.id ? ' (you)' : ''}</div>`).join('')}
       ${S.invites.map(i => `<div class="hint">${esc(i.email)} · invited</div>`).join('')}
-      <div class="field"><label class="label" for="invEmail">Invite another parent</label><input id="invEmail" type="email" placeholder="partner@example.com"></div>
+      <div class="field"><label class="label" for="invEmail">Invite another parent</label><input id="invEmail" type="email" placeholder="Email address"></div>
       <button class="pill" id="invGo" type="button" style="justify-self:start">Add parent</button>
       <p class="hint">They sign in at this site with that email and join your family automatically.</p></section>
     <section class="card"><span class="label">Contact & feedback</span><p class="hint">Found a bug, have an idea, or just want to say hi? It goes straight to the person who makes ${esc(APP)}.</p>
@@ -496,6 +551,12 @@ function bindAll() {
   bindBoards();
   // parent
   each('[data-logjob]', el => logJobSheet(kidById(el.dataset.logjob)));
+  each('[data-claim]', el => claimSheet(kidById(S.profile), S.jobs.find(j => j.id === el.dataset.claim)));
+  each('[data-approve]', el => act(() => q(sb.from('credits').update({ status: 'approved' }).eq('id', el.dataset.approve)), 'Approved'));
+  each('[data-notyet]', el => act(() => q(sb.from('credits').delete().eq('id', el.dataset.notyet)), 'Sent back to the board'));
+  each('[data-payall]', el => { const k = kidById(el.dataset.payall); txSheet(k, 'payout', { amount: stats(k).balance, note: 'Paid in full' }) });
+  each('[data-txlist]', el => txListSheet(kidById(S.profile), el.dataset.txlist));
+  on('goalBtn', () => goalSheet(kidById(S.profile)));
   each('[data-bonus]', el => bonusSheet(kidById(el.dataset.bonus)));
   each('[data-more]', el => kidMoreSheet(kidById(el.dataset.more)));
   on('addKidBtn', () => kidSheet());
@@ -507,7 +568,7 @@ function bindAll() {
   on('newJob', () => jobSheet(null));
   on('copyBoard', copyBoardSheet);
   each('[data-payout]', el => txSheet(kidById(el.dataset.payout), 'payout'));
-  each('[data-purchase]', el => txSheet(kidById(el.dataset.purchase), 'purchase'));
+  each('[data-purchase]', el => { const k = kidById(el.dataset.purchase), g = goalOf(k); txSheet(k, 'purchase', g && stats(k).balance >= g.amount ? { amount: g.amount, note: g.name } : {}) });
   each('[data-allstmt]', el => statementSheet(kidById(el.dataset.allstmt)));
   bindUndo(app);
   on('saveFam', () => act(() => q(sb.from('families').update({ name: titleCase($('sFam').value) || 'Our Family', timezone: $('sTz').value }).eq('id', S.family.id)), 'Saved'));
@@ -543,13 +604,13 @@ async function stopRead(kid) {
   const a = activeRead(kid); if (!a) return; const sec = timerSec(a, kid);
   await doneTimer('reading_sessions', a, sec >= 60 ? `+${dur(sec)} of reading` : `+${sec} sec. It all adds up.`, kid);
 }
-function txSheet(kid, kind) {
+function txSheet(kid, kind, pre = {}) {
   const st = stats(kid), pay = kind === 'payout';
   openSheet(`<span class="label">${esc(kid.name)} has ${money(st.balance)}</span><h2>${pay ? `You paid ${esc(kid.name)}` : `You bought something for ${esc(kid.name)}`}</h2>
     <p class="hint">${pay ? 'Cash, a transfer, or anything you handed over. It comes out of what you owe.' : 'Something you paid for with their money. It comes out of their balance.'}</p>
     ${pay && st.balance > 0 ? `<div class="chips"><button class="chip" type="button" data-amt="${st.balance}">All of it · ${money(st.balance)}</button>${[5, 10, 20].filter(a => a < st.balance).map(a => `<button class="chip" type="button" data-amt="${a}">$${a}</button>`).join('')}</div>` : ''}
-    <div class="field"><label class="label" for="tAmt">Amount ($)</label><input id="tAmt" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00"></div>
-    <div class="field"><label class="label" for="tWhy">Explanation ${esc(kid.name)} will see</label><input id="tWhy" maxlength="120" placeholder="${pay ? 'Cash for the weekend' : 'Lego set at Target'}"></div>
+    <div class="field"><label class="label" for="tAmt">Amount ($)</label><input id="tAmt" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" value="${pre.amount ? Number(pre.amount).toFixed(2) : ''}"></div>
+    <div class="field"><label class="label" for="tWhy">Explanation ${esc(kid.name)} will see</label><input id="tWhy" maxlength="120" placeholder="${pay ? 'Cash' : 'What you bought'}" value="${esc(pre.note || '')}"></div>
     <div class="field"><label class="label" for="tDate">Date</label><input id="tDate" type="date" value="${today()}" max="${today()}"></div>
     <button class="save" id="tGo" type="button">${pay ? 'Record payment' : 'Record purchase'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
     layer.querySelectorAll('[data-amt]').forEach(b => b.onclick = () => { $('tAmt').value = Number(b.dataset.amt).toFixed(2) });
@@ -625,12 +686,14 @@ function newPinSheet(force, after) {
 function rulesSheet(kid) {
   openSheet(`<h2>How it works</h2><ol class="rules">
     <li><span><b>Every Monday you get ${money(Number(kid.weekly_allowance))}.</b> That's your allowance, no matter what.</span></li>
-    <li><span><b>Jobs add money.</b> When you finish one, a parent adds it.</span></li>
+    <li><span><b>Jobs add money.</b> Tap a job and press I did it. A parent checks, then it's yours.</span></li>
+    <li><span><b>Anything you earn is yours to keep.</b> It stays in your bank until you ask for it or save up for something.</span></li>
     <li><span><b>Your money stays in your bank</b> until you get paid or a parent buys something for you with it. Every entry says why.</span></li>
     <li><span><b>Money is never taken away as a punishment.</b></span></li>
     <li><span><b>${kid.base_screen_minutes} screen minutes each week</b> on ${screenDayNames(kid)}.</span></li>
     <li><span><b>1 minute reading = 1 screen minute,</b> up to ${kid.reading_cap} a week. Chapter books and graphic novels count.</span></li>
-    <li><span><b>Screens only while the clock runs.</b> Pause it whenever you stop. Minutes without the clock come off next week.</span></li>
+    <li><span><b>Screens only while the clock runs.</b> Pause it whenever you stop.</span></li>
+    <li><span><b>Extra screen minutes</b> come from reading, some jobs, and bonuses.</span></li>
     <li><span><b>Every second counts.</b> Reading and screen time add up to the second.</span></li>
     <li><span><b>If it's not written here, it's not a rule.</b></span></li></ol><button class="save" data-close type="button">Got it</button>`);
 }
@@ -649,7 +712,7 @@ function manualSheet(kid, kind) {
   openSheet(`<span class="label">Parent · ${esc(kid.name)}</span><h2>${read ? 'Add reading time' : 'Add screen time used'}</h2>
     <p class="hint">${read ? 'For reading that happened without the timer.' : 'For screen time that happened without the clock, like a family movie. It counts toward this week\u2019s time.'}</p>
     ${read ? `<div class="field"><label class="label" for="mBook">Book</label><input id="mBook" maxlength="100" placeholder="Book title" value="${esc(books[0] || '')}">${books.length ? `<div class="chips">${books.map(b => `<button class="chip" type="button" data-book="${esc(b)}">${esc(b)}</button>`).join('')}</div>` : ''}</div>`
-      : `<div class="field"><label class="label" for="mNote">What was it?</label><input id="mNote" maxlength="120" placeholder="Family movie night"></div>`}
+      : `<div class="field"><label class="label" for="mNote">What was it?</label><input id="mNote" maxlength="120" placeholder="What it was"></div>`}
     <div class="row2"><div class="field"><label class="label" for="mMin">Minutes</label><input id="mMin" type="number" inputmode="numeric" min="0" max="600" placeholder="0"></div>
     <div class="field"><label class="label" for="mSec">Seconds</label><input id="mSec" type="number" inputmode="numeric" min="0" max="59" placeholder="0"></div></div>
     <div class="field"><label class="label" for="mDate">Day</label><input id="mDate" type="date" value="${today()}" min="${thisWeek()}" max="${today()}"></div>
@@ -675,20 +738,26 @@ function logJobSheet(kid) {
     <button class="cancel" data-close type="button">Close</button>`, () => {
     $('jobSearch').oninput = e => { const v = e.target.value.toLowerCase(); layer.querySelectorAll('[data-pickjob]').forEach(b => b.hidden = !b.dataset.q.includes(v)) };
     layer.querySelectorAll('[data-pickjob]').forEach(b => b.onclick = async () => { const j = S.jobs.find(x => x.id === b.dataset.pickjob); closeSheet();
-      await act(() => q(sb.from('credits').insert({ family_id: S.family.id, kid_id: kid.id, week_start: ws, kind: 'job', title: j.title, amount: Number(j.price) })), `+${money(Number(j.price))} for ${kid.name}`) });
+      await act(() => q(sb.from('credits').insert({ family_id: S.family.id, kid_id: kid.id, week_start: ws, kind: 'job', title: j.title, amount: Number(j.price), minutes: Number(j.bonus_minutes) || 0, job_id: j.id, status: 'approved' })), `+${money(Number(j.price))} for ${kid.name}`) });
   });
 }
 function bonusSheet(kid) {
-  const ws = creditWeek();
-  openSheet(`<span class="label">Add money for ${esc(kid.name)}</span><h2>Something good happened</h2>
-    <div class="chips">${[0.5, 1, 2, 5].map(a => `<button class="chip" type="button" data-amt="${a}">$${a < 1 ? a.toFixed(2) : a}</button>`).join('')}</div>
-    <div class="field"><label class="label" for="bAmt">Amount ($)</label><input id="bAmt" type="number" inputmode="decimal" min="0.25" step="0.25" value="1"></div>
-    <div class="field"><label class="label" for="bWhy">Explanation ${esc(kid.name)} will see</label><input id="bWhy" maxlength="120" placeholder="Helped a neighbor carry groceries"></div>
-    <button class="save" id="bGo" type="button" style="background:var(--money)">Add money</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+  const ws = creditWeek(); let mode = 'money';
+  const draw = () => openSheet(`<span class="label">Bonus for ${esc(kid.name)}</span><h2>Something good happened</h2>
+    <div class="seg" style="grid-template-columns:1fr 1fr"><button type="button" data-bm="money" aria-pressed="${mode === 'money'}">Money</button><button type="button" data-bm="minutes" aria-pressed="${mode === 'minutes'}">Screen minutes</button></div>
+    <div class="chips">${(mode === 'money' ? [0.5, 1, 2, 5] : [5, 10, 15, 30]).map(a => `<button class="chip" type="button" data-amt="${a}">${mode === 'money' ? '$' + (a < 1 ? a.toFixed(2) : a) : a + ' min'}</button>`).join('')}</div>
+    <div class="field"><label class="label" for="bAmt">${mode === 'money' ? 'Amount ($)' : 'Minutes'}</label><input id="bAmt" type="number" inputmode="decimal" min="${mode === 'money' ? '0.25' : '1'}" step="${mode === 'money' ? '0.25' : '1'}" value="${mode === 'money' ? 1 : 10}"></div>
+    <div class="field"><label class="label" for="bWhy">Explanation ${esc(kid.name)} will see</label><input id="bWhy" maxlength="120" placeholder="What they did"></div>
+    <button class="save" id="bGo" type="button" style="background:var(--money)">Add ${mode === 'money' ? 'money' : 'minutes'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+    layer.querySelectorAll('[data-bm]').forEach(b => b.onclick = () => { draw.why = $('bWhy').value; mode = b.dataset.bm; draw(); $('bWhy').value = draw.why || '' });
     layer.querySelectorAll('[data-amt]').forEach(b => b.onclick = () => { $('bAmt').value = b.dataset.amt });
-    $('bGo').onclick = async () => { const a = r2(parseFloat($('bAmt').value) || 0), why = $('bWhy').value.trim(); if (a <= 0) return toast('Enter an amount.'); if (!why) return toast('Add an explanation so they know why.'); closeSheet();
-      await act(() => q(sb.from('credits').insert({ family_id: S.family.id, kid_id: kid.id, week_start: ws, kind: 'bonus', title: why, amount: a })), `+${money(a)} for ${kid.name}`) };
+    $('bGo').onclick = async () => {
+      const v = parseFloat($('bAmt').value) || 0, why = $('bWhy').value.trim(); if (v <= 0) return toast('Enter an amount.'); if (!why) return toast('Add an explanation so they know why.'); closeSheet();
+      if (mode === 'money') { const a = r2(v); await act(() => q(sb.from('credits').insert({ family_id: S.family.id, kid_id: kid.id, week_start: ws, kind: 'bonus', title: why, amount: a, status: 'approved' })), `+${money(a)} for ${kid.name}`) }
+      else { const m = Math.min(600, Math.round(v)); await act(() => q(sb.from('screen_bonus').insert({ family_id: S.family.id, kid_id: kid.id, week_start: ws, minutes: m, note: why })), `+${m} screen minutes for ${kid.name}`) }
+    };
   });
+  draw();
 }
 function kidMoreSheet(kid) {
   const cur = thisWeek(), cr = weekCredits(kid, cur), x = screenWeek(kid), paid = false;
@@ -697,29 +766,19 @@ function kidMoreSheet(kid) {
     <div class="sect"><div class="sect-h"><h3>This week's money</h3></div><div class="list" style="box-shadow:none;border:1px solid var(--line)">
       <div class="row"><span class="ico m">${I.coin}</span><span class="t"><b>Weekly allowance</b><span>Monday</span></span><span class="amt up">+${money(Number(weekRow(kid, cur)?.allowance ?? kid.weekly_allowance))}</span></div>
       ${cr.map(c => `<button class="row" type="button" data-undo="${c.id}" ${paid ? 'disabled' : ''}><span class="ico ${c.kind === 'job' ? 'j' : 'm'}">${c.kind === 'job' ? I.check : I.star}</span><span class="t"><b>${esc(c.title)}</b><span>${paid ? 'Paid' : 'Tap to undo a mistake'}</span></span><span class="amt up">+${money(Number(c.amount))}</span></button>`).join('')}</div></div>
-    ${eqHTML(kid, x, `<div class="ptools"><button class="pill soft" id="addScr" type="button">+ Add screen time used</button><button class="pill soft" id="logOver" type="button">Take minutes off next week</button>${x.sess.length ? '<button class="pill soft" id="undoSess" type="button">Undo last session</button>' : ''}</div>`)}
+    ${eqHTML(kid, x, `<div class="ptools"><button class="pill soft" id="addScr" type="button">+ Add screen time used</button><button class="pill soft" id="addMin" type="button">+ Bonus minutes</button>${x.sess.length ? '<button class="pill soft" id="undoSess" type="button">Undo last session</button>' : ''}</div>`)}
     <div class="sect"><div class="sect-h"><h3>Reading this week</h3><button class="link" id="addRead" type="button">+ Add reading</button></div><div class="list" style="box-shadow:none;border:1px solid var(--line)">${reads.length ? reads.map(r => readRow(r, kid, true)).join('') : '<div class="empty">No reading yet this week.</div>'}</div></div>
     <button class="pill soft" id="editThisKid" type="button" style="justify-self:start">Edit ${esc(kid.name)}'s settings</button>
     <button class="cancel" data-close type="button">Close</button>`, () => {
     layer.querySelectorAll('[data-undo]').forEach(b => b.onclick = () => { const c = S.credits.find(x => x.id === b.dataset.undo); confirmSheet('Undo this entry?', `${c.title} · ${money(Number(c.amount))}. Use this only to fix a mistake.`, 'Undo entry', () => q(sb.from('credits').delete().eq('id', c.id)), 'Entry removed') });
     layer.querySelectorAll('[data-delread]').forEach(b => b.onclick = () => confirmSheet('Remove this reading session?', 'Its minutes come off this week’s bonus.', 'Remove', () => q(sb.from('reading_sessions').delete().eq('id', b.dataset.delread)), 'Removed'));
     const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn };
-    on('logOver', () => overSheet(kid)); on('addScr', () => manualSheet(kid, 'screen')); on('addRead', () => manualSheet(kid, 'read'));
+    on('addMin', () => bonusSheet(kid)); on('addScr', () => manualSheet(kid, 'screen')); on('addRead', () => manualSheet(kid, 'read'));
     on('undoSess', () => { const l = x.sess[x.sess.length - 1]; confirmSheet('Undo the last session?', `${dur(liveSec(l))} goes back to this week.`, 'Undo', () => q(sb.from('screen_sessions').delete().eq('id', l.id)), 'Minutes returned') });
     on('editThisKid', () => kidSheet(kid));
   });
 }
-function overSheet(kid) {
-  openSheet(`<h2>Screens without the clock</h2><p class="hint">These minutes come off ${esc(kid.name)}'s next week. They'll see the line item.</p>
-    <div class="chips">${[10, 15, 20, 30].map(m => `<button class="chip" type="button" data-om="${m}">${m} min</button>`).join('')}</div>
-    <div class="field"><label class="label" for="oMin">Minutes</label><input id="oMin" type="number" inputmode="numeric" min="1" value="15"></div>
-    <div class="field"><label class="label" for="oNote">Line item</label><input id="oNote" maxlength="120" value="Screens without the clock"></div>
-    <button class="save red" id="oGo" type="button">Take off next week</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
-    layer.querySelectorAll('[data-om]').forEach(b => b.onclick = () => { $('oMin').value = b.dataset.om });
-    $('oGo').onclick = async () => { const m = parseInt($('oMin').value) || 0; if (m < 1) return toast('Enter minutes.'); closeSheet();
-      await act(() => q(sb.from('screen_adjust').insert({ family_id: S.family.id, kid_id: kid.id, week_start: addDays(thisWeek(), 7), minutes: m, note: $('oNote').value.trim() || 'Screens without the clock' })), `${m} min off next week`) };
-  });
-}
+
 function kidSheet(kid) {
   const K = kid ? { ...kid, screen_days: [...(kid.screen_days || [6, 0])] } : { name: '', weekly_allowance: 5, color: Object.keys(COLORS)[S.kids.length % 6], base_screen_minutes: 100, reading_cap: 60, max_read_session: 60, screen_days: [6, 0] };
   const draw = () => openSheet(`<h2>${kid ? `Edit ${esc(kid.name)}` : 'Add a kid'}</h2>
@@ -753,9 +812,10 @@ function jobSheet(job) {
     <div class="field"><label class="label" for="jD">Done means</label><input id="jD" maxlength="160" value="${esc(J.done_means)}" placeholder="What finished looks like"></div>
     <div class="row2"><div class="field"><label class="label" for="jP">Price ($)</label><input id="jP" type="number" min="0" step="0.25" value="${J.price}"></div>
     <div class="field"><label class="label" for="jC">Group</label><select id="jC">${cats.map(c => `<option ${c === J.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div></div>
+    <div class="field"><label class="label" for="jM">Bonus screen minutes (optional)</label><input id="jM" type="number" inputmode="numeric" min="0" max="240" step="5" value="${Number(J.bonus_minutes) || 0}"></div>
     <button class="save" id="jGo" type="button">${job ? 'Save' : 'Add to board'}</button>${job ? '<button class="cancel danger-link" id="jDel" type="button">Delete job</button>' : ''}<button class="cancel" data-close type="button">Cancel</button>`, () => {
     $('jGo').onclick = async () => { const title = $('jT').value.trim(); if (!title) return toast('Name the job.'); const price = Math.max(0, r2(parseFloat($('jP').value) || 0)); closeSheet();
-      const body = { title, done_means: $('jD').value.trim(), price, category: $('jC').value };
+      const body = { title, done_means: $('jD').value.trim(), price, category: $('jC').value, bonus_minutes: Math.min(240, Math.max(0, parseInt($('jM').value) || 0)) };
       if (job) await act(() => q(sb.from('jobs').update(body).eq('id', job.id)), 'Saved');
       else await act(() => q(sb.from('jobs').insert({ ...body, family_id: S.family.id, kid_id: kid.id, enabled: true, sort: S.jobs.length })), 'Added') };
     if (job) $('jDel').onclick = () => confirmSheet('Delete this job?', 'Money already earned for it stays.', 'Delete', () => q(sb.from('jobs').delete().eq('id', job.id)), 'Deleted');
@@ -768,7 +828,7 @@ function copyBoardSheet() {
     <button class="cancel" data-close type="button">Cancel</button>`, () => {
     layer.querySelectorAll('[data-copyto]').forEach(b => b.onclick = () => { const k = kidById(b.dataset.copyto); confirmSheet(`Replace ${k.name}'s board?`, 'Their current jobs are swapped for a copy of this board.', 'Replace board', async () => {
       await q(sb.from('jobs').delete().eq('kid_id', k.id));
-      await q(sb.from('jobs').insert(S.jobs.filter(j => j.kid_id === src.id).map(j => ({ family_id: S.family.id, kid_id: k.id, title: j.title, done_means: j.done_means, category: j.category, price: j.price, enabled: j.enabled, sort: j.sort }))));
+      await q(sb.from('jobs').insert(S.jobs.filter(j => j.kid_id === src.id).map(j => ({ family_id: S.family.id, kid_id: k.id, title: j.title, done_means: j.done_means, category: j.category, price: j.price, bonus_minutes: j.bonus_minutes || 0, enabled: j.enabled, sort: j.sort }))));
     }, 'Board copied') });
   });
 }

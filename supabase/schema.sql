@@ -41,6 +41,8 @@ create table if not exists public.kids (
   max_read_session    int not null default 60 check (max_read_session between 5 and 240),
   screen_days         int[] not null default '{6,0}',
   start_week          date not null,
+  goal_name           text check (char_length(goal_name) <= 60),
+  goal_amount         numeric(8,2) check (goal_amount > 0 and goal_amount <= 100000),
   created_at          timestamptz not null default now()
 );
 
@@ -54,6 +56,7 @@ create table if not exists public.jobs (
   price       numeric(8,2) not null default 1 check (price >= 0 and price <= 1000),
   enabled     boolean not null default true,
   sort        int not null default 0,
+  bonus_minutes int not null default 0 check (bonus_minutes between 0 and 240),
   created_at  timestamptz not null default now()
 );
 
@@ -79,7 +82,11 @@ create table if not exists public.credits (
   title       text not null check (char_length(title) between 1 and 120),
   amount      numeric(8,2) not null check (amount > 0 and amount <= 1000),
   created_at  timestamptz not null default now(),
-  created_by  uuid default auth.uid()
+  created_by  uuid default auth.uid(),
+  -- 'pending' = the kid tapped "I did it" and a parent hasn't approved yet. Only 'approved' counts.
+  status      text not null default 'approved' check (status in ('approved','pending')),
+  minutes     int not null default 0 check (minutes between 0 and 600),
+  job_id      uuid references public.jobs on delete set null
 );
 
 -- Money out of a kid's balance: cash or a transfer the parent handed over ('payout'),
@@ -128,7 +135,18 @@ create table if not exists public.screen_sessions (
   minutes       int not null default 0
 );
 
--- Screen minutes used without the clock, taken off a later weekend.
+-- Extra screen minutes a parent gives, always with an explanation.
+create table if not exists public.screen_bonus (
+  id          uuid primary key default gen_random_uuid(),
+  family_id   uuid not null references public.families on delete cascade,
+  kid_id      uuid not null references public.kids on delete cascade,
+  week_start  date not null,
+  minutes     int not null check (minutes between 1 and 600),
+  note        text not null check (char_length(trim(note)) between 1 and 120),
+  created_at  timestamptz not null default now()
+);
+
+-- Older versions used this to take minutes away. The app no longer does that; kept so upgrades don't fail.
 create table if not exists public.screen_adjust (
   id          uuid primary key default gen_random_uuid(),
   family_id   uuid not null references public.families on delete cascade,
@@ -151,6 +169,12 @@ alter table public.screen_sessions add column if not exists note text;
 alter table public.screen_sessions alter column minutes set default 0;
 alter table public.screen_sessions drop constraint if exists screen_sessions_minutes_check;
 alter table public.reading_sessions drop constraint if exists reading_sessions_minutes_check;
+alter table public.credits add column if not exists status text not null default 'approved';
+alter table public.credits add column if not exists minutes int not null default 0;
+alter table public.credits add column if not exists job_id uuid references public.jobs on delete set null;
+alter table public.jobs add column if not exists bonus_minutes int not null default 0;
+alter table public.kids add column if not exists goal_name text;
+alter table public.kids add column if not exists goal_amount numeric(8,2);
 
 create index if not exists jobs_kid on public.jobs (kid_id);
 create index if not exists credits_kid on public.credits (kid_id, week_start);
@@ -226,6 +250,7 @@ alter table public.transactions     enable row level security;
 alter table public.reading_sessions enable row level security;
 alter table public.screen_sessions  enable row level security;
 alter table public.screen_adjust    enable row level security;
+alter table public.screen_bonus     enable row level security;
 
 drop policy if exists fam_select on public.families;
 drop policy if exists fam_update on public.families;
@@ -242,7 +267,7 @@ create policy inv_all on public.family_invites for all to authenticated
 do $$
 declare t text;
 begin
-  foreach t in array array['kids','jobs','reading_sessions','screen_sessions','screen_adjust'] loop
+  foreach t in array array['kids','jobs','reading_sessions','screen_sessions','screen_adjust','screen_bonus'] loop
     execute format('drop policy if exists fam_all on public.%I', t);
     execute format('create policy fam_all on public.%I for all to authenticated using (family_id in (select public.my_family_ids())) with check (family_id in (select public.my_family_ids()))', t);
   end loop;
@@ -269,3 +294,17 @@ begin
     execute format('create policy cr_delete on public.%I for delete to authenticated using (family_id in (select public.my_family_ids()))', t);
   end loop;
 end $$;
+
+-- A parent approves a kid's claim by flipping status to 'approved'. Nothing else about an entry can change.
+drop policy if exists cr_update on public.credits;
+create policy cr_update on public.credits for update to authenticated using (family_id in (select public.my_family_ids())) with check (family_id in (select public.my_family_ids()));
+create or replace function public.credits_only_approve() returns trigger language plpgsql as $$
+begin
+  if new.amount <> old.amount or new.title <> old.title or new.kid_id <> old.kid_id or new.kind <> old.kind or new.minutes <> old.minutes or new.week_start <> old.week_start
+     or not (old.status = 'pending' and new.status = 'approved') then
+    raise exception 'entries can only be approved, not changed';
+  end if;
+  return new;
+end $$;
+drop trigger if exists credits_only_approve on public.credits;
+create trigger credits_only_approve before update on public.credits for each row execute function public.credits_only_approve();

@@ -62,14 +62,16 @@ That's it. Visit the site, sign in with your email, and set up your family.
 |---|---|
 | Week | Monday to Sunday in the family's time zone (set in Settings). |
 | Allowance | Each Monday a kid's week starts at their weekly allowance. A change applies from the next Monday. |
-| Jobs | A parent taps **Log a job** and picks from that kid's board. The price is added to this week. |
-| Bonuses | **Add money** with a reason the kid can see. |
+| Jobs | The kid taps a job and **I did it**. It waits under **Needs your OK** (with a badge) until a parent taps **OK** or **Not yet**. Parents can also log a job directly. A job can also carry bonus screen minutes. |
+| Bonuses | **Add bonus**: money or screen minutes, always with an explanation the kid can see. |
+| Saving goal | The kid picks something to save for and sees a progress bar against their balance. When there's enough, **Bought something** fills in the goal. |
+| What you owe | Each kid's card shows what you owe and when you last paid. After two weeks with no payment, a reminder with **Paid all** appears (not while the kid is saving toward a goal). The Bank tab breaks it down by week. |
 | Paying out | **Bank → Paid [kid]**: type the amount you handed over and an explanation. It comes off the balance you owe. |
 | Purchases | **Bank → Bought something**: what you bought for them with their money, with an explanation. You can't go below their balance. |
 | Taking money away | Not possible. A parent can **undo** an entry made by mistake (this week's jobs and bonuses, or any payment or purchase). |
 | Totals per kid | Balance (what you owe), this week, this month, lifetime earned, paid out, and spent. Each entry shows the running balance, like a bank statement. |
 | Reading | The kid starts a timer and types the book, and can pause and resume it. Time is kept to the second, so 10:40 + 10:20 = 21 minutes, and each full minute adds a screen minute that week, up to the kid's limit. A forgotten timer stops itself. Parents can add reading by hand. |
-| Screen time | Base minutes plus reading minutes, used on the kid's screen days. The clock counts down the week's time to the second and can be paused. It stops itself at zero. Parents can add screen time used by hand (it counts this week), or take minutes off next week. Base minutes, screen days and reading limit are in **Settings → Screen time**. |
+| Screen time | Base minutes plus reading minutes, used on the kid's screen days. The clock counts down the week's time to the second and can be paused. It stops itself at zero. Parents can add screen time used by hand (it counts this week). Time is never taken away as a punishment. Base minutes, screen days and reading limit are in **Settings → Screen time**. |
 | Parent PIN | Kids share the parent's sign-in, so parent tools sit behind a 4-digit PIN. After signing in fresh with the email code, a parent can reset a forgotten PIN. |
 | Second parent | Settings → **Invite another parent**. They sign in with that email and join automatically. |
 | Delete | Settings → **Delete account and all data** removes the family and the login. |

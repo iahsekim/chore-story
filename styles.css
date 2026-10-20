@@ -402,3 +402,25 @@ body{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/20
 .hero,.board{position:relative;overflow:visible}
 .hero::after{border-radius:0 28px 0 0}
 .hero::after{right:12px;top:12px;width:96px;height:96px}
+
+/* ---------- goals, owed, claims ---------- */
+.goal{gap:10px}
+.goal-h{display:flex;align-items:center;gap:12px}
+.goal-h .t{flex:1;min-width:0;display:grid;gap:2px}
+.goal-h .t b{font:700 20px/1.15 var(--display);overflow-wrap:anywhere}
+.goal-n{font:800 20px var(--display);color:var(--money);text-align:right;white-space:nowrap}
+.goal-n small{display:block;font:700 12px var(--body);color:var(--muted)}
+button.bucket{text-align:left;font:inherit;color:inherit;cursor:pointer}
+.bucket .see{font-size:12px;font-weight:800;color:var(--muted);text-decoration:underline}
+.nudge{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#FFF1C2;color:#4A3800;border:2.5px solid var(--edge);border-radius:18px;padding:12px 14px;box-shadow:var(--pop);font-size:14px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .nudge{background:#3A3010;color:#FFE9A8}}
+:root[data-theme="dark"] .nudge{background:#3A3010;color:#FFE9A8}
+.nudge b{font-weight:900}
+.owedline{padding:0 18px 12px;font-size:13px;font-weight:700;color:var(--muted)}
+.owedhint{margin-top:-4px}
+.weeksince{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.weeksince::-webkit-scrollbar{display:none}
+.weeksince span{flex:none;display:grid;gap:2px;padding:8px 12px;border-radius:12px;background:var(--sunk);border:2px solid var(--line)}
+.weeksince small{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.weeksince b{font:800 18px var(--display)}
+.kh+.owedline{margin-top:-8px}
