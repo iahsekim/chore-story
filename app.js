@@ -218,7 +218,7 @@ function authHTML() {
         <button class="save" id="emailGo" type="button">Email me a sign-in code</button>
         <p class="hint">No password. We email you a code each time you sign in on a new device. Kids sign in with your email too, then pick their name.</p>`}
     </div>
-    <div class="foot">${supportHTML()}<span><button class="link" type="button" data-fb="hi">Contact</button> · <a href="privacy.html">Privacy</a></span></div></section>`;
+    <div class="foot">${supportHTML()}<span><button class="link" type="button" data-fb="hi">Contact</button> · <button class="link" type="button" data-privacy>Privacy</button></span></div></section>`;
 }
 async function sendCode() {
   const email = $('emailIn').value.trim().toLowerCase();
@@ -508,7 +508,7 @@ function pSettings() {
     <section class="card"><span class="label">Support ${esc(APP)}</span><p class="hint">${esc(APP)} is free. If it helps your family, a coffee keeps it running.</p>${supportHTML(true)}</section>
     <section class="card"><span class="label">Account</span><p class="hint">Signed in as ${esc(S.user.email)}</p>
       <div class="ptools"><button class="pill soft" id="signOut" type="button">Sign out</button><button class="pill no" id="delAcct" type="button">Delete account and all data</button></div>
-      <a class="hint" href="privacy.html">Privacy</a></section>`;
+      <button class="link" type="button" data-privacy style="justify-self:start">Privacy</button></section>`;
 }
 function tzOptions(cur) {
   let list = []; try { list = Intl.supportedValuesOf('timeZone') } catch (e) { list = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix', 'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu'] }
@@ -582,6 +582,7 @@ function bindAll() {
     if (!days.length) return toast('Pick at least one screen day.');
     act(() => q(sb.from('kids').update({ base_screen_minutes: Math.max(0, parseInt($('sb-' + id).value) || 0), reading_cap: Math.max(0, parseInt($('sr-' + id).value) || 0), screen_days: days }).eq('id', id)), 'Screen time saved') });
   each('[data-fb]', el => feedbackSheet(el.dataset.fb));
+  each('[data-privacy]', () => privacySheet());
 }
 function bindBoards() {
   const kid = kidById(S.profile); if (!kid) return;
@@ -851,6 +852,19 @@ function feedbackSheet(kind) {
     };
   });
   draw.msg = ''; draw.email = undefined; draw();
+}
+const PRIVACY = [
+  ['The short version', `${APP} is a free tool for families. It keeps as little as possible, never sells or shares it, and has no ads, trackers or analytics.`],
+  ['What we store', 'The parent\u2019s email address, used only to send sign-in codes. A family name, time zone and a scrambled (hashed) parent PIN. For each kid: a first name and color, allowance amount, job board, jobs and bonuses with their explanations, payments and purchases with their explanations, a saving goal if one is set, reading sessions (book titles and time) and screen-time sessions.'],
+  ['What we don\u2019t collect', 'No last names, birthdays, photos, locations, school names, contact details or anything else about kids. Kids never make an account or enter an email. Everything sits under the parent\u2019s account.'],
+  ['Who can see it', 'Only the parents signed in to your family. Data is stored with Supabase and protected by database rules that keep each family\u2019s records separate from every other family\u2019s.'],
+  ['Feedback messages', 'If you send a bug report, idea or message, it\u2019s delivered to the person who runs this site, along with the email you typed (optional) and which screen you were on.'],
+  ['Donations', 'The Venmo and Cash App links open those apps. This site never sees your payment details.'],
+  ['Deleting your data', 'Parent \u2192 Settings \u2192 Delete account and all data permanently removes your family, every kid profile and all history right away.'],
+  ['Questions', 'Use Contact on the sign-in screen, or Settings \u2192 Contact & feedback.']
+];
+function privacySheet() {
+  openSheet(`<span class="label">${esc(APP)}</span><h2>Privacy</h2>${PRIVACY.map(([h, t]) => `<div class="field"><b style="font:700 18px var(--display)">${h}</b><p class="hint" style="color:var(--ink);font-size:15px;line-height:1.55">${t}</p></div>`).join('')}<p class="hint">Last updated October 2026.</p><button class="save" data-close type="button">Done</button>`);
 }
 function deleteSheet() {
   openSheet(`<h2>Delete everything?</h2><p class="hint">This permanently deletes your family, every kid profile, all earnings history, reading and screen time, and your sign-in. Other parents on this family lose access too.</p>
