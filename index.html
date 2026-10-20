@@ -20,6 +20,10 @@
 <body>
 <div class="wrap" id="app"><div class="loading">Loading…</div></div>
 <div id="layer"></div>
+<!-- Netlify Forms: this hidden form lets Netlify detect the feedback form at deploy time. -->
+<form name="feedback" data-netlify="true" netlify-honeypot="bot-field" hidden>
+  <input name="bot-field"><input name="type"><textarea name="message"></textarea><input name="email"><input name="page"><input name="app">
+</form>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="jobs.js"></script>

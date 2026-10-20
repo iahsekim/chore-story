@@ -38,6 +38,11 @@ const money = n => (n < 0 ? '−' : '') + '$' + Math.abs(n).toFixed(2);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ms = iso => iso ? new Date(iso).getTime() : 0;
 const $ = id => document.getElementById(id);
+const titleCase = v => String(v || '').trim().replace(/\s+/g, ' ').replace(/(^|[\s-])(\p{L})/gu, (m, a, c) => a + c.toUpperCase());
+const capFirst = v => { const t = String(v || '').trim(); return t ? t[0].toUpperCase() + t.slice(1) : t };
+/* Color swatches update in place, so typing in nearby fields is never lost. */
+function swatchesHTML(sel, attr = 'data-sw') { return `<div class="swatches" role="radiogroup" aria-label="Color">${Object.entries(COLORS).map(([n, c]) => `<button class="sw" type="button" role="radio" ${attr}="${n}" aria-label="${n}" aria-checked="${sel === n}" aria-pressed="${sel === n}" style="background:${c}"></button>`).join('')}</div>` }
+function bindSwatches(root, attr, onPick) { root.querySelectorAll(`[${attr}]`).forEach(b => b.onclick = () => { root.querySelectorAll(`[${attr}]`).forEach(x => { const on = x === b; x.setAttribute('aria-pressed', on); x.setAttribute('aria-checked', on) }); onPick(b.getAttribute(attr)) }) }
 
 /* ---------- data access ---------- */
 async function q(p) { const { data, error } = await p; if (error) throw error; return data }
@@ -183,7 +188,7 @@ function authHTML() {
         <button class="save" id="emailGo" type="button">Email me a sign-in code</button>
         <p class="hint">No password. We email you a code each time you sign in on a new device. Kids sign in with your email too, then pick their name.</p>`}
     </div>
-    <div class="foot">${supportHTML()}<a href="privacy.html">Privacy</a></div></section>`;
+    <div class="foot">${supportHTML()}<span><button class="link" type="button" data-fb="hi">Contact</button> · <a href="privacy.html">Privacy</a></span></div></section>`;
 }
 async function sendCode() {
   const email = $('emailIn').value.trim().toLowerCase();
@@ -206,7 +211,7 @@ function onboardHTML() {
   const steps = `<div class="steps">${[0, 1, 2].map(i => `<i class="${i <= O.step ? 'on' : ''}"></i>`).join('')}</div>`;
   if (O.step === 0) return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Welcome</h2>
     <p class="lede">Set up your family in about a minute.</p>
-    <div class="card form"><div class="field"><label class="label" for="famName">Family name</label><input id="famName" maxlength="60" placeholder="The Smiths" value="${esc(O.name)}"></div>
+    <div class="card form"><div class="field"><label class="label" for="famName">Family name</label><input id="famName" maxlength="60" placeholder="The Smiths" autocapitalize="words" value="${esc(O.name)}"></div>
     <p class="hint">Weeks start Monday in your time zone: <b>${esc(O.tz)}</b>.</p>
     <button class="save" id="ob0" type="button">Next</button></div></section>`;
   if (O.step === 1) return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Parent PIN</h2>
@@ -214,20 +219,22 @@ function onboardHTML() {
     <div class="card form"><div class="field"><label class="label" for="pin1">Choose a PIN</label><input id="pin1" class="pin" inputmode="numeric" type="password" maxlength="4" autocomplete="off"></div>
     <div class="field"><label class="label" for="pin2">Type it again</label><input id="pin2" class="pin" inputmode="numeric" type="password" maxlength="4" autocomplete="off"></div>
     <button class="save" id="ob1" type="button">Next</button></div></section>`;
+  const D = O.draft, n = O.kids.length;
   return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Add your kids</h2>
     <p class="lede">First names only. Each kid gets their own job board, which you can change later.</p>
-    <div class="card form">
-      ${O.kids.map((k, i) => `<div class="kidrow">${avatar(k)}<span><b>${esc(k.name)}</b><span class="hint" style="display:block">$${Number(k.allowance).toFixed(2)} a week</span></span><button class="link" type="button" data-rmkid="${i}">Remove</button></div>`).join('')}
-      <div class="row2"><div class="field"><label class="label" for="kName">First name</label><input id="kName" maxlength="40" autocomplete="off"></div>
-      <div class="field"><label class="label" for="kAllow">Weekly $</label><input id="kAllow" type="number" inputmode="decimal" min="0" step="0.5" value="5"></div></div>
-      <div class="field"><span class="label">Color</span><div class="swatches">${Object.entries(COLORS).map(([n, c]) => `<button class="sw" type="button" data-sw="${n}" aria-label="${n}" aria-pressed="${O.color === n}" style="background:${c}"></button>`).join('')}</div></div>
-      <button class="pill soft" id="kAdd" type="button" style="justify-self:start">+ Add kid</button>
-      <button class="save" id="ob2" type="button">Finish setup</button></div></section>`;
+    ${n ? `<div class="card form"><span class="label">Your kids · ${n}</span>${O.kids.map((k, i) => `<div class="kidrow">${avatar(k)}<span><b>${esc(k.name)}</b><span class="hint" style="display:block">${money(Number(k.allowance))} a week</span></span><button class="link" type="button" data-rmkid="${i}">Remove</button></div>`).join('')}</div>` : ''}
+    <div class="card form kidform">
+      <div class="kidform-h"><span class="avatar" id="kPrev" style="background:${COLORS[D.color]}">${esc((D.name || '?').slice(0, 1).toUpperCase())}</span><span><span class="label">${n ? 'Add another kid' : 'Your first kid'}</span><b id="kPrevName">${esc(D.name || 'First name')}</b></span></div>
+      <div class="row2"><div class="field"><label class="label" for="kName">First name</label><input id="kName" maxlength="40" autocomplete="off" autocapitalize="words" value="${esc(D.name)}" placeholder="Eli"></div>
+      <div class="field"><label class="label" for="kAllow">Weekly allowance ($)</label><input id="kAllow" type="number" inputmode="decimal" min="0" step="0.5" value="${esc(D.allowance)}"></div></div>
+      <div class="field"><span class="label">Color</span>${swatchesHTML(D.color)}</div>
+      <button class="pill soft" id="kAdd" type="button" style="justify-self:start">+ Save and add another kid</button></div>
+    <button class="save" id="ob2" type="button">Finish setup</button></section>`;
 }
 async function finishOnboard() {
   const O = S.onboard; const b = $('ob2'); b.disabled = true; b.textContent = 'Setting up…';
   try {
-    const fid = await q(sb.rpc('create_family', { p_name: O.name, p_tz: O.tz }));
+    const fid = await q(sb.rpc('create_family', { p_name: titleCase(O.name) || 'Our Family', p_tz: O.tz }));
     S.family = { id: fid, timezone: O.tz };
     await q(sb.from('families').update({ pin_hash: await hashPin(fid, O.pin) }).eq('id', fid));
     for (const k of O.kids) await addKid(k.name, k.allowance, k.color);
@@ -407,7 +414,7 @@ function pSettings() {
   return `<section class="sect"><div class="sect-h"><h3>Kids</h3></div><div class="list">${S.kids.map(k => `<button class="row" type="button" data-editkid="${k.id}">${avatar(k)}<span class="t"><b>${esc(k.name)}</b><span>${money(Number(k.weekly_allowance))} a week · ${k.base_screen_minutes} screen min · reading up to +${k.reading_cap}</span></span></button>`).join('')}</div>
     <button class="pill soft" id="addKidBtn" type="button" style="justify-self:start">+ Add a kid</button></section>
     <section class="card"><span class="label">Family</span>
-      <div class="field"><label class="label" for="sFam">Family name</label><input id="sFam" maxlength="60" value="${esc(F.name)}"></div>
+      <div class="field"><label class="label" for="sFam">Family name</label><input id="sFam" maxlength="60" autocapitalize="words" value="${esc(F.name)}"></div>
       <div class="field"><label class="label" for="sTz">Time zone (weeks reset Monday here)</label><select id="sTz">${tzOptions(F.timezone)}</select></div>
       <button class="save" id="saveFam" type="button">Save</button>
       <button class="pill soft" id="changePin" type="button" style="justify-self:start">Change parent PIN</button></section>
@@ -417,6 +424,8 @@ function pSettings() {
       <div class="field"><label class="label" for="invEmail">Invite another parent</label><input id="invEmail" type="email" placeholder="partner@example.com"></div>
       <button class="pill" id="invGo" type="button" style="justify-self:start">Add parent</button>
       <p class="hint">They sign in at this site with that email and join your family automatically.</p></section>
+    <section class="card"><span class="label">Contact & feedback</span><p class="hint">Found a bug, have an idea, or just want to say hi? It goes straight to the person who makes ${esc(APP)}.</p>
+      <div class="ptools"><button class="pill soft" type="button" data-fb="bug">Report a bug</button><button class="pill soft" type="button" data-fb="idea">Request a feature</button><button class="pill soft" type="button" data-fb="hi">Say hi</button></div></section>
     <section class="card"><span class="label">Support ${esc(APP)}</span><p class="hint">${esc(APP)} is free. If it helps your family, a coffee keeps it running.</p>${supportHTML(true)}</section>
     <section class="card"><span class="label">Account</span><p class="hint">Signed in as ${esc(S.user.email)}</p>
       <div class="ptools"><button class="pill soft" id="signOut" type="button">Sign out</button><button class="pill no" id="delAcct" type="button">Delete account and all data</button></div>
@@ -437,12 +446,20 @@ function bindAll() {
   if ($('emailIn')) $('emailIn').onkeydown = e => { if (e.key === 'Enter') sendCode() };
   if ($('codeIn')) $('codeIn').oninput = e => { if (e.target.value.replace(/\D/g, '').length === 6) verifyCode() };
   // onboarding
-  on('ob0', () => { S.onboard.name = $('famName').value.trim() || 'Our family'; S.onboard.step = 1; render() });
+  if ($('famName')) $('famName').onblur = e => { e.target.value = titleCase(e.target.value) };
+  on('ob0', () => { S.onboard.name = titleCase($('famName').value) || 'Our Family'; S.onboard.step = 1; render() });
   on('ob1', () => { const a = $('pin1').value, b = $('pin2').value; if (!/^\d{4}$/.test(a)) return toast('Use 4 digits.'); if (a !== b) return toast('The PINs don’t match.'); S.onboard.pin = a; S.onboard.step = 2; render() });
-  each('[data-sw]', el => { if (S.view === 'onboard') { S.onboard.color = el.dataset.sw; render() } });
-  on('kAdd', () => { const n = $('kName').value.trim(); if (!n) return toast('Type a first name.'); S.onboard.kids.push({ name: n, allowance: Number($('kAllow').value) || 0, color: S.onboard.color }); const keys = Object.keys(COLORS); S.onboard.color = keys[S.onboard.kids.length % keys.length]; render(); $('kName')?.focus() });
+  if (S.view === 'onboard' && S.onboard.step === 2) {
+    const D = S.onboard.draft, prev = () => { const p = $('kPrev'); if (p) { p.style.background = COLORS[D.color]; p.textContent = (D.name || '?').slice(0, 1).toUpperCase() } const nm = $('kPrevName'); if (nm) nm.textContent = D.name || 'First name' };
+    $('kName').oninput = e => { D.name = e.target.value; prev() };
+    $('kName').onblur = e => { e.target.value = D.name = capFirst(e.target.value); prev() };
+    $('kAllow').oninput = e => { D.allowance = e.target.value };
+    bindSwatches(app, 'data-sw', c => { D.color = c; prev() });
+    const take = () => { const nm = capFirst(D.name); if (!nm) return false; S.onboard.kids.push({ name: nm, allowance: Number(D.allowance) || 0, color: D.color }); const keys = Object.keys(COLORS); S.onboard.draft = { name: '', allowance: D.allowance || '5', color: keys[S.onboard.kids.length % keys.length] }; return true };
+    on('kAdd', () => { if (!take()) { toast('Type a first name first.'); return $('kName').focus() } render(); toast('Added. Add another, or tap Finish setup.'); $('kName')?.focus() });
+    on('ob2', () => { take(); if (!S.onboard.kids.length) { toast('Add at least one kid.'); return $('kName').focus() } finishOnboard() });
+  }
   each('[data-rmkid]', el => { S.onboard.kids.splice(Number(el.dataset.rmkid), 1); render() });
-  on('ob2', () => { const n = $('kName')?.value.trim(); if (n) S.onboard.kids.push({ name: n, allowance: Number($('kAllow').value) || 0, color: S.onboard.color }); if (!S.onboard.kids.length) return toast('Add at least one kid.'); finishOnboard() });
   // who
   each('[data-who]', el => chooseProfile(el.dataset.who));
   on('swapBtn', switchProfile);
@@ -468,12 +485,13 @@ function bindAll() {
   each('[data-purchase]', el => txSheet(kidById(el.dataset.purchase), 'purchase'));
   each('[data-allstmt]', el => statementSheet(kidById(el.dataset.allstmt)));
   bindUndo(app);
-  on('saveFam', () => act(() => q(sb.from('families').update({ name: $('sFam').value.trim() || 'Our family', timezone: $('sTz').value }).eq('id', S.family.id)), 'Saved'));
+  on('saveFam', () => act(() => q(sb.from('families').update({ name: titleCase($('sFam').value) || 'Our Family', timezone: $('sTz').value }).eq('id', S.family.id)), 'Saved'));
   on('changePin', () => newPinSheet());
   on('invGo', () => { const e = $('invEmail').value.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return toast('Enter a valid email.'); act(() => q(sb.from('family_invites').upsert({ family_id: S.family.id, email: e })), 'Invite saved') });
   on('signOutWho', async () => { await sb.auth.signOut(); store.set('profile', null); store.set('signed-in', null); location.reload() });
   on('signOut', async () => { await sb.auth.signOut(); store.set('profile', null); location.reload() });
   on('delAcct', deleteSheet);
+  each('[data-fb]', el => feedbackSheet(el.dataset.fb));
 }
 function bindBoards() {
   const kid = kidById(S.profile); if (!kid) return;
@@ -647,7 +665,7 @@ function kidSheet(kid) {
   const K = kid ? { ...kid, screen_days: [...(kid.screen_days || [6, 0])] } : { name: '', weekly_allowance: 5, color: Object.keys(COLORS)[S.kids.length % 6], base_screen_minutes: 100, reading_cap: 60, max_read_session: 60, screen_days: [6, 0] };
   const draw = () => openSheet(`<h2>${kid ? `Edit ${esc(kid.name)}` : 'Add a kid'}</h2>
     <div class="field"><label class="label" for="kN">First name</label><input id="kN" maxlength="40" value="${esc(K.name)}"></div>
-    <div class="field"><span class="label">Color</span><div class="swatches">${Object.entries(COLORS).map(([n, c]) => `<button class="sw" type="button" data-ksw="${n}" aria-label="${n}" aria-pressed="${K.color === n}" style="background:${c}"></button>`).join('')}</div></div>
+    <div class="field"><span class="label">Color</span>${swatchesHTML(K.color, 'data-ksw')}</div>
     <div class="row2"><div class="field"><label class="label" for="kA">Weekly allowance ($)</label><input id="kA" type="number" min="0" step="0.5" value="${K.weekly_allowance}"></div>
     <div class="field"><label class="label" for="kS">Screen min / week</label><input id="kS" type="number" min="0" step="5" value="${K.base_screen_minutes}"></div></div>
     <div class="row2"><div class="field"><label class="label" for="kR">Reading bonus limit</label><input id="kR" type="number" min="0" step="5" value="${K.reading_cap}"></div>
@@ -657,9 +675,10 @@ function kidSheet(kid) {
     <button class="save" id="kGo" type="button">${kid ? 'Save' : 'Add kid'}</button>
     ${kid ? `<button class="cancel danger-link" id="kDel" type="button">Remove ${esc(kid.name)} and their history</button>` : ''}<button class="cancel" data-close type="button">Cancel</button>`, () => {
     const keep = () => { K.name = $('kN').value; K.weekly_allowance = $('kA').value; K.base_screen_minutes = $('kS').value; K.reading_cap = $('kR').value; K.max_read_session = $('kM').value };
-    layer.querySelectorAll('[data-ksw]').forEach(b => b.onclick = () => { keep(); K.color = b.dataset.ksw; draw() });
+    bindSwatches(layer, 'data-ksw', c => { K.color = c });
+    $('kN').onblur = e => { e.target.value = capFirst(e.target.value) };
     layer.querySelectorAll('[data-kd]').forEach(b => b.onclick = () => { keep(); const d = Number(b.dataset.kd); K.screen_days = K.screen_days.includes(d) ? K.screen_days.filter(x => x !== d) : [...K.screen_days, d]; draw() });
-    $('kGo').onclick = async () => { keep(); const name = K.name.trim(); if (!name) return toast('Type a first name.'); closeSheet();
+    $('kGo').onclick = async () => { keep(); const name = capFirst(K.name); if (!name) { toast('Type a first name.'); return $('kN').focus() } closeSheet();
       const body = { name, color: K.color, weekly_allowance: Math.max(0, Number(K.weekly_allowance) || 0), base_screen_minutes: Math.max(0, parseInt(K.base_screen_minutes) || 0), reading_cap: Math.max(0, parseInt(K.reading_cap) || 0), max_read_session: Math.min(240, Math.max(5, parseInt(K.max_read_session) || 60)), screen_days: K.screen_days };
       if (kid) await act(() => q(sb.from('kids').update(body).eq('id', kid.id)), 'Saved');
       else await act(() => addKid(name, body.weekly_allowance, body.color).then(k => q(sb.from('kids').update(body).eq('id', k.id))), `${name} added`) };
@@ -694,6 +713,26 @@ function copyBoardSheet() {
     }, 'Board copied') });
   });
 }
+const FB = { bug: ['Report a bug', 'What happened, and what did you expect? Which screen were you on?'], idea: ['Request a feature', 'What would make this more useful for your family?'], hi: ['Say hi', 'Questions, thanks, anything.'] };
+function feedbackSheet(kind) {
+  let K = FB[kind] ? kind : 'hi';
+  const draw = () => openSheet(`<h2>${FB[K][0]}</h2>
+    <div class="seg">${Object.entries(FB).map(([k, v]) => `<button type="button" data-fk="${k}" aria-pressed="${k === K}">${({ bug: 'Bug', idea: 'Feature idea', hi: 'Say hi' })[k]}</button>`).join('')}</div>
+    <div class="field"><label class="label" for="fbMsg">Message</label><textarea id="fbMsg" class="textarea" maxlength="2000" placeholder="${esc(FB[K][1])}">${esc(draw.msg || '')}</textarea></div>
+    <div class="field"><label class="label" for="fbEmail">Your email (so I can reply, optional)</label><input id="fbEmail" type="email" value="${esc(draw.email ?? (S.user?.email || ''))}" placeholder="you@example.com"></div>
+    <button class="save" id="fbGo" type="button">Send</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+    const keep = () => { draw.msg = $('fbMsg').value; draw.email = $('fbEmail').value };
+    layer.querySelectorAll('[data-fk]').forEach(b => b.onclick = () => { keep(); K = b.dataset.fk; draw() });
+    $('fbGo').onclick = async () => {
+      keep(); const msg = draw.msg.trim(); if (msg.length < 3) { toast('Write a short message first.'); return $('fbMsg').focus() }
+      const b = $('fbGo'); b.disabled = true; b.textContent = 'Sending\u2026';
+      const body = new URLSearchParams({ 'form-name': 'feedback', 'bot-field': '', type: FB[K][0], message: msg, email: draw.email.trim(), page: S.view + (S.view === 'parent' ? '/' + S.ptab : S.view === 'kid' ? '/' + S.tab : ''), app: navigator.userAgent.slice(0, 200) });
+      try { const r = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() }); if (!r.ok) throw new Error(r.status); draw.msg = ''; closeSheet(); toast('Sent. Thank you!') }
+      catch (e) { b.disabled = false; b.textContent = 'Send'; toast(CFG.contactEmail ? `Couldn\u2019t send. Email ${CFG.contactEmail} instead.` : 'Couldn\u2019t send. Try again in a minute.') }
+    };
+  });
+  draw.msg = ''; draw.email = undefined; draw();
+}
 function deleteSheet() {
   openSheet(`<h2>Delete everything?</h2><p class="hint">This permanently deletes your family, every kid profile, all earnings history, reading and screen time, and your sign-in. Other parents on this family lose access too.</p>
     <div class="field"><label class="label" for="delType">Type DELETE to confirm</label><input id="delType" autocomplete="off"></div>
@@ -709,7 +748,7 @@ async function enter(session) {
   try {
     let fid = (await q(sb.from('family_members').select('family_id').eq('user_id', S.user.id).limit(1)))[0]?.family_id;
     if (!fid) fid = await q(sb.rpc('accept_invites'));
-    if (!fid) { S.onboard = { step: 0, name: '', tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Denver', pin: '', kids: [], color: 'green' }; S.view = 'onboard'; return render() }
+    if (!fid) { S.onboard = { step: 0, name: '', tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Denver', pin: '', kids: [], draft: { name: '', allowance: '5', color: 'green' } }; S.view = 'onboard'; return render() }
     S.family = { id: fid }; await loadAll();
     const fresh = store.get('signed-in') !== S.user.id; store.set('signed-in', S.user.id); S.canResetPin = fresh;
     const p = store.get('profile');

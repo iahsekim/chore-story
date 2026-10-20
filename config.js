@@ -5,5 +5,6 @@ window.CHORE_JAR_CONFIG = {
   supabaseAnonKey: 'YOUR-ANON-KEY',
   appName: 'Chore Story',
   venmo: 'mike-shai',
-  cashapp: 'mikeshai'
+  cashapp: 'mikeshai',
+  contactEmail: ''   // optional: shown as a fallback if the feedback form can't send
 };

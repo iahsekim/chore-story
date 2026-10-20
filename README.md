@@ -44,6 +44,9 @@ Supabase's built-in email only sends a few emails per hour, which is fine for te
 
 ### 4. Deploy on Netlify
 
+Feedback (Settings → Contact & feedback) uses **Netlify Forms**, so there's nothing to set up beyond deploying. After the first deploy, turn on email alerts in Netlify: **Site → Forms → Form notifications → Add notification → Email** and enter your address. Messages also show under **Forms → feedback**.
+
+
 1. Push this repo to GitHub.
 2. In Netlify: **Add new site → Import an existing project → GitHub →** pick this repo.
 3. Leave the build command empty. The publish directory is `.` (already set in `netlify.toml`). Click **Deploy**.
@@ -70,6 +73,7 @@ That's it. Visit the site, sign in with your email, and set up your family.
 | Parent PIN | Kids share the parent's sign-in, so parent tools sit behind a 4-digit PIN. After signing in fresh with the email code, a parent can reset a forgotten PIN. |
 | Second parent | Settings → **Invite another parent**. They sign in with that email and join automatically. |
 | Delete | Settings → **Delete account and all data** removes the family and the login. |
+| Feedback | Settings → **Report a bug / Request a feature / Say hi**, or **Contact** on the sign-in screen. Sent through Netlify Forms. |
 
 ## Files
 
