@@ -34,19 +34,20 @@ The site is plain HTML, CSS and JavaScript with no build step. It's hosted on Ne
    Make the same change to the **Confirm signup** template, which a parent receives the very first time.
 3. **Authentication → URL Configuration**: set **Site URL** to your Netlify address (for example `https://chorestory.netlify.app`) and add it under **Redirect URLs**.
 
-### 3. Send sign-in emails from your own Gmail (important)
+### 3. Set up real email before you share it (important)
 
-Supabase's built-in email is for testing only: it sends just a few emails per hour, and only to people on your Supabase team. To let any family sign in, have Supabase send through a Gmail or Google Workspace account you already have. No extra service needed.
+Supabase's built-in email is for testing only: it sends just a few emails per hour, and only to people on your Supabase team. Before sharing the link, send sign-in emails through Resend (free tier: 3,000 emails a month).
 
-1. Turn on 2-Step Verification for the Google account, then create an **App password** at https://myaccount.google.com/apppasswords (name it "Chore Story").
-2. In Supabase: **Project Settings → Authentication → SMTP Settings → Enable custom SMTP**
-   - Host `smtp.gmail.com`, port `465`
-   - Username: the full Gmail or Workspace address
-   - Password: the 16-character app password
-   - Sender email: the same address. Sender name: `Chore Story`
-3. Under **Authentication → Rate Limits**, set emails to around 30 per hour.
+1. Make a free [Resend](https://resend.com) account, add a domain you own, and add the DNS records Resend shows you. Wait until the domain shows **Verified**.
+2. In Resend, create an **API key** (Sending access is enough).
+3. In Supabase: **Project Settings → Authentication → SMTP Settings → Enable custom SMTP**
+   - Host `smtp.resend.com`, port `465`
+   - Username `resend`
+   - Password: the Resend API key
+   - Sender email: an address on your verified domain, like `hello@yourdomain.com`. Sender name: `Chore Story`
+4. Under **Authentication → Rate Limits**, set emails to around 30 per hour.
 
-Gmail allows about 500 emails a day (Google Workspace about 2,000), which is plenty for sign-in codes.
+(Alternative with no new account: use a Gmail or Google Workspace address with an app password. Host `smtp.gmail.com`, port `465`.)
 
 ### 4. Deploy on Netlify
 
