@@ -3,7 +3,7 @@
 window.CHORE_JAR_CONFIG = {
   supabaseUrl: 'https://YOUR-PROJECT.supabase.co',
   supabaseAnonKey: 'YOUR-ANON-KEY',
-  appName: 'Chore Jar',
+  appName: 'Chore Story',
   venmo: 'mike-shai',
   cashapp: 'mikeshai'
 };

@@ -1,6 +1,6 @@
-/* Chore Jar — allowance, job board, reading log and weekend screen clock for families. */
+/* Chore Story — allowance, job board, reading log and weekend screen clock for families. */
 const CFG = window.CHORE_JAR_CONFIG;
-const APP = CFG.appName || 'Chore Jar';
+const APP = CFG.appName || 'Chore Story';
 const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
 const COLORS = { green: '#0E7A4A', blue: '#2453D6', purple: '#7340D0', orange: '#C2570C', pink: '#B8327A', teal: '#0F766E' };
@@ -138,6 +138,7 @@ const supportHTML = () => `<div class="support"><span>Free to use. Like it?</spa
   <a class="venmo" href="https://venmo.com/u/${encodeURIComponent(CFG.venmo)}" target="_blank" rel="noopener">${I.heart} Venmo @${esc(CFG.venmo)}</a>
   <a class="cash" href="https://cash.app/$${encodeURIComponent(CFG.cashapp)}" target="_blank" rel="noopener">${I.heart} Cash App $${esc(CFG.cashapp)}</a></div>`;
 
+const brandName = () => { const w = APP.split(' '); return w.length > 1 ? `${esc(w.slice(0, -1).join(' '))} <span class="story">${esc(w[w.length - 1])}</span>` : esc(APP) };
 /* ---------- top-level render ---------- */
 const app = $('app');
 function render() {
@@ -156,7 +157,7 @@ function render() {
 function authHTML() {
   const code = S.authStep === 'code';
   return `<section class="screen-center">
-    <div class="brand"><img src="icon.svg" alt=""><h1>${esc(APP)}</h1></div>
+    <div class="brand"><img src="icon.svg" alt=""><h1>${brandName()}</h1></div>
     <p class="lede">Allowance, chores, reading and screen time for kids. One weekly number they can see and trust.</p>
     <div class="card form">
       ${code ? `<div class="field"><label class="label" for="codeIn">Enter the 6-digit code we sent to ${esc(S.authEmail)}</label>
@@ -189,17 +190,17 @@ async function verifyCode() {
 function onboardHTML() {
   const O = S.onboard;
   const steps = `<div class="steps">${[0, 1, 2].map(i => `<i class="${i <= O.step ? 'on' : ''}"></i>`).join('')}</div>`;
-  if (O.step === 0) return `<section class="screen-center">${steps}<h2 style="font:900 34px/1 var(--display);text-transform:uppercase">Welcome</h2>
+  if (O.step === 0) return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Welcome</h2>
     <p class="lede">Set up your family in about a minute.</p>
     <div class="card form"><div class="field"><label class="label" for="famName">Family name</label><input id="famName" maxlength="60" placeholder="The Smiths" value="${esc(O.name)}"></div>
     <p class="hint">Weeks start Monday in your time zone: <b>${esc(O.tz)}</b>.</p>
     <button class="save" id="ob0" type="button">Next</button></div></section>`;
-  if (O.step === 1) return `<section class="screen-center">${steps}<h2 style="font:900 34px/1 var(--display);text-transform:uppercase">Parent PIN</h2>
+  if (O.step === 1) return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Parent PIN</h2>
     <p class="lede">Kids use your email to sign in, so a 4-digit PIN keeps parent tools to you.</p>
     <div class="card form"><div class="field"><label class="label" for="pin1">Choose a PIN</label><input id="pin1" class="pin" inputmode="numeric" type="password" maxlength="4" autocomplete="off"></div>
     <div class="field"><label class="label" for="pin2">Type it again</label><input id="pin2" class="pin" inputmode="numeric" type="password" maxlength="4" autocomplete="off"></div>
     <button class="save" id="ob1" type="button">Next</button></div></section>`;
-  return `<section class="screen-center">${steps}<h2 style="font:900 34px/1 var(--display);text-transform:uppercase">Add your kids</h2>
+  return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Add your kids</h2>
     <p class="lede">First names only. Each kid gets their own job board, which you can change later.</p>
     <div class="card form">
       ${O.kids.map((k, i) => `<div class="kidrow">${avatar(k)}<span><b>${esc(k.name)}</b><span class="hint" style="display:block">$${Number(k.allowance).toFixed(2)} a week</span></span><button class="link" type="button" data-rmkid="${i}">Remove</button></div>`).join('')}
@@ -233,7 +234,7 @@ async function hashPin(fid, pin) {
 
 /* ---------- who's using ---------- */
 function whoHTML() {
-  return `<section class="screen-center"><div class="brand"><img src="icon.svg" alt=""><h1>${esc(APP)}</h1></div>
+  return `<section class="screen-center"><div class="brand"><img src="icon.svg" alt=""><h1>${brandName()}</h1></div>
     <p class="lede">Who's using ${esc(APP)}?</p>
     <div class="who">${S.kids.map(k => `<button type="button" data-who="${k.id}">${avatar(k)}${esc(k.name)}</button>`).join('')}
       <button type="button" class="par" data-who="parent"><span class="avatar">${I.lock}</span>Parent</button></div>
