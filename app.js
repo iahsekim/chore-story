@@ -131,7 +131,7 @@ function statement(kid) {
   const L = [];
   for (const w of kidWeeks(kid)) L.push({ date: w.week_start, ts: ms(w.week_start + 'T00:00:00Z'), title: 'Weekly allowance', kind: 'Allowance', v: Number(w.allowance), type: 'allow', id: w.week_start, week: w.week_start });
   for (const c of approvedCredits(kid)) L.push({ date: localDate(ms(c.created_at)), ts: ms(c.created_at), title: c.title, kind: c.kind === 'job' ? 'Job' : 'Bonus', v: Number(c.amount), type: c.kind, id: c.id, week: c.week_start });
-  for (const t of S.tx.filter(t => t.kid_id === kid.id)) L.push({ date: t.local_date, ts: ms(t.created_at), title: t.note, kind: t.kind === 'payout' ? 'Paid to ' + kid.name : 'Bought for ' + kid.name, v: -Number(t.amount), type: t.kind, id: t.id });
+  for (const t of S.tx.filter(t => t.kid_id === kid.id)) L.push({ date: t.local_date, ts: ms(t.created_at), title: t.note, kind: t.kind === 'payout' ? 'Withdrawal' : 'Bought for ' + kid.name, v: -Number(t.amount), type: t.kind, id: t.id });
   L.sort((a, b) => a.date.localeCompare(b.date) || a.ts - b.ts);
   let run = 0; for (const l of L) { run = r2(run + l.v); l.bal = run }
   return L.reverse();
@@ -410,7 +410,7 @@ function kidLedger(kid) {
   const ws = S.kweek || thisWeek(), f = S.kfilter || 'all', st = stats(kid);
   return `${weekNav(ws, 'kweek')}${weekSummary(kid, ws)}
     <div class="filters">${LFILTERS.map(([v, l]) => `<button class="chip" type="button" data-kf="${v}" aria-pressed="${f === v}">${l}</button>`).join('')}</div>
-    ${f === 'money' ? `<section class="buckets"><button class="bucket pd ${st.paid ? '' : 'zero'}" type="button" data-txlist="payout"><span class="label">Paid to you</span><b class="num">${money(st.paid)}</b><span class="see">See list</span></button><button class="bucket sp ${st.spent ? '' : 'zero'}" type="button" data-txlist="purchase"><span class="label">Spent on things</span><b class="num">${money(st.spent)}</b><span class="see">See list</span></button></section>` : ''}
+    ${f === 'money' ? `<section class="buckets"><button class="bucket pd ${st.paid ? '' : 'zero'}" type="button" data-txlist="payout"><span class="label">Withdrawn</span><b class="num">${money(st.paid)}</b><span class="see">See list</span></button><button class="bucket sp ${st.spent ? '' : 'zero'}" type="button" data-txlist="purchase"><span class="label">Spent on things</span><b class="num">${money(st.spent)}</b><span class="see">See list</span></button></section>` : ''}
     ${f === 'screen' ? eqHTML(kid, screenWeek(kid, ws)) : ''}
     ${ledgerListHTML(kid, ws, f, false)}
     <div class="ptools"><button class="pill soft" type="button" data-manual="read">+ Reading by hand</button><button class="pill soft" type="button" data-manual="screen">+ Screen time by hand</button></div>`;
@@ -437,7 +437,7 @@ function ledgerItems(kid, ws, f = 'all') {
         sub: (wait ? 'Waiting for a parent' : c.kind === 'job' ? 'Job' : 'Bonus') + (m ? ` · +${m} screen min` : ''), amt: '+' + money(Number(c.amount)), cls: wait ? 'wait' : 'up', edit: `${c.kind === 'job' ? 'job' : 'bonus'}|${c.id}|${kid.id}` });
     }
     for (const t of S.tx.filter(t => t.kid_id === kid.id && monday(t.local_date) === ws))
-      R.push({ date: t.local_date, ts: ms(t.created_at), ico: `<span class="ico ${t.kind === 'payout' ? 's' : 'r'}">${t.kind === 'payout' ? I.cash : I.bag}</span>`, title: t.note, sub: t.kind === 'payout' ? 'Paid out' : 'Spent', amt: '−' + money(Number(t.amount)), cls: 'out', edit: `${t.kind}|${t.id}|${kid.id}` });
+      R.push({ date: t.local_date, ts: ms(t.created_at), ico: `<span class="ico ${t.kind === 'payout' ? 's' : 'r'}">${t.kind === 'payout' ? I.cash : I.bag}</span>`, title: t.note, sub: t.kind === 'payout' ? 'Withdrawal' : 'Spent', amt: '−' + money(Number(t.amount)), cls: 'out', edit: `${t.kind}|${t.id}|${kid.id}` });
   }
   if (rd) for (const r of S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws))
     R.push({ date: r.local_date, ts: ms(r.started_at), when: span(r), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: 'Reading' + (r.source === 'manual' ? ' · added by a parent' : !r.ended_at ? (r.running_since ? ' · reading now' : ' · paused') : ''), amt: dur(readSec(r, kid)), cls: 'rd', edit: `read|${r.id}` });
@@ -493,8 +493,8 @@ function goalSheet(kid) {
 function txListSheet(kid, kind) {
   const rows = S.tx.filter(t => t.kid_id === kid.id && t.kind === kind).sort((a, b) => b.local_date.localeCompare(a.local_date) || ms(b.created_at) - ms(a.created_at));
   const total = rows.reduce((a, t) => a + Number(t.amount), 0);
-  openSheet(`<span class="label">${esc(kid.name)} · ${money(total)} total</span><h2>${kind === 'payout' ? 'Paid to you' : 'Spent on things'}</h2>
-    <div class="list">${rows.length ? rows.map(t => `<div class="row"><span class="ico ${kind === 'payout' ? 's' : 'r'}">${kind === 'payout' ? I.cash : I.bag}</span><span class="t"><b>${esc(t.note)}</b><span>${short(t.local_date)}</span></span><span class="amt">${money(Number(t.amount))}</span></div>`).join('') : `<div class="empty">${kind === 'payout' ? 'Nothing paid out yet. Your money is waiting in your bank.' : 'Nothing bought yet.'}</div>`}</div>
+  openSheet(`<span class="label">${esc(kid.name)} · ${money(total)} total</span><h2>${kind === 'payout' ? 'Withdrawn' : 'Spent on things'}</h2>
+    <div class="list">${rows.length ? rows.map(t => `<div class="row"><span class="ico ${kind === 'payout' ? 's' : 'r'}">${kind === 'payout' ? I.cash : I.bag}</span><span class="t"><b>${esc(t.note)}</b><span>${short(t.local_date)}</span></span><span class="amt">${money(Number(t.amount))}</span></div>`).join('') : `<div class="empty">${kind === 'payout' ? 'No withdrawals yet. Your money is waiting in your bank.' : 'Nothing bought yet.'}</div>`}</div>
     <button class="cancel" data-close type="button">Close</button>`);
 }
 function readBoardHTML(kid) {
@@ -545,11 +545,11 @@ function pKids() {
   const pend = pendingClaims();
   let h = pend.length ? `<section class="sect"><div class="sect-h"><h3>Needs your OK</h3><span class="label">${pend.length}</span></div><div class="list">${pend.map(c => { const k = kidById(c.kid_id); return `<div class="row wait-row">${avatar(k)}<span class="t"><b>${esc(c.title)}</b><span>${esc(k?.name || '')} says it's done · ${short(localDate(ms(c.created_at)))}</span></span>
       <span class="decide"><button class="pill soft" type="button" data-notyet="${c.id}">Not yet</button><button class="pill ok" type="button" data-approve="${c.id}">OK +${money(Number(c.amount))}${Number(c.minutes) ? ` +${c.minutes}m` : ''}</button></span></div>` }).join('')}</div></section>` : '';
-  for (const k of S.kids) { const o = owedInfo(k); if (o.nudge) h += `<div class="nudge"><span><b>You owe ${esc(k.name)} ${money(o.balance)}</b> · ${o.last ? `last paid ${ago(o.days)}` : `nothing paid yet, ${o.weeks.length} week${o.weeks.length === 1 ? '' : 's'} of earnings`}</span><button class="pill" type="button" data-payall="${k.id}">Paid all ${money(o.balance)}</button></div>` }
+  for (const k of S.kids) { const o = owedInfo(k); if (o.nudge) h += `<div class="nudge"><span><b>${esc(k.name)} has ${money(o.balance)} banked</b> · ${o.last ? `last withdrawal ${ago(o.days)}` : `no withdrawals yet, ${o.weeks.length} week${o.weeks.length === 1 ? '' : 's'} of savings`}</span><button class="pill" type="button" data-payall="${k.id}">Withdraw ${money(o.balance)}</button></div>` }
   return h + S.kids.map(k => {
     const st = stats(k), sw = screenWeek(k), rw = readWeek(k), o = owedInfo(k), g = goalOf(k);
-    return `<article class="kcard"><div class="kh">${avatar(k)}<h3>${esc(k.name)}</h3><span class="wk num" style="color:color-mix(in srgb, ${COLORS[k.color]} 78%, var(--ink))">${money(st.balance)}<small>You owe</small></span></div>
-      <div class="owedline">${o.saving ? `Saving for ${esc(g.name)} · ${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}` : o.last ? `Last paid ${short(o.last)} (${ago(o.days)})` : 'Not paid out yet'}</div>
+    return `<article class="kcard"><div class="kh">${avatar(k)}<h3>${esc(k.name)}</h3><span class="wk num" style="color:color-mix(in srgb, ${COLORS[k.color]} 78%, var(--ink))">${money(st.balance)}<small>Banked</small></span></div>
+      <div class="owedline">${o.saving ? `Saving for ${esc(g.name)} · ${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}` : o.last ? `Last withdrawal ${short(o.last)} (${ago(o.days)})` : 'No withdrawals yet'}</div>
       <div class="kstats"><div><b class="num">${money(st.week)}</b><span>This week</span></div><div><b class="num">${money(st.month)}</b><span>Month</span></div><div><b class="num">${money(st.lifetime)}</b><span>Lifetime</span></div></div>
       <div class="kstats"><div><b class="num">${hms(sw.leftSec)}</b><span>Screen left</span></div><div><b class="num" style="color:var(--read)">+${rw.bonus}</b><span>Reading bonus</span></div><div><b class="num">${hms(rw.sec)}</b><span>Read</span></div></div>
       <div class="kact"><button class="pill" type="button" data-logjob="${k.id}">Log a job</button><button class="pill ok" type="button" data-bonus="${k.id}">Add bonus</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button><button class="pill soft" type="button" data-more="${k.id}">More</button></div></article>`;
@@ -591,14 +591,14 @@ function pPay() {
     <div class="seg">${[['all', 'All'], ['money', 'Money'], ['screen', 'Screens'], ['reading', 'Reading']].map(([v, l]) => `<button type="button" data-lview="${v}" aria-pressed="${view === v}">${l}</button>`).join('')}</div>`;
   if (view === 'all') {
     const st = stats(k);
-    h += `${weekNav(ws, 'lweek')}<button class="owedline-b" type="button" data-lview="money"><span>You owe ${esc(k.name)} <b class="num">${money(st.balance)}</b></span><span class="see">Pay or log a purchase ${I.chev}</span></button>${weekSummary(k, ws)}${ledgerListHTML(k, ws, 'all', true)}`;
+    h += `${weekNav(ws, 'lweek')}<button class="owedline-b" type="button" data-lview="money"><span>${esc(k.name)}’s bank <b class="num">${money(st.balance)}</b></span><span class="see">Withdraw or log a purchase ${I.chev}</span></button>${weekSummary(k, ws)}${ledgerListHTML(k, ws, 'all', true)}`;
   } else if (view === 'money') {
     const st = stats(k), L = statement(k), o = owedInfo(k), g = goalOf(k);
-    h += `<div class="card bankcard"><span class="label">You owe ${esc(k.name)}</span><b class="bankbig num">${money(st.balance)}</b>
-        <p class="hint owedhint">${o.last ? `Last paid <b>${short(o.last)}</b>, ${ago(o.days)}.` : 'Nothing paid out yet.'}${g ? ` Saving for <b>${esc(g.name)}</b> (${money(g.amount)}).` : ''}</p>
+    h += `<div class="card bankcard"><span class="label">In ${esc(k.name)}’s bank</span><b class="bankbig num">${money(st.balance)}</b>
+        <p class="hint owedhint">${o.last ? `Last withdrawal <b>${short(o.last)}</b>, ${ago(o.days)}.` : 'No withdrawals yet.'}${g ? ` Saving for <b>${esc(g.name)}</b> (${money(g.amount)}).` : ''}</p>
         ${o.weeks.length ? `<div class="weeksince">${o.weeks.map(w => `<span><small>Week of ${md(w.ws)}</small><b class="num">${money(w.amt)}</b></span>`).join('')}</div>` : ''}
-        <div class="kstats flat"><div><b class="num">${money(st.lifetime)}</b><span>Earned</span></div><div><b class="num">${money(st.paid)}</b><span>Paid out</span></div><div><b class="num">${money(st.spent)}</b><span>Spent</span></div></div>
-        <div class="row2"><button class="pill" type="button" data-payout="${k.id}">Paid ${esc(k.name)}</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button></div>
+        <div class="kstats flat"><div><b class="num">${money(st.lifetime)}</b><span>Earned</span></div><div><b class="num">${money(st.paid)}</b><span>Withdrawn</span></div><div><b class="num">${money(st.spent)}</b><span>Spent</span></div></div>
+        <div class="row2"><button class="pill" type="button" data-payout="${k.id}">Withdraw cash</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button></div>
         <div class="row2"><button class="pill soft" type="button" data-logjob="${k.id}">+ Job</button><button class="pill soft" type="button" data-bonus="${k.id}">+ Bonus</button></div></div>
       <section class="sect"><div class="sect-h"><h3>Every entry</h3><span class="label">${L.length}</span></div>
       <div class="list">${L.length ? (() => { let last = '', out = ''; for (const l of L) { const w = monday(l.date); if (w !== last) { out += `<div class="lgroup">Week of ${md(w)}</div>`; last = w } out += stmtRow(l, k, true) } return out })() : '<div class="empty">No entries yet.</div>'}</div></section>`;
@@ -625,7 +625,7 @@ function entrySheet(kind, kid, row, ws0) {
   const isTime = kind === 'screen' || kind === 'read', isMin = kind === 'sbonus';
   const live = isTime && row && !row.ended_at && row.source !== 'manual';
   const sec = isTime ? (row ? (kind === 'read' ? readSec(row, kid) : liveSec(row)) : 0) : 0;
-  const titles = { credit: row?.kind === 'job' ? 'Job' : 'Bonus', tx: row?.kind === 'payout' ? 'Payment' : 'Purchase', allow: 'Weekly allowance', screen: row ? 'Screen time' : 'Add screen time used', sbonus: row ? 'Bonus minutes' : 'Add bonus minutes', read: row ? 'Reading' : 'Add reading' };
+  const titles = { credit: row?.kind === 'job' ? 'Job' : 'Bonus', tx: row?.kind === 'payout' ? 'Withdrawal' : 'Purchase', allow: 'Weekly allowance', screen: row ? 'Screen time' : 'Add screen time used', sbonus: row ? 'Bonus minutes' : 'Add bonus minutes', read: row ? 'Reading' : 'Add reading' };
   const vals = { title: row ? (row.title ?? row.note ?? row.book ?? '') : '', amount: row ? Number(row.amount ?? row.allowance ?? 0) : '', mins: isMin ? (row?.minutes ?? 10) : Math.floor(sec / 60), secs: sec % 60, jobMin: row?.minutes || 0 };
   const rowTs = row ? ms(kind === 'read' || kind === 'screen' ? row.started_at : row.created_at) : 0;
   vals.time = rowTs ? hhmm(rowTs) : hhmm();
@@ -748,7 +748,7 @@ function bindAll() {
   each('[data-claim]', el => claimSheet(kidById(S.profile), S.jobs.find(j => j.id === el.dataset.claim)));
   each('[data-approve]', el => act(() => q(sb.from('credits').update({ status: 'approved' }).eq('id', el.dataset.approve)), 'Approved'));
   each('[data-notyet]', el => act(() => q(sb.from('credits').delete().eq('id', el.dataset.notyet)), 'Sent back to the board'));
-  each('[data-payall]', el => { const k = kidById(el.dataset.payall); txSheet(k, 'payout', { amount: stats(k).balance, note: 'Paid in full' }) });
+  each('[data-payall]', el => { const k = kidById(el.dataset.payall); txSheet(k, 'payout', { amount: stats(k).balance, note: 'Cash withdrawal' }) });
   each('[data-txlist]', el => txListSheet(kidById(S.profile), el.dataset.txlist));
   on('goalBtn', () => goalSheet(kidById(S.profile)));
   each('[data-bonus]', el => bonusSheet(kidById(el.dataset.bonus)));
@@ -821,13 +821,13 @@ async function stopRead(kid) {
 }
 function txSheet(kid, kind, pre = {}) {
   const st = stats(kid), pay = kind === 'payout';
-  openSheet(`<span class="label">${esc(kid.name)} has ${money(st.balance)}</span><h2>${pay ? `You paid ${esc(kid.name)}` : `You bought something for ${esc(kid.name)}`}</h2>
-    <p class="hint">${pay ? 'Cash, a transfer, or anything you handed over. It comes out of what you owe.' : 'Something you paid for with their money. It comes out of their balance.'}</p>
+  openSheet(`<span class="label">${esc(kid.name)} has ${money(st.balance)} banked</span><h2>${pay ? `Withdraw cash for ${esc(kid.name)}` : `You bought something for ${esc(kid.name)}`}</h2>
+    <p class="hint">${pay ? 'Cash, a transfer, or anything you handed over. It comes out of their bank.' : 'Something you paid for with their money. It comes out of their balance.'}</p>
     ${pay && st.balance > 0 ? `<div class="chips"><button class="chip" type="button" data-amt="${st.balance}">All of it · ${money(st.balance)}</button>${[5, 10, 20].filter(a => a < st.balance).map(a => `<button class="chip" type="button" data-amt="${a}">$${a}</button>`).join('')}</div>` : ''}
     <div class="field"><label class="label" for="tAmt">Amount ($)</label><input id="tAmt" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" value="${pre.amount ? Number(pre.amount).toFixed(2) : ''}"></div>
     <div class="field"><label class="label" for="tWhy">Explanation ${esc(kid.name)} will see</label><input id="tWhy" maxlength="120" placeholder="${pay ? 'Cash' : 'What you bought'}" value="${esc(pre.note || '')}"></div>
     <div class="field"><label class="label" for="tDate">Date</label><input id="tDate" type="date" value="${today()}" max="${today()}"></div>
-    <button class="save" id="tGo" type="button">${pay ? 'Record payment' : 'Record purchase'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+    <button class="save" id="tGo" type="button">${pay ? 'Record withdrawal' : 'Record purchase'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
     layer.querySelectorAll('[data-amt]').forEach(b => b.onclick = () => { $('tAmt').value = Number(b.dataset.amt).toFixed(2) });
     $('tGo').onclick = async () => {
       const a = r2(parseFloat($('tAmt').value) || 0), why = $('tWhy').value.trim(), d = $('tDate').value || today();
@@ -835,7 +835,7 @@ function txSheet(kid, kind, pre = {}) {
       if (!why) return toast('Add an explanation so ' + kid.name + ' knows what this was.');
       if (a > stats(kid).balance + 0.001) return toast(`That's more than ${kid.name} has (${money(stats(kid).balance)}).`);
       closeSheet();
-      await act(() => q(sb.from('transactions').insert({ family_id: S.family.id, kid_id: kid.id, kind, amount: a, note: why, local_date: d })), pay ? `Paid ${kid.name} ${money(a)}` : `${money(a)} purchase recorded`);
+      await act(() => q(sb.from('transactions').insert({ family_id: S.family.id, kid_id: kid.id, kind, amount: a, note: why, local_date: d })), pay ? `${money(a)} withdrawn` : `${money(a)} purchase recorded`);
     };
   });
 }
@@ -897,7 +897,7 @@ function rulesSheet(kid) {
     <li><span><b>Every Monday you get ${money(Number(kid.weekly_allowance))}.</b> That's your allowance, no matter what.</span></li>
     <li><span><b>Jobs add money.</b> Tap a job and press I did it. A parent checks, then it's yours.</span></li>
     <li><span><b>Anything you earn is yours to keep.</b> It stays in your bank until you ask for it or save up for something.</span></li>
-    <li><span><b>Your money stays in your bank</b> until you get paid or a parent buys something for you with it. Every entry says why.</span></li>
+    <li><span><b>Your money stays in your bank</b> until you withdraw it or a parent buys something for you with it. Every entry says why.</span></li>
     <li><span><b>Money is never taken away as a punishment.</b></span></li>
     <li><span><b>${kid.base_screen_minutes} screen minutes each week</b> on ${screenDayNames(kid)}.</span></li>
     <li><span><b>1 minute reading = 1 screen minute,</b> up to ${kid.reading_cap} a week. Chapter books and graphic novels count.</span></li>
@@ -1043,7 +1043,7 @@ function feedbackSheet(kind) {
 }
 const PRIVACY = [
   ['The short version', `${APP} is a free tool for families. It keeps as little as possible, never sells or shares it, and has no ads, trackers or analytics.`],
-  ['What we store', 'The parent\u2019s email address, used only to send sign-in codes. A family name, time zone and a scrambled (hashed) parent PIN. For each kid: a first name and color, allowance amount, job board, jobs and bonuses with their explanations, payments and purchases with their explanations, a saving goal if one is set, reading sessions (book titles and time) and screen-time sessions.'],
+  ['What we store', 'The parent\u2019s email address, used only to send sign-in codes. A family name, time zone and a scrambled (hashed) parent PIN. For each kid: a first name and color, allowance amount, job board, jobs and bonuses with their explanations, withdrawals and purchases with their explanations, a saving goal if one is set, reading sessions (book titles and time) and screen-time sessions.'],
   ['What we don\u2019t collect', 'No last names, birthdays, photos, locations, school names, contact details or anything else about kids. Kids never make an account or enter an email. Everything sits under the parent\u2019s account.'],
   ['Who can see it', 'Only the parents signed in to your family. Data is stored with Supabase and protected by database rules that keep each family\u2019s records separate from every other family\u2019s.'],
   ['Feedback messages', 'If you send a bug report, idea or message, it\u2019s delivered to the person who runs this site, along with the email you typed (optional) and which screen you were on.'],
