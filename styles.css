@@ -1,12 +1,12 @@
-/* Layout: a phone app in a "PiggyBoo" look (navy, cream, gold and piggy pink) — rounded friendly type, chunky buttons that press down, bright page colors on a warm paper ground. Each area owns a color: money green, jobs blue, reading violet, screen sunshine. */
+/* Layout: a phone app in a "storybook toybox" look — rounded friendly type, chunky buttons that press down, bright page colors on a warm paper ground. Each area owns a color: money green, jobs blue, reading violet, screen sunshine. */
 :root{
-  --bg:#FFF8EE; --surface:#FFFFFF; --sunk:#FFEEDA; --ink:#0B1733; --muted:#5A6382; --line:#F0DCC8; --edge:#0B1733;
+  --bg:#FFFAEB; --surface:#FFFFFF; --sunk:#FFF0C7; --ink:#10224A; --muted:#55627F; --line:#F1E3B8; --edge:#0F3F86;
   --money:#1FA34A; --money-deep:#147A36; --money-soft:#DCF5D9; --hero:#1FA34A;
-  --jobs:#D23C66; --on-jobs:#FFFFFF; --jobs-soft:#FFE3EA;
+  --jobs:#1A5FD0; --jobs-soft:#E1EBFF;
   --read:#7A3FF2; --read-soft:#ECE2FF;
-  --screen:#FFC61A; --board:#0B1733; --board-raise:#18264A; --board-line:#2A3A66; --board-ink:#FFF8EE; --board-muted:#B9C0D8;
+  --screen:#FFD31A; --board:#0F2A5C; --board-raise:#1B3A74; --board-line:#2B4C8A; --board-ink:#FFFAEB; --board-muted:#AFC0E0;
   --danger:#E3192F; --danger-soft:#FFE0E3;
-  --press:rgba(11,23,51,.22);
+  --press:rgba(15,63,134,.22);
   --shadow:0 2px 0 rgba(36,33,58,.06),0 6px 18px rgba(36,33,58,.06);
   --display:"Baloo 2","Fredoka","Arial Rounded MT Bold",system-ui,sans-serif;
   --body:"Nunito","Segoe UI",system-ui,-apple-system,sans-serif;
@@ -14,18 +14,18 @@
   --r:24px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#070D1F; --surface:#111A33; --sunk:#18233F; --ink:#FFF7DE; --muted:#B4BCD4; --line:#28334F; --edge:#02060F;
+  --bg:#0B1430; --surface:#13204A; --sunk:#1A2A5A; --ink:#FFF7DE; --muted:#AEBBDD; --line:#25386E; --edge:#040A1C;
   --money:#4BD873; --money-deep:#11592A; --money-soft:#173A22; --hero:#178A3D;
-  --jobs:#FF8FA8; --on-jobs:#0B1733; --jobs-soft:#3D1E2A;
+  --jobs:#5B91FF; --jobs-soft:#1D2F66;
   --read:#AE8BFF; --read-soft:#30244F;
-  --screen:#FFCC33; --board:#050A18; --board-raise:#141D36; --board-line:#28334F;
+  --screen:#FFD84A; --board:#060E26; --board-raise:#15224A; --board-line:#25386E;
   --danger:#FF7A6E; --danger-soft:#43211F; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#070D1F; --surface:#111A33; --sunk:#18233F; --ink:#FFF7DE; --muted:#B4BCD4; --line:#28334F; --edge:#02060F;
+  --bg:#0B1430; --surface:#13204A; --sunk:#1A2A5A; --ink:#FFF7DE; --muted:#AEBBDD; --line:#25386E; --edge:#040A1C;
   --money:#4BD873; --money-deep:#11592A; --money-soft:#173A22; --hero:#178A3D;
-  --jobs:#FF8FA8; --on-jobs:#0B1733; --jobs-soft:#3D1E2A;
+  --jobs:#5B91FF; --jobs-soft:#1D2F66;
   --read:#AE8BFF; --read-soft:#30244F;
-  --screen:#FFCC33; --board:#050A18; --board-raise:#141D36; --board-line:#28334F;
+  --screen:#FFD84A; --board:#060E26; --board-raise:#15224A; --board-line:#25386E;
   --danger:#FF7A6E; --danger-soft:#43211F; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body);
@@ -84,7 +84,7 @@ h1{font:600 34px/1.05 var(--display);letter-spacing:-.01em}
 .chev{color:var(--muted);flex:none}
 .meter{height:10px;border-radius:5px;background:var(--sunk);overflow:hidden;display:flex}
 .meter i{display:block;height:100%}
-.pill{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;border-radius:999px;font-weight:700;font-size:14px;white-space:nowrap;background:var(--jobs);color:var(--on-jobs)}
+.pill{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;border-radius:999px;font-weight:700;font-size:14px;white-space:nowrap;background:var(--jobs);color:#fff}
 .pill.soft{background:var(--sunk);color:var(--ink)}
 .pill.ok{background:var(--money);color:#fff}
 .pill.no{background:var(--danger-soft);color:var(--danger)}
@@ -165,7 +165,7 @@ h1{font:600 34px/1.05 var(--display);letter-spacing:-.01em}
 .sheet h2{font:600 28px/1 var(--display);letter-spacing:-.01em}
 .field{display:grid;gap:6px}
 input,select{font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:12px 14px;width:100%;min-height:48px}
-.save{height:52px;border-radius:14px;background:var(--jobs);color:var(--on-jobs);font-weight:800;width:100%}
+.save{height:52px;border-radius:14px;background:var(--jobs);color:#fff;font-weight:800;width:100%}
 .save.red{background:var(--danger)}
 .cancel{height:44px;color:var(--muted);font-weight:700;width:100%}
 .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--sunk);padding:4px;border-radius:14px}
@@ -196,7 +196,7 @@ input,select{font:inherit;color:var(--ink);background:var(--sunk);border:1px sol
 @media (max-width:360px){.big{font-size:64px}.digits{font-size:60px}.tile .v{font-size:34px}}
 @media (prefers-reduced-motion:reduce){.tog::after{transition:none}}
 
-/* ---------- PiggyBoo screens ---------- */
+/* ---------- Chore Story screens ---------- */
 .screen-center{min-height:calc(100vh - 80px);display:flex;flex-direction:column;justify-content:center;gap:20px;padding-block:24px}
 .brand{display:flex;align-items:center;gap:12px}
 .brand img{width:48px;height:48px;border-radius:14px}
@@ -250,7 +250,7 @@ input,select{font:inherit;color:var(--ink);background:var(--sunk);border:1px sol
 .weekrow .t b{font-weight:700}
 .bucket.zero b{color:var(--muted)!important}
 
-/* ---------- PiggyBoo toybox styling ---------- */
+/* ---------- Chore Story toybox styling ---------- */
 .label{letter-spacing:.06em;font-weight:800}
 .sect-h h3{font-size:22px}
 .big{font-weight:600;letter-spacing:-.02em}
@@ -316,13 +316,13 @@ input,select{border:2.5px solid var(--edge);background:var(--surface)}
 .badge{border:2px solid var(--edge)}
 .toast{border:2.5px solid var(--edge);box-shadow:var(--pop)}
 
-/* ---------- PiggyBoo logo ---------- */
+/* ---------- Chore Story logo ---------- */
 .logo-h{margin:0;display:block}
-.logo-h img{display:block;width:100%;max-width:250px;height:auto;margin:0 auto 4px;filter:drop-shadow(0 3px 0 rgba(11,23,51,.2))}
+.logo-h img{display:block;width:100%;max-width:420px;height:auto;margin:0 auto 4px;filter:drop-shadow(0 3px 0 rgba(15,63,134,.18))}
 .screen-center .lede{text-align:center;margin-inline:auto}
-.save{background:var(--jobs);color:var(--on-jobs)}
-.go{background:var(--screen);color:#0B1733}
-.tabbar button[aria-selected="true"] .ic{background:var(--screen);color:#0B1733}
+.save{background:var(--jobs);color:#fff}
+.go{background:var(--screen);color:#10224A}
+.tabbar button[aria-selected="true"] .ic{background:var(--screen);color:#10224A}
 .brand{justify-content:center}
 
 /* ---------- bank ledger ---------- */
@@ -367,51 +367,41 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:2.5px so
 .eq .term b{font-size:clamp(17px,5.4vw,28px);white-space:nowrap}
 .eq .op{font-size:18px}
 
-/* ---------- PiggyBoo touches: night-sky sparkles, ghost-hem edges, coin stickers ---------- */
-:root{--sparkle:#FFB800;--ghosty:#E9879C}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--sparkle:#FFCC33;--ghosty:#F7A8B8}}
-:root[data-theme="dark"]{--sparkle:#FFCC33;--ghosty:#F7A8B8}
-.playroom{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+/* ---------- playroom touches (subtle) ---------- */
+:root{--hand:"Gochi Hand","Comic Neue","Segoe Print",cursive;--doodle:#3E7BE0;--wood-a:#C98E55;--wood-b:#B47A44;--wood-line:#8E5A2E;--tape:rgba(255,211,26,.75)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--doodle:#9DB8FF;--wood-a:#6E4A2C;--wood-b:#5E3E24;--wood-line:#3B2414;--tape:rgba(255,216,74,.55)}}
+:root[data-theme="dark"]{--doodle:#9DB8FF;--wood-a:#6E4A2C;--wood-b:#5E3E24;--wood-line:#3B2414;--tape:rgba(255,216,74,.55)}
+body{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .4 0 0 0 0 .3 0 0 0 0 .2 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+.playroom{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;color:var(--doodle)}
 .wrap,#layer{position:relative;z-index:1}
-.pr{position:absolute;opacity:.22}
-.pr.g{color:var(--sparkle)} .pr.p{color:var(--ghosty);opacity:.28}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pr{opacity:.18}}
-:root[data-theme="dark"] .pr{opacity:.18}
+.pr{position:absolute;opacity:.13;transform:rotate(var(--r))}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pr{opacity:.10}}
+:root[data-theme="dark"] .pr{opacity:.10}
 @media (prefers-reduced-motion:no-preference){
-  .pr-a{animation:bob-a 9s ease-in-out infinite alternate}
-  .pr-b{animation:bob-b 12s ease-in-out infinite alternate}
-  .pr-c{animation:bob-c 7s ease-in-out infinite alternate}
+  .pr-a{animation:drift-a 48s ease-in-out infinite alternate}
+  .pr-b{animation:drift-b 62s ease-in-out infinite alternate}
+  .pr-c{animation:drift-c 70s ease-in-out infinite alternate}
 }
-@keyframes bob-a{from{transform:translateY(0) scale(1)}to{transform:translateY(-10px) scale(1.12)}}
-@keyframes bob-b{from{transform:translateY(0) rotate(-8deg)}to{transform:translateY(12px) rotate(8deg)}}
-@keyframes bob-c{from{transform:translate(0,0) rotate(-4deg)}to{transform:translate(8px,-14px) rotate(4deg)}}
-/* the tab bar's top edge is a wavy ghost hem */
-.tabbar{border-top:0!important;padding-top:14px}
-.tabbar::before{content:"";position:absolute;left:0;right:0;top:-6px;height:12px;background:var(--edge);
-  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='12'%3E%3Cpath d='M0 7c5.5 0 5.5-5 11-5s5.5 5 11 5 5.5-5 11-5 5.5 5 11 5' fill='none' stroke='black' stroke-width='2.6'/%3E%3C/svg%3E") repeat-x 0 0/44px 12px;
-          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='12'%3E%3Cpath d='M0 7c5.5 0 5.5-5 11-5s5.5 5 11 5 5.5-5 11-5 5.5 5 11 5' fill='none' stroke='black' stroke-width='2.6'/%3E%3C/svg%3E") repeat-x 0 0/44px 12px}
-/* rounded, chunky type everywhere (matches the logo) */
-.hello small{font:800 16px/1 var(--display);color:var(--jobs);letter-spacing:.01em}
-.sect-h h3{font:800 22px/1.1 var(--display);letter-spacing:-.01em}
-.who button{font:800 22px/1.1 var(--display)}
-.empty{font:600 15px/1.4 var(--body)}
-.empty::before{content:"";display:block;width:52px;height:47px;margin:0 auto 8px;background:url(piggy.png) center/contain no-repeat;opacity:.55}
-.screen-center .lede{font:700 17px/1.4 var(--body)}
-.kidform-h b{font:800 22px/1.1 var(--display)}
-/* a gold sparkle sticker on the bank card and boards */
-.hero::before,.board::before{content:"";position:absolute;top:-14px;left:16px;width:30px;height:30px;transform:rotate(-10deg);z-index:2;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2c1.3 7.6 3.4 9.8 11 11-7.6 1.3-9.7 3.4-11 11-1.3-7.6-3.4-9.7-11-11 7.6-1.2 9.7-3.4 11-11z' fill='%23FFC61A' stroke='%230B1733' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+@keyframes drift-a{from{transform:translate(0,0) rotate(var(--r))}to{transform:translate(28px,-14px) rotate(calc(var(--r) + 6deg))}}
+@keyframes drift-b{from{transform:translate(0,0) rotate(var(--r))}to{transform:translate(-22px,12px) rotate(calc(var(--r) - 8deg))}}
+@keyframes drift-c{from{transform:translate(0,0) rotate(var(--r))}to{transform:translate(18px,16px) rotate(var(--r))}}
+/* a strip of wood floor under the tab bar */
+.tabbar{border-top:0;padding-top:16px}
+.tabbar::before{content:"";position:absolute;left:0;right:0;top:0;height:9px;border-top:2.5px solid var(--edge);border-bottom:2px solid var(--wood-line);
+  background:repeating-linear-gradient(90deg,var(--wood-a) 0 118px,var(--wood-line) 118px 120px,var(--wood-b) 120px 238px,var(--wood-line) 238px 240px)}
+.playroom .floor{display:none}
+/* kid handwriting for small friendly text */
+.hello small{font:400 19px/1 var(--hand);color:var(--muted);letter-spacing:.01em}
+.sect-h h3{font:400 26px/1 var(--hand);letter-spacing:.01em}
+.who button{font:400 24px/1.1 var(--hand)}
+.empty{font:400 19px/1.35 var(--hand)}
+.screen-center .lede{font:400 21px/1.35 var(--hand)}
+.kidform-h b{font:400 26px/1.1 var(--hand)}
+/* a strip of tape on the bank card and boards */
+.hero::before,.board::before{content:"";position:absolute;top:-10px;left:22px;width:70px;height:20px;background:var(--tape);transform:rotate(-4deg);border-radius:2px;box-shadow:0 1px 0 rgba(0,0,0,.08);z-index:2}
 .hero,.board{position:relative;overflow:visible}
 .hero::after{border-radius:0 28px 0 0}
 .hero::after{right:12px;top:12px;width:96px;height:96px}
-/* main buttons are gold like the "Boo" */
-.save{background:var(--screen)!important;color:#0B1733!important}
-/* loading: the piggy bobs */
-.loading{gap:10px;font:800 16px var(--display)}
-.loading img{width:88px;height:auto}
-@media (prefers-reduced-motion:no-preference){.loading img,.cheer-pig{animation:float 1.6s ease-in-out infinite alternate}}
-@keyframes float{from{transform:translateY(0) rotate(-3deg)}to{transform:translateY(-8px) rotate(3deg)}}
-.logo-h img{filter:none!important}
 
 /* ---------- goals, owed, claims ---------- */
 .goal{gap:10px}
@@ -507,23 +497,22 @@ input,select,textarea{font-size:16px}
 .daypick .chip{flex:none;height:auto;min-height:54px;padding:6px 0;display:grid;justify-items:center;gap:0;font:800 17px/1.1 var(--display)}
 .daypick .chip small{font:700 11px var(--body);letter-spacing:.04em;text-transform:uppercase;color:inherit;opacity:.75}
 .daypick .chip:disabled{opacity:.3}
-.sheet .daypick .chip[aria-pressed="true"]{background:var(--jobs);border-color:var(--edge);color:var(--on-jobs)}
+.sheet .daypick .chip[aria-pressed="true"]{background:var(--jobs);border-color:var(--edge);color:#fff}
 
 /* ---------- celebrations ---------- */
 .confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
-.cheer{position:fixed;inset:0;z-index:55;display:grid;place-items:center;padding:24px;background:rgba(11,23,51,.3);animation:cheer-in .2s ease-out}
+.cheer{position:fixed;inset:0;z-index:55;display:grid;place-items:center;padding:24px;background:rgba(16,34,74,.25);animation:cheer-in .2s ease-out}
 .cheer.out{animation:cheer-out .3s ease-in forwards}
 .cheer-card{background:var(--surface);color:var(--ink);border:3px solid var(--edge);box-shadow:6px 6px 0 var(--edge);border-radius:28px;padding:26px 24px 22px;max-width:340px;width:100%;display:grid;justify-items:center;gap:8px;text-align:center;animation:cheer-pop .5s cubic-bezier(.2,1.6,.4,1)}
-.cheer-ico{width:76px;height:76px;border-radius:24px;display:grid;place-items:center;background:var(--screen);color:#0B1733;border:3px solid var(--edge);box-shadow:3px 3px 0 var(--edge);animation:cheer-wiggle 1s ease-in-out .3s 2}
+.cheer-ico{width:76px;height:76px;border-radius:24px;display:grid;place-items:center;background:var(--screen);color:#10224A;border:3px solid var(--edge);box-shadow:3px 3px 0 var(--edge);animation:cheer-wiggle 1s ease-in-out .3s 2}
 .cheer-ico svg{width:42px;height:42px}
 .cheer-card b{font:800 30px/1.1 var(--display);margin-top:6px}
-.cheer-card span{font:700 17px/1.35 var(--body);color:var(--muted)}
-.cheer-pig{width:120px;height:auto;margin-top:-62px;filter:drop-shadow(3px 4px 0 rgba(11,23,51,.18))}
+.cheer-card span{font:400 20px/1.3 var(--hand);color:var(--muted)}
 @keyframes cheer-in{from{opacity:0}to{opacity:1}}
 @keyframes cheer-out{to{opacity:0}}
 @keyframes cheer-pop{0%{transform:scale(.4) rotate(-6deg);opacity:0}100%{transform:none;opacity:1}}
 @keyframes cheer-wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-10deg) scale(1.08)}75%{transform:rotate(10deg) scale(1.08)}}
-@media (prefers-reduced-motion:reduce){.cheer,.cheer-card,.cheer-ico,.cheer-pig{animation:none}}
+@media (prefers-reduced-motion:reduce){.cheer,.cheer-card,.cheer-ico{animation:none}}
 /* a gentle bounce when money or minutes go up */
 @media (prefers-reduced-motion:no-preference){.hero .big{animation:bump .6s cubic-bezier(.2,1.6,.4,1)}}
 @keyframes bump{0%{transform:scale(.9)}100%{transform:none}}

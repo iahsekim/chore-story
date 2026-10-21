@@ -1,4 +1,4 @@
-# PiggyBoo
+# Coin Story
 
 A free web app for families: a weekly allowance, a job board with prices, a reading log that earns screen minutes, and a weekend screen clock that can't be paused.
 
@@ -25,14 +25,14 @@ The site is plain HTML, CSS and JavaScript with no build step. It's hosted on Ne
 2. **Authentication → Email Templates → Magic Link**: replace the body with this, so parents get a code they can type on any device (handy for a kid's iPad):
 
    ```html
-   <h2>Your PiggyBoo sign-in code</h2>
+   <h2>Your Coin Story sign-in code</h2>
    <p style="font-size:28px;font-weight:700;letter-spacing:6px">{{ .Token }}</p>
    <p>Or tap to sign in on this device: <a href="{{ .ConfirmationURL }}">Sign in</a></p>
    <p>If you didn't ask for this, you can ignore it.</p>
    ```
 
    Make the same change to the **Confirm signup** template, which a parent receives the very first time.
-3. **Authentication → URL Configuration**: set **Site URL** to your Netlify address (for example `https://piggyboo.netlify.app`) and add it under **Redirect URLs**.
+3. **Authentication → URL Configuration**: set **Site URL** to your Netlify address (for example `https://getcoinstory.com`) and add it under **Redirect URLs**.
 
 ### 3. Set up real email before you share it (important)
 
@@ -44,7 +44,7 @@ Supabase's built-in email is for testing only: it sends just a few emails per ho
    - Host `smtp.resend.com`, port `465`
    - Username `resend`
    - Password: the Resend API key
-   - Sender email: an address on your verified domain, like `hello@yourdomain.com`. Sender name: `PiggyBoo`
+   - Sender email: an address on your verified domain, like `hello@yourdomain.com`. Sender name: `Coin Story`
 4. Under **Authentication → Rate Limits**, set emails to around 30 per hour.
 
 (Alternative with no new account: use a Gmail or Google Workspace address with an app password. Host `smtp.gmail.com`, port `465`.)
@@ -102,4 +102,4 @@ To rename the app, change `appName` in `config.js` and the `<title>`/manifest te
 
 ## Support
 
-PiggyBoo is free. If it helps your family: **Venmo [@mike-shai](https://venmo.com/u/mike-shai)** · **Cash App [$mikeshai](https://cash.app/$mikeshai)** · **PayPal [mikeshai](https://www.paypal.com/paypalme/mikeshai)**
+Coin Story is free. If it helps your family: **Venmo [@mike-shai](https://venmo.com/u/mike-shai)** · **Cash App [$mikeshai](https://cash.app/$mikeshai)** · **PayPal [mikeshai](https://www.paypal.com/paypalme/mikeshai)**
