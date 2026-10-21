@@ -2,7 +2,7 @@
    Row Level Security in supabase/schema.sql keeps each family's data private. */
 window.CHORE_JAR_CONFIG = {
   supabaseUrl: 'https://wddbtkmtqunsbpfyzkxd.supabase.co',
-  supabaseAnonKey: 'YOUR-ANON-KEY',
+  supabaseAnonKey: 'sb_publishable_nvKmj2yOomzogvrTKwXVNw_jr6EZjSG',
   appName: 'Chore Story',
   venmo: 'mike-shai',
   cashapp: 'mikeshai',
