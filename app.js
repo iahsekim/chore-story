@@ -121,7 +121,7 @@ const ago = d => d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 14 ? `${d} days 
 /* Every entry in a kid's bank, newest first, each with the balance after it. */
 function statement(kid) {
   const L = [];
-  for (const w of kidWeeks(kid)) L.push({ date: w.week_start, ts: ms(w.week_start + 'T00:00:00Z'), title: 'Weekly allowance', kind: 'Allowance', v: Number(w.allowance), type: 'allow' });
+  for (const w of kidWeeks(kid)) L.push({ date: w.week_start, ts: ms(w.week_start + 'T00:00:00Z'), title: 'Weekly allowance', kind: 'Allowance', v: Number(w.allowance), type: 'allow', id: w.week_start, week: w.week_start });
   for (const c of approvedCredits(kid)) L.push({ date: localDate(ms(c.created_at)), ts: ms(c.created_at), title: c.title, kind: c.kind === 'job' ? 'Job' : 'Bonus', v: Number(c.amount), type: c.kind, id: c.id, week: c.week_start });
   for (const t of S.tx.filter(t => t.kid_id === kid.id)) L.push({ date: t.local_date, ts: ms(t.created_at), title: t.note, kind: t.kind === 'payout' ? 'Paid to ' + kid.name : 'Bought for ' + kid.name, v: -Number(t.amount), type: t.kind, id: t.id });
   L.sort((a, b) => a.date.localeCompare(b.date) || a.ts - b.ts);
@@ -319,9 +319,8 @@ function tabbar(tabs, cur, badges = {}) {
 function creditRow(c) { return `<div class="row"><span class="ico ${c.kind === 'job' ? 'j' : 'm'}">${c.kind === 'job' ? I.check : I.star}</span><span class="t"><b>${esc(c.title)}</b><span>${c.kind === 'job' ? 'Job' : 'Bonus'} · ${short(localDate(ms(c.created_at)))}</span></span><span class="amt up">+${money(Number(c.amount))}</span></div>` }
 function stmtRow(l, kid, parent) {
   const ico = l.type === 'job' ? `<span class="ico j">${I.check}</span>` : l.type === 'bonus' ? `<span class="ico m">${I.star}</span>` : l.type === 'payout' ? `<span class="ico s">${I.cash}</span>` : l.type === 'purchase' ? `<span class="ico r">${I.bag}</span>` : `<span class="ico m">${I.coin}</span>`;
-  const undoable = parent && l.id && (l.type === 'payout' || l.type === 'purchase' || l.week === thisWeek());
-  const tg = undoable ? 'button' : 'div';
-  return `<${tg} ${undoable ? `type="button" data-undo="${l.type}|${l.id}"` : ''} class="row">${ico}<span class="t"><b>${esc(l.title)}</b><span>${esc(l.kind)} · ${short(l.date)}</span></span><span class="stack"><span class="amt ${l.v >= 0 ? 'up' : 'out'}">${l.v >= 0 ? '+' : '\u2212'}${money(Math.abs(l.v))}</span><span class="bal num">${money(l.bal)}</span></span></${tg}>`;
+  const tg = parent && l.id ? 'button' : 'div';
+  return `<${tg} ${tg === 'button' ? `type="button" data-edit="${l.type}|${l.id}|${kid.id}"` : ''} class="row">${ico}<span class="t"><b>${esc(l.title)}</b><span>${esc(l.kind)} · ${short(l.date)}${tg === 'button' ? ' · tap to edit' : ''}</span></span><span class="stack"><span class="amt ${l.v >= 0 ? 'up' : 'out'}">${l.v >= 0 ? '+' : '\u2212'}${money(Math.abs(l.v))}</span><span class="bal num">${money(l.bal)}</span></span></${tg}>`;
 }
 function kidHome(kid) {
   const st = stats(kid), sw = screenWeek(kid), rw = readWeek(kid), L = statement(kid), g = goalOf(kid), mine = pendingClaims(kid);
@@ -390,7 +389,7 @@ function kidRead(kid) {
 }
 function readRow(r, kid, parent) {
   const tg = parent ? 'button' : 'div', st = r.source === 'manual' ? 'Added by a parent' : !r.ended_at ? (r.running_since ? 'Reading now' : 'Paused') : clockTime(ms(r.started_at));
-  return `<${tg} ${parent ? `type="button" data-delread="${r.id}"` : ''} class="row"><span class="ico r">${I.read}</span><span class="t"><b>${esc(r.book)}</b><span>${short(r.local_date)} · ${st}${parent ? ' · tap to remove' : ''}</span></span><span class="amt rd">+${dur(readSec(r, kid))}</span></${tg}>`;
+  return `<${tg} ${parent ? `type="button" data-delread="${r.id}"` : ''} class="row"><span class="ico r">${I.read}</span><span class="t"><b>${esc(r.book)}</b><span>${short(r.local_date)} · ${st}${parent ? ' · tap to edit' : ''}</span></span><span class="amt rd">+${dur(readSec(r, kid))}</span></${tg}>`;
 }
 function readBoardHTML(kid) {
   const a = activeRead(kid);
@@ -436,10 +435,10 @@ function boardHTML(kid) {
     <p class="note">Start the clock when screens go on. Pause it when you stop.</p><button class="go" id="startBtn" type="button">Start clock</button>`;
 }
 /* ---------- parent app ---------- */
-const PTABS = [['kids', 'Kids', 'kids'], ['jobs', 'Job boards', 'jobs'], ['pay', 'Bank', 'pay'], ['settings', 'Settings', 'gear']];
+const PTABS = [['kids', 'Kids', 'kids'], ['jobs', 'Job boards', 'jobs'], ['pay', 'Ledger', 'pay'], ['settings', 'Settings', 'gear']];
 function parentAppHTML() {
   
-  const greet = { kids: 'Parent', jobs: 'Edit each kid’s board', pay: 'What you owe', settings: 'Family settings' }[S.ptab];
+  const greet = { kids: 'Parent', jobs: 'Edit each kid’s board', pay: 'Every entry, editable', settings: 'Family settings' }[S.ptab];
   return `<header><div class="hello"><small>${greet}</small><h1>${esc(S.family.name || APP)}</h1></div>
     <button class="lock on" id="swapBtn" type="button">${I.swap} Switch</button></header>
     <main>${({ kids: pKids, jobs: pJobs, pay: pPay, settings: pSettings })[S.ptab]()}</main>
@@ -472,18 +471,108 @@ function pJobs() {
     <div class="ptools"><button class="pill" id="newJob" type="button">+ New job</button>${S.kids.length > 1 ? `<button class="pill soft" id="copyBoard" type="button">Copy this board to…</button>` : ''}</div></section>
     ${all.length ? '' : `<div class="list"><div class="empty">${show === 'on' ? 'No jobs switched on yet. Tap Off to find some.' : 'Every job is switched on.'}</div></div>`}${cats.map(c => `<section class="sect"><div class="sect-h"><h3>${esc(c)}</h3></div><div class="list">${all.filter(j => j.category === c).map(j => `<div class="row"><button class="tog" type="button" data-tog="${j.id}" aria-pressed="${j.enabled}" aria-label="Show ${esc(j.title)}"></button><button class="t" type="button" data-editjob="${j.id}" style="text-align:left"><b>${esc(j.title)}</b><span>${esc(j.done_means)}</span></button><span class="price num">${money(Number(j.price))}</span></div>`).join('')}</div></section>`).join('')}`;
 }
+/* Parent ledger: every line item for money, screen time and reading, each tappable to edit or delete. */
+function timeRows(kid, view, ws) {
+  const R = [];
+  if (view === 'screen') {
+    for (const x of S.screen.filter(x => x.kid_id === kid.id && x.week_start === ws)) R.push({ date: x.local_date, ts: ms(x.started_at), ico: `<span class="ico s">${I.screen}</span>`, title: x.source === 'manual' ? (x.note || 'Screen time') : 'Screen session', sub: x.source === 'manual' ? 'Added by a parent' : !x.ended_at ? (x.running_since ? 'Running now' : 'Paused') : `Clock · ${clockTime(ms(x.started_at))}`, v: -liveSec(x), edit: `screen|${x.id}` });
+    for (const b of S.sbonus.filter(b => b.kid_id === kid.id && b.week_start === ws)) R.push({ date: localDate(ms(b.created_at)), ts: ms(b.created_at), ico: `<span class="ico m">${I.star}</span>`, title: b.note, sub: 'Bonus minutes', v: b.minutes * 60, edit: `sbonus|${b.id}` });
+    for (const c of weekCredits(kid, ws).filter(c => Number(c.minutes) > 0)) R.push({ date: localDate(ms(c.created_at)), ts: ms(c.created_at), ico: `<span class="ico j">${I.check}</span>`, title: c.title, sub: 'Job bonus minutes', v: c.minutes * 60, edit: `credit|${c.id}` });
+    const rw = readWeek(kid, ws); if (rw.bonus) R.push({ date: addDays(ws, 6) > today() ? today() : addDays(ws, 6), ts: 0, ico: `<span class="ico r">${I.read}</span>`, title: 'Earned from reading', sub: `${dur(rw.sec)} read this week`, v: rw.bonus * 60, edit: '' });
+  } else {
+    for (const r of S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws)) R.push({ date: r.local_date, ts: ms(r.started_at), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: r.source === 'manual' ? 'Added by a parent' : !r.ended_at ? (r.running_since ? 'Reading now' : 'Paused') : `Timer · ${clockTime(ms(r.started_at))}`, v: readSec(r, kid), edit: `read|${r.id}` });
+  }
+  return R.sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
+}
+function timeRowHTML(r) {
+  const tg = r.edit ? 'button' : 'div', pos = r.v >= 0;
+  return `<${tg} ${r.edit ? `type="button" data-edit="${r.edit}"` : ''} class="row">${r.ico}<span class="t"><b>${esc(r.title)}</b><span>${short(r.date)} · ${esc(r.sub)}${r.edit ? ' · tap to edit' : ''}</span></span><span class="amt ${pos ? 'up' : 'out'}">${pos ? '+' : '\u2212'}${dur(Math.abs(r.v))}</span></${tg}>`;
+}
 function pPay() {
   if (!S.kids.length) return `<div class="card"><p class="hint">Add a kid first.</p></div>`;
-  return S.kids.map(k => {
-    const st = stats(k), L = statement(k);
-    return `<section class="sect"><div class="sect-h"><h3 style="display:flex;align-items:center;gap:10px">${avatar(k)}${esc(k.name)}</h3></div>
-      <div class="card bankcard"><span class="label">You owe ${esc(k.name)}</span><b class="bankbig num">${money(st.balance)}</b>
-        ${(() => { const o = owedInfo(k), g = goalOf(k); return `<p class="hint owedhint">${o.last ? `Last paid <b>${short(o.last)}</b>, ${ago(o.days)}.` : 'Nothing paid out yet.'}${g ? ` Saving for <b>${esc(g.name)}</b> (${money(g.amount)}).` : ''}</p>${o.weeks.length ? `<div class="weeksince">${o.weeks.map(w => `<span><small>Week of ${md(w.ws)}</small><b class="num">${money(w.amt)}</b></span>`).join('')}</div>` : ''}` })()}
+  if (!kidById(S.lk)) S.lk = S.kids[0].id; const k = kidById(S.lk), view = S.lview || 'money', ws = S.lweek || thisWeek();
+  let h = `${S.kids.length > 1 ? `<div class="kpick">${S.kids.map(x => `<button class="chip" type="button" data-lk="${x.id}" aria-pressed="${x.id === k.id}"><span class="dot" style="background:${COLORS[x.color]}"></span>${esc(x.name)}</button>`).join('')}</div>` : ''}
+    <div class="seg">${[['money', 'Money'], ['screen', 'Screen time'], ['reading', 'Reading']].map(([v, l]) => `<button type="button" data-lview="${v}" aria-pressed="${view === v}">${l}</button>`).join('')}</div>`;
+  if (view === 'money') {
+    const st = stats(k), L = statement(k), o = owedInfo(k), g = goalOf(k);
+    h += `<div class="card bankcard"><span class="label">You owe ${esc(k.name)}</span><b class="bankbig num">${money(st.balance)}</b>
+        <p class="hint owedhint">${o.last ? `Last paid <b>${short(o.last)}</b>, ${ago(o.days)}.` : 'Nothing paid out yet.'}${g ? ` Saving for <b>${esc(g.name)}</b> (${money(g.amount)}).` : ''}</p>
+        ${o.weeks.length ? `<div class="weeksince">${o.weeks.map(w => `<span><small>Week of ${md(w.ws)}</small><b class="num">${money(w.amt)}</b></span>`).join('')}</div>` : ''}
         <div class="kstats flat"><div><b class="num">${money(st.lifetime)}</b><span>Earned</span></div><div><b class="num">${money(st.paid)}</b><span>Paid out</span></div><div><b class="num">${money(st.spent)}</b><span>Spent</span></div></div>
-        <div class="row2"><button class="pill" type="button" data-payout="${k.id}">Paid ${esc(k.name)}</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button></div></div>
-      <div class="list">${L.slice(0, 10).map(l => stmtRow(l, k, true)).join('')}</div>
-      ${L.length > 10 ? `<button class="link" type="button" data-allstmt="${k.id}" style="justify-self:start">See all ${L.length} entries</button>` : ''}</section>`;
-  }).join('') + `<p class="hint">Tap an entry from this week, or any payment or purchase, to undo a mistake.</p>`;
+        <div class="row2"><button class="pill" type="button" data-payout="${k.id}">Paid ${esc(k.name)}</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button></div>
+        <div class="row2"><button class="pill soft" type="button" data-logjob="${k.id}">+ Job</button><button class="pill soft" type="button" data-bonus="${k.id}">+ Bonus</button></div></div>
+      <section class="sect"><div class="sect-h"><h3>Every entry</h3><span class="label">${L.length}</span></div>
+      <div class="list">${L.length ? (() => { let last = '', out = ''; for (const l of L) { const w = monday(l.date); if (w !== last) { out += `<div class="lgroup">Week of ${md(w)}</div>`; last = w } out += stmtRow(l, k, true) } return out })() : '<div class="empty">No entries yet.</div>'}</div></section>`;
+  } else {
+    const x = screenWeek(k, ws), rw = readWeek(k, ws), R = timeRows(k, view, ws);
+    h += `<div class="weeknav"><button class="pill soft" type="button" data-lweek="${addDays(ws, -7)}" aria-label="Previous week">\u2039</button><b>Week of ${md(ws)}${ws === thisWeek() ? ' · this week' : ''}</b><button class="pill soft" type="button" data-lweek="${addDays(ws, 7)}" aria-label="Next week" ${ws >= thisWeek() ? 'disabled' : ''}>\u203a</button></div>`;
+    h += view === 'screen'
+      ? `${eqHTML(k, x, `<div class="row2"><button class="pill soft" type="button" data-addtime="screen|${k.id}|${ws}">+ Time used</button><button class="pill soft" type="button" data-addtime="sbonus|${k.id}|${ws}">+ Bonus minutes</button></div>`)}`
+      : `<div class="card"><span class="label">Read this week</span><b class="bankbig num" style="color:var(--read)">${dur(rw.sec)}</b><p class="hint">Earned <b>+${rw.bonus}</b> screen minutes (limit ${k.reading_cap}).</p><button class="pill soft" type="button" data-addtime="read|${k.id}|${ws}" style="justify-self:start">+ Add reading</button></div>`;
+    h += `<section class="sect"><div class="sect-h"><h3>${view === 'screen' ? 'Time used and added' : 'Reading sessions'}</h3><span class="label">${R.length}</span></div><div class="list">${R.length ? R.map(timeRowHTML).join('') : '<div class="empty">Nothing this week.</div>'}</div></section>`;
+  }
+  return h + `<p class="hint">Tap any entry to change it or delete it.</p>`;
+}
+/* Day picker for the 7 days of one week; days after today can't be picked. */
+function dayPicker(ws, sel) {
+  return `<div class="field"><span class="label">Day</span><div class="daypick">${[0, 1, 2, 3, 4, 5, 6].map(i => { const d = addDays(ws, i); return `<button class="chip" type="button" data-day="${d}" aria-pressed="${d === sel}" ${d > today() ? 'disabled' : ''}><small>${DOW[dow(d)]}</small>${parseD(d).getUTCDate()}</button>` }).join('')}</div>
+    <div class="weeknav small"><button class="link" type="button" data-dweek="${addDays(ws, -7)}">\u2039 Earlier week</button>${ws < thisWeek() ? `<button class="link" type="button" data-dweek="${addDays(ws, 7)}">Later week \u203a</button>` : ''}</div></div>`;
+}
+const noonISO = d => new Date(d + 'T12:00:00').toISOString();
+/* One sheet to add or edit any line item. kind: credit, tx, allow, screen, sbonus, read */
+function entrySheet(kind, kid, row, ws0) {
+  const E = { ws: ws0 || thisWeek(), day: null };
+  const curDay = row ? (kind === 'credit' ? localDate(ms(row.created_at)) : kind === 'sbonus' ? localDate(ms(row.created_at)) : kind === 'tx' ? row.local_date : kind === 'allow' ? row.week_start : row.local_date) : (ws0 && ws0 < thisWeek() ? addDays(ws0, 6) : today());
+  E.day = curDay; E.ws = monday(curDay);
+  const isTime = kind === 'screen' || kind === 'read', isMin = kind === 'sbonus';
+  const live = isTime && row && !row.ended_at && row.source !== 'manual';
+  const sec = isTime ? (row ? (kind === 'read' ? readSec(row, kid) : liveSec(row)) : 0) : 0;
+  const titles = { credit: row?.kind === 'job' ? 'Job' : 'Bonus', tx: row?.kind === 'payout' ? 'Payment' : 'Purchase', allow: 'Weekly allowance', screen: row ? 'Screen time' : 'Add screen time used', sbonus: row ? 'Bonus minutes' : 'Add bonus minutes', read: row ? 'Reading' : 'Add reading' };
+  const vals = { title: row ? (row.title ?? row.note ?? row.book ?? '') : '', amount: row ? Number(row.amount ?? row.allowance ?? 0) : '', mins: isMin ? (row?.minutes ?? 10) : Math.floor(sec / 60), secs: sec % 60, jobMin: row?.minutes || 0 };
+  const draw = () => {
+    openSheet(`<span class="label">${esc(kid.name)}</span><h2>${row ? 'Edit ' : ''}${titles[kind]}</h2>
+      ${live ? '<p class="hint">This timer is still running. Stop it on the kid\u2019s screen first, or delete it.</p>' : ''}
+      ${kind === 'allow' ? `<p class="hint">Week of ${md(row.week_start)}. Changes only this week\u2019s allowance.</p>` : ''}
+      ${['credit', 'tx', 'sbonus', 'read', 'screen'].includes(kind) ? `<div class="field"><label class="label" for="eT">${kind === 'read' ? 'Book' : kind === 'screen' ? 'What was it?' : 'Explanation ' + esc(kid.name) + ' will see'}</label><input id="eT" maxlength="120" value="${esc(vals.title)}" placeholder="${kind === 'read' ? 'Book title' : kind === 'screen' ? 'What it was' : 'Explanation'}" ${live || (kind === 'screen' && row && row.source !== 'manual') ? 'disabled' : ''}></div>` : ''}
+      ${['credit', 'tx', 'allow'].includes(kind) ? `<div class="field"><label class="label" for="eA">Amount ($)</label><input id="eA" type="number" inputmode="decimal" min="0.01" step="0.01" value="${vals.amount}"></div>` : ''}
+      ${kind === 'credit' ? `<div class="field"><label class="label" for="eJM">Bonus screen minutes</label><input id="eJM" type="number" inputmode="numeric" min="0" max="600" value="${vals.jobMin}"></div>` : ''}
+      ${isMin ? `<div class="field"><label class="label" for="eM">Minutes</label><input id="eM" type="number" inputmode="numeric" min="1" max="600" value="${vals.mins}"></div>` : ''}
+      ${isTime && !live ? `<div class="row2"><div class="field"><label class="label" for="eM">Minutes</label><input id="eM" type="number" inputmode="numeric" min="0" max="600" value="${vals.mins}"></div><div class="field"><label class="label" for="eS">Seconds</label><input id="eS" type="number" inputmode="numeric" min="0" max="59" value="${vals.secs}"></div></div>` : ''}
+      ${kind !== 'allow' && !live ? dayPicker(E.ws, E.day) : ''}
+      ${live ? '' : `<button class="save" id="eGo" type="button">${row ? 'Save changes' : 'Add'}</button>`}
+      ${row && kind !== 'allow' ? '<button class="cancel danger-link" id="eDel" type="button">Delete this entry</button>' : ''}
+      <button class="cancel" data-close type="button">Cancel</button>`, () => {
+      const keep = () => { if ($('eT')) vals.title = $('eT').value; if ($('eA')) vals.amount = $('eA').value; if ($('eM')) vals.mins = $('eM').value; if ($('eS')) vals.secs = $('eS').value; if ($('eJM')) vals.jobMin = $('eJM').value };
+      layer.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { E.day = b.dataset.day; layer.querySelectorAll('[data-day]').forEach(x => x.setAttribute('aria-pressed', x === b)) });
+      layer.querySelectorAll('[data-dweek]').forEach(b => b.onclick = () => { keep(); E.ws = b.dataset.dweek; E.day = addDays(E.ws, 6) > today() ? today() : addDays(E.ws, 6); draw() });
+      if ($('eGo')) $('eGo').onclick = async () => {
+        keep(); const d = E.day, w = monday(d), title = String(vals.title).trim();
+        const amt = r2(parseFloat(vals.amount) || 0), s2 = Math.max(0, parseInt(vals.mins) || 0) * 60 + Math.min(59, Math.max(0, parseInt(vals.secs) || 0));
+        let tbl, body, fx = 'Saved';
+        if (kind === 'credit') { if (!title) return toast('Add an explanation.'); if (amt <= 0) return toast('Enter an amount.'); tbl = 'credits'; body = { title, amount: amt, minutes: Math.min(600, Math.max(0, parseInt(vals.jobMin) || 0)), created_at: noonISO(d), week_start: w } }
+        else if (kind === 'tx') { if (!title) return toast('Add an explanation.'); if (amt <= 0) return toast('Enter an amount.'); if (amt > stats(kid).balance + Number(row.amount) + 0.001) return toast(`That's more than ${kid.name} has.`); tbl = 'transactions'; body = { note: title, amount: amt, local_date: d } }
+        else if (kind === 'allow') { if (amt < 0) return toast('Enter an amount.'); tbl = 'weeks'; body = { allowance: amt } }
+        else if (kind === 'sbonus') { const m = Math.min(600, parseInt(vals.mins) || 0); if (m < 1) return toast('Enter minutes.'); if (!title) return toast('Add an explanation.'); tbl = 'screen_bonus'; body = { minutes: m, note: title, week_start: w, created_at: noonISO(d) } }
+        else if (kind === 'read') { if (!title) return toast('Type the book\u2019s title.'); if (!s2) return toast('Enter the time.'); tbl = 'reading_sessions'; body = { book: title, seconds: s2, local_date: d, week_start: w, ...(row ? {} : { source: 'manual', started_at: noonISO(d), ended_at: noonISO(d) }) } }
+        else if (kind === 'screen') { if (!s2) return toast('Enter the time.'); if (!row && !title) return toast('Say what it was.'); tbl = 'screen_sessions'; body = { seconds: s2, local_date: d, week_start: w, ...(row ? (row.source === 'manual' ? { note: title } : {}) : { note: title, source: 'manual', started_at: noonISO(d), ended_at: noonISO(d) }) } }
+        closeSheet();
+        if (!row) { if (kind === 'sbonus') body.created_at = noonISO(d); await act(() => q(sb.from(tbl).insert({ family_id: S.family.id, kid_id: kid.id, ...body })), 'Added'); return }
+        const sel = kind === 'allow' ? sb.from('weeks').update(body).eq('kid_id', kid.id).eq('week_start', row.week_start) : sb.from(tbl).update(body).eq('id', row.id);
+        await act(() => q(sel), fx);
+      };
+      if ($('eDel')) $('eDel').onclick = () => { const tbl = { credit: 'credits', tx: 'transactions', screen: 'screen_sessions', sbonus: 'screen_bonus', read: 'reading_sessions' }[kind]; confirmSheet('Delete this entry?', 'It\u2019s removed from the ledger and the totals update.', 'Delete', () => q(sb.from(tbl).delete().eq('id', row.id)), 'Deleted') };
+    });
+  };
+  draw();
+}
+function openEdit(spec) {
+  const [type, id, kidId] = spec.split('|');
+  if (type === 'allow') { const k = kidById(kidId), w = S.weeks.find(x => x.kid_id === kidId && x.week_start === id); return w && entrySheet('allow', k, w) }
+  if (type === 'job' || type === 'bonus' || type === 'credit') { const c = S.credits.find(x => x.id === id); return c && entrySheet('credit', kidById(c.kid_id), c) }
+  if (type === 'payout' || type === 'purchase') { const t = S.tx.find(x => x.id === id); return t && entrySheet('tx', kidById(t.kid_id), t) }
+  if (type === 'screen') { const x = S.screen.find(r => r.id === id); return x && entrySheet('screen', kidById(x.kid_id), x) }
+  if (type === 'sbonus') { const x = S.sbonus.find(r => r.id === id); return x && entrySheet('sbonus', kidById(x.kid_id), x) }
+  if (type === 'read') { const x = S.reading.find(r => r.id === id); return x && entrySheet('read', kidById(x.kid_id), x) }
 }
 function pSettings() {
   const F = S.family;
@@ -574,6 +663,10 @@ function bindAll() {
   each('[data-purchase]', el => { const k = kidById(el.dataset.purchase), g = goalOf(k); txSheet(k, 'purchase', g && stats(k).balance >= g.amount ? { amount: g.amount, note: g.name } : {}) });
   each('[data-allstmt]', el => statementSheet(kidById(el.dataset.allstmt)));
   bindUndo(app);
+  each('[data-lk]', el => { S.lk = el.dataset.lk; render() });
+  each('[data-lview]', el => { S.lview = el.dataset.lview; render() });
+  each('[data-lweek]', el => { S.lweek = el.dataset.lweek; render() });
+  each('[data-addtime]', el => { const [kind, kid, ws] = el.dataset.addtime.split('|'); entrySheet(kind, kidById(kid), null, ws) });
   on('saveFam', () => act(() => q(sb.from('families').update({ name: titleCase($('sFam').value) || 'Our Family', timezone: $('sTz').value }).eq('id', S.family.id)), 'Saved'));
   on('changePin', () => newPinSheet());
   on('invGo', () => { const e = $('invEmail').value.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return toast('Enter a valid email.'); act(() => q(sb.from('family_invites').upsert({ family_id: S.family.id, email: e })), 'Invite saved') });
@@ -630,15 +723,9 @@ function txSheet(kid, kind, pre = {}) {
 }
 function statementSheet(kid) {
   const parent = S.view === 'parent';
-  openSheet(`<span class="label">${esc(kid.name)} · ${money(stats(kid).balance)}</span><h2>Bank statement</h2><div class="list">${statement(kid).map(l => stmtRow(l, kid, parent)).join('')}</div><button class="cancel" data-close type="button">Close</button>`, () => bindUndo(layer));
+  openSheet(`<span class="label">${esc(kid.name)} · ${money(stats(kid).balance)}</span><h2>Bank statement</h2><div class="list">${statement(kid).map(l => stmtRow(l, kid, parent)).join('')}</div><button class="cancel" data-close type="button">Close</button>`, () => { bindUndo(layer); layer.querySelectorAll('[data-edit]').forEach(b => { const f = b.onclick; b.onclick = () => { closeSheet(); f() } }) });
 }
-function bindUndo(root) {
-  root.querySelectorAll('[data-undo]').forEach(b => b.onclick = () => {
-    const [type, id] = b.dataset.undo.split('|'), isTx = type === 'payout' || type === 'purchase';
-    const row = isTx ? S.tx.find(x => x.id === id) : S.credits.find(x => x.id === id); if (!row) return;
-    confirmSheet('Undo this entry?', `${isTx ? row.note : row.title} · ${money(Number(row.amount))}. Use this only to fix a mistake.`, 'Undo entry', () => q(sb.from(isTx ? 'transactions' : 'credits').delete().eq('id', id)), 'Entry removed');
-  });
-}
+function bindUndo(root) { root.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEdit(b.dataset.edit)) }
 /* ticking: updates the display; it only writes to stop a timer that has run out */
 let wasActive = null, wakeLock = null, audio = null, autoStopping = false;
 setInterval(() => {
@@ -711,27 +798,7 @@ function readStartSheet(kid) {
       const now = new Date().toISOString(); await act(() => q(sb.from('reading_sessions').insert({ family_id: S.family.id, kid_id: kid.id, book, local_date: d, week_start: monday(d), started_at: now, running_since: now, seconds: 0, source: 'timer' }))) };
   });
 }
-function manualSheet(kid, kind) {
-  const read = kind === 'read', books = [...new Set(S.reading.filter(r => r.kid_id === kid.id).map(r => r.book))].slice(0, 6);
-  openSheet(`<span class="label">Parent · ${esc(kid.name)}</span><h2>${read ? 'Add reading time' : 'Add screen time used'}</h2>
-    <p class="hint">${read ? 'For reading that happened without the timer.' : 'For screen time that happened without the clock, like a family movie. It counts toward this week\u2019s time.'}</p>
-    ${read ? `<div class="field"><label class="label" for="mBook">Book</label><input id="mBook" maxlength="100" placeholder="Book title" value="${esc(books[0] || '')}">${books.length ? `<div class="chips">${books.map(b => `<button class="chip" type="button" data-book="${esc(b)}">${esc(b)}</button>`).join('')}</div>` : ''}</div>`
-      : `<div class="field"><label class="label" for="mNote">What was it?</label><input id="mNote" maxlength="120" placeholder="What it was"></div>`}
-    <div class="row2"><div class="field"><label class="label" for="mMin">Minutes</label><input id="mMin" type="number" inputmode="numeric" min="0" max="600" placeholder="0"></div>
-    <div class="field"><label class="label" for="mSec">Seconds</label><input id="mSec" type="number" inputmode="numeric" min="0" max="59" placeholder="0"></div></div>
-    <div class="field"><label class="label" for="mDate">Day</label><input id="mDate" type="date" value="${today()}" min="${thisWeek()}" max="${today()}"></div>
-    <button class="save" id="mGo" type="button" ${read ? 'style="background:var(--read)"' : ''}>Add ${read ? 'reading' : 'screen time'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
-    layer.querySelectorAll('[data-book]').forEach(b => b.onclick = () => { $('mBook').value = b.dataset.book });
-    $('mGo').onclick = async () => {
-      const sec = Math.max(0, parseInt($('mMin').value) || 0) * 60 + Math.min(59, Math.max(0, parseInt($('mSec').value) || 0)), d = $('mDate').value || today();
-      if (!sec) return toast('Enter the minutes and seconds.'); if (sec > 600 * 60) return toast('That\u2019s more than 10 hours. Check the minutes.');
-      const label = read ? $('mBook').value.trim() : $('mNote').value.trim(); if (!label) return toast(read ? 'Type the book\u2019s title.' : 'Say what it was.');
-      closeSheet(); const now = new Date().toISOString();
-      const row = { family_id: S.family.id, kid_id: kid.id, local_date: d, week_start: monday(d), started_at: now, ended_at: now, seconds: sec, source: 'manual' };
-      await act(() => q(sb.from(read ? 'reading_sessions' : 'screen_sessions').insert(read ? { ...row, book: label } : { ...row, note: label })), `Added ${dur(sec)}`);
-    };
-  });
-}
+function manualSheet(kid, kind) { entrySheet(kind === 'read' ? 'read' : 'screen', kid, null, thisWeek()) }
 /* In a kid's view, manual entry needs the parent PIN each time, and doesn't leave parent mode unlocked. */
 function manualGate(kid, kind) { if (S.view === 'parent') return manualSheet(kid, kind); pinSheet(() => { S.parentOk = false; try { sessionStorage.removeItem('cj-parent') } catch (e) { } manualSheet(kid, kind) }) }
 function logJobSheet(kid) {
@@ -769,13 +836,13 @@ function kidMoreSheet(kid) {
   openSheet(`<div style="display:flex;gap:12px;align-items:center">${avatar(kid)}<h2>${esc(kid.name)}</h2></div>
     <div class="sect"><div class="sect-h"><h3>This week's money</h3></div><div class="list" style="box-shadow:none;border:1px solid var(--line)">
       <div class="row"><span class="ico m">${I.coin}</span><span class="t"><b>Weekly allowance</b><span>Monday</span></span><span class="amt up">+${money(Number(weekRow(kid, cur)?.allowance ?? kid.weekly_allowance))}</span></div>
-      ${cr.map(c => `<button class="row" type="button" data-undo="${c.id}" ${paid ? 'disabled' : ''}><span class="ico ${c.kind === 'job' ? 'j' : 'm'}">${c.kind === 'job' ? I.check : I.star}</span><span class="t"><b>${esc(c.title)}</b><span>${paid ? 'Paid' : 'Tap to undo a mistake'}</span></span><span class="amt up">+${money(Number(c.amount))}</span></button>`).join('')}</div></div>
+      ${cr.map(c => `<button class="row" type="button" data-cedit="${c.id}" ${paid ? 'disabled' : ''}><span class="ico ${c.kind === 'job' ? 'j' : 'm'}">${c.kind === 'job' ? I.check : I.star}</span><span class="t"><b>${esc(c.title)}</b><span>${paid ? 'Paid' : 'Tap to edit'}</span></span><span class="amt up">+${money(Number(c.amount))}</span></button>`).join('')}</div></div>
     ${eqHTML(kid, x, `<div class="ptools"><button class="pill soft" id="addScr" type="button">+ Add screen time used</button><button class="pill soft" id="addMin" type="button">+ Bonus minutes</button>${x.sess.length ? '<button class="pill soft" id="undoSess" type="button">Undo last session</button>' : ''}</div>`)}
     <div class="sect"><div class="sect-h"><h3>Reading this week</h3><button class="link" id="addRead" type="button">+ Add reading</button></div><div class="list" style="box-shadow:none;border:1px solid var(--line)">${reads.length ? reads.map(r => readRow(r, kid, true)).join('') : '<div class="empty">No reading yet this week.</div>'}</div></div>
     <button class="pill soft" id="editThisKid" type="button" style="justify-self:start">Edit ${esc(kid.name)}'s settings</button>
     <button class="cancel" data-close type="button">Close</button>`, () => {
-    layer.querySelectorAll('[data-undo]').forEach(b => b.onclick = () => { const c = S.credits.find(x => x.id === b.dataset.undo); confirmSheet('Undo this entry?', `${c.title} · ${money(Number(c.amount))}. Use this only to fix a mistake.`, 'Undo entry', () => q(sb.from('credits').delete().eq('id', c.id)), 'Entry removed') });
-    layer.querySelectorAll('[data-delread]').forEach(b => b.onclick = () => confirmSheet('Remove this reading session?', 'Its minutes come off this week’s bonus.', 'Remove', () => q(sb.from('reading_sessions').delete().eq('id', b.dataset.delread)), 'Removed'));
+    layer.querySelectorAll('[data-cedit]').forEach(b => b.onclick = () => { closeSheet(); openEdit('credit|' + b.dataset.cedit) });
+    layer.querySelectorAll('[data-delread]').forEach(b => b.onclick = () => { closeSheet(); openEdit('read|' + b.dataset.delread) });
     const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn };
     on('addMin', () => bonusSheet(kid)); on('addScr', () => manualSheet(kid, 'screen')); on('addRead', () => manualSheet(kid, 'read'));
     on('undoSess', () => { const l = x.sess[x.sess.length - 1]; confirmSheet('Undo the last session?', `${dur(liveSec(l))} goes back to this week.`, 'Undo', () => q(sb.from('screen_sessions').delete().eq('id', l.id)), 'Minutes returned') });

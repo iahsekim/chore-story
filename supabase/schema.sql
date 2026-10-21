@@ -295,16 +295,11 @@ begin
   end loop;
 end $$;
 
--- A parent approves a kid's claim by flipping status to 'approved'. Nothing else about an entry can change.
-drop policy if exists cr_update on public.credits;
-create policy cr_update on public.credits for update to authenticated using (family_id in (select public.my_family_ids())) with check (family_id in (select public.my_family_ids()));
-create or replace function public.credits_only_approve() returns trigger language plpgsql as $$
-begin
-  if new.amount <> old.amount or new.title <> old.title or new.kid_id <> old.kid_id or new.kind <> old.kind or new.minutes <> old.minutes or new.week_start <> old.week_start
-     or not (old.status = 'pending' and new.status = 'approved') then
-    raise exception 'entries can only be approved, not changed';
-  end if;
-  return new;
-end $$;
+-- Parents can edit any entry from the Ledger (fix an amount, explanation or day).
+-- Money amounts still can't be negative; the checks on each table enforce that.
 drop trigger if exists credits_only_approve on public.credits;
-create trigger credits_only_approve before update on public.credits for each row execute function public.credits_only_approve();
+drop function if exists public.credits_only_approve();
+drop policy if exists cr_update on public.credits;
+drop policy if exists cr_update on public.transactions;
+create policy cr_update on public.credits for update to authenticated using (family_id in (select public.my_family_ids())) with check (family_id in (select public.my_family_ids()));
+create policy cr_update on public.transactions for update to authenticated using (family_id in (select public.my_family_ids())) with check (family_id in (select public.my_family_ids()));
