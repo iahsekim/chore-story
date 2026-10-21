@@ -527,3 +527,43 @@ input,select,textarea{font-size:16px}
 /* a gentle bounce when money or minutes go up */
 @media (prefers-reduced-motion:no-preference){.hero .big{animation:bump .6s cubic-bezier(.2,1.6,.4,1)}}
 @keyframes bump{0%{transform:scale(.9)}100%{transform:none}}
+
+/* ---------- simple kid home: bank first, timers right on the dash, one ledger ---------- */
+.hero.bank{gap:12px}
+.hero.bank .big{font-size:clamp(52px,17vw,72px);line-height:1}
+.goalline{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;text-align:left;color:#fff;font-size:14px;font-weight:700;background:rgba(0,0,0,.16);border-radius:16px;padding:10px 12px}
+.goalline .meter{grid-column:1/-1;height:8px;background:rgba(255,255,255,.28)} .goalline .meter i{background:#fff}
+.goalline .num{font-weight:800;white-space:nowrap}
+.link-w{color:#fff;font-weight:800;font-size:14px;text-decoration:underline;text-underline-offset:3px}
+.earn{display:flex;align-items:center;gap:10px;width:100%;min-height:54px;padding:0 16px;border-radius:16px;background:var(--surface);color:var(--ink);font:800 17px var(--display);text-align:left;border:2.5px solid var(--edge);box-shadow:var(--pop)}
+.earn span{flex:1}
+.earn svg{width:22px;height:22px;flex:none}
+.earn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--edge)}
+.waitline{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;border-radius:16px;background:var(--jobs-soft);color:var(--ink);font-size:14px;text-align:left;border:2px dashed var(--jobs)}
+.waitline svg{width:20px;height:20px;color:var(--jobs);flex:none}
+.starts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.start{display:grid;gap:4px;justify-items:start;text-align:left;padding:16px;border-radius:24px;min-height:150px;align-content:end;border:2.5px solid var(--edge);box-shadow:var(--pop-lg);position:relative}
+.start b{font:800 22px/1.1 var(--display)}
+.start>span:last-child{font-size:13px;font-weight:700;opacity:.85}
+.start .pl{position:absolute;top:14px;left:14px;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;border:2.5px solid var(--edge)}
+.start .pl svg{width:20px;height:20px;margin-left:2px}
+.start.rd{background:var(--read);color:#fff} .start.rd .pl{background:#fff;color:var(--read)}
+.start.sc{background:var(--board);color:var(--board-ink)} .start.sc .pl{background:var(--screen);color:#0B1733} .start.sc b{color:var(--screen)}
+.start.off{filter:saturate(.35);opacity:.75}
+.start:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--edge)!important}
+.wsum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--surface);border:2.5px solid var(--edge);border-radius:20px;box-shadow:var(--pop)}
+.wsum div{display:grid;gap:2px;padding:12px 10px;text-align:center;min-width:0}
+.wsum div+div{border-left:2px dashed var(--line)}
+.wsum b{font:800 clamp(16px,5vw,21px)/1.1 var(--display);overflow-wrap:anywhere}
+.wsum span{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.weeknav b small{display:block;font:700 12px var(--body);color:var(--muted)}
+.ico.w{background:var(--jobs-soft);color:var(--jobs)}
+.amt.wait{color:var(--muted)}
+.amt.rd{color:var(--read)}
+.owedline-b{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;width:100%;padding:12px 16px;border-radius:16px;background:var(--surface);border:2.5px solid var(--edge);box-shadow:var(--pop);font-size:15px;text-align:left}
+.owedline-b b{color:var(--money);font:800 20px var(--display)}
+.owedline-b .see{display:flex;align-items:center;gap:4px;font-size:13px;font-weight:800;color:var(--muted)}
+.owedline-b svg{width:16px;height:16px}
+.wsum small{font-size:11px;font-weight:700;color:var(--muted)}
+.seg{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+.seg button{min-width:0;padding-inline:4px}

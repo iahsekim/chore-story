@@ -177,6 +177,8 @@ const I = {
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
   cup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 3c0 1.5 1.5 1.5 1.5 3M12 3c0 1.5 1.5 1.5 1.5 3"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>',
+  chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
   heart: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.6 1.1 4.3 2.5h2c.7-1.4 2.2-2.5 4.3-2.5 3.7 0 5.8 3.8 4.3 7.2C19.5 16.4 12 21 12 21z"/></svg>'
 };
 const avatar = (k, cls = '') => `<span class="avatar ${cls}" style="background:${COLORS[k.color] || COLORS.green}">${esc((k.name || '?').slice(0, 1))}</span>`;
@@ -361,13 +363,14 @@ function chooseProfile(p) {
 function switchProfile() { S.parentOk = false; try { sessionStorage.removeItem('cj-parent') } catch (e) { } S.view = 'who'; store.set('profile', null); render(); window.scrollTo(0, 0) }
 
 /* ---------- kid app ---------- */
-const KTABS = [['home', 'Home', 'home'], ['jobs', 'Jobs', 'jobs'], ['read', 'Reading', 'read'], ['screen', 'Screen', 'screen']];
+const KTABS = [['home', 'Home', 'home'], ['jobs', 'Jobs', 'jobs'], ['ledger', 'Ledger', 'pay']];
 function kidAppHTML() {
   const kid = kidById(S.profile); if (!kid) { S.view = 'who'; return whoHTML() }
-  const greet = { home: 'Your money', jobs: 'Ways to earn extra', read: 'Every minute counts', screen: 'Screen time' }[S.tab];
+  if (!['home', 'jobs', 'ledger'].includes(S.tab)) S.tab = 'home';
+  const greet = { home: 'Hi there', jobs: 'Ways to earn extra', ledger: 'Everything logged' }[S.tab];
   return `<header><div class="hello"><small>${greet}</small><h1>${esc(kid.name)}</h1></div>
     <button class="lock" id="swapBtn" type="button">${I.swap} Switch</button></header>
-    <main>${({ home: kidHome, jobs: kidJobs, read: kidRead, screen: kidScreen })[S.tab](kid)}</main>
+    <main>${({ home: kidHome, jobs: kidJobs, ledger: kidLedger })[S.tab](kid)}</main>
     ${tabbar(KTABS, S.tab)}`;
 }
 function tabbar(tabs, cur, badges = {}) {
@@ -379,25 +382,84 @@ function stmtRow(l, kid, parent) {
   const tg = parent && l.id ? 'button' : 'div';
   return `<${tg} ${tg === 'button' ? `type="button" data-edit="${l.type}|${l.id}|${kid.id}"` : ''} class="row">${ico}<span class="t"><b>${esc(l.title)}</b><span>${esc(l.kind)} · ${short(l.date)}${l.type !== 'allow' && l.ts ? ' · ' + clockTime(l.ts) : ''}${tg === 'button' ? ' · tap to edit' : ''}</span></span><span class="stack"><span class="amt ${l.v >= 0 ? 'up' : 'out'}">${l.v >= 0 ? '+' : '\u2212'}${money(Math.abs(l.v))}</span><span class="bal num">${money(l.bal)}</span></span></${tg}>`;
 }
+/* Kid home: status first. The bank (with a way to earn more), then the two timers, then this week's log. */
 function kidHome(kid) {
-  const st = stats(kid), sw = screenWeek(kid), rw = readWeek(kid), L = statement(kid), g = goalOf(kid), mine = pendingClaims(kid);
+  const st = stats(kid), sw = screenWeek(kid), rw = readWeek(kid), g = goalOf(kid), mine = pendingClaims(kid);
+  const ra = activeRead(kid), sa = sw.active, cap = Number(kid.reading_cap) || 0;
   const pct = g ? Math.min(100, Math.round(100 * st.balance / g.amount)) : 0;
-  return `<section class="hero" style="--hero:${COLORS[kid.color]}"><div class="label">Held for you</div><div class="big num">${money(st.balance)}</div>
-    <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span><span>Lifetime <b>${money(st.lifetime)}</b></span></div></section>
-    <section class="card goal">${g ? `<div class="goal-h"><span class="ico m">${I.star}</span><span class="t"><span class="label">Saving for</span><b>${esc(g.name)}</b></span><span class="num goal-n">${money(Math.min(st.balance, g.amount))} <small>of ${money(g.amount)}</small></span></div>
-      <div class="meter"><i style="width:${pct}%;background:var(--money)"></i></div>
-      <p class="hint">${st.balance >= g.amount ? `You have enough! Ask a grown-up to buy ${esc(g.name)} with your money.` : `${money(g.amount - st.balance)} to go. Money you leave in your bank counts toward it.`}</p>
-      <button class="link" type="button" id="goalBtn" style="justify-self:start">Change goal</button>`
-      : `<div class="goal-h"><span class="ico m">${I.star}</span><span class="t"><span class="label">Saving goal</span><b>Saving for something?</b></span></div><p class="hint">Pick something you want and watch your bank fill up toward it.</p><button class="pill" type="button" id="goalBtn" style="justify-self:start">Set a goal</button>`}</section>
-    <section class="buckets"><button class="bucket pd ${st.paid ? '' : 'zero'}" type="button" data-txlist="payout"><span class="label">Paid to you</span><b class="num">${money(st.paid)}</b><span class="see">See list</span></button><button class="bucket sp ${st.spent ? '' : 'zero'}" type="button" data-txlist="purchase"><span class="label">Spent on things</span><b class="num">${money(st.spent)}</b><span class="see">See list</span></button></section>
-    ${mine.length ? `<section class="sect"><div class="sect-h"><h3>Waiting for a parent</h3></div><div class="list">${mine.map(c => `<div class="row wait-row"><span class="ico j">${I.clock}</span><span class="t"><b>${esc(c.title)}</b><span>You said you did this · ${short(localDate(ms(c.created_at)))}</span></span><span class="amt">+${money(Number(c.amount))}</span></div>`).join('')}</div></section>` : ''}
-    <section class="tiles">
-      <button class="tile scr" type="button" data-tab="screen"><span class="label">Screen left</span><span class="v num">${sw.left}<small> min</small></span><span class="s">${screenDayNames(kid)}</span></button>
-      <button class="tile rdg" type="button" data-tab="read"><span class="label">Reading bonus</span><span class="v num">+${rw.bonus}<small> min</small></span><span class="s">${rw.bonus >= kid.reading_cap ? 'Maxed out this week!' : `${kid.reading_cap - rw.bonus} more to earn`}</span></button>
+  const scrSub = !isScreenDay(kid) ? `Opens ${screenDayNames(kid)}` : sw.leftSec ? `${dur(sw.leftSec)} left` : 'All used this week';
+  const recent = ledgerItems(kid, thisWeek()).slice(0, 4);
+  return `<section class="hero bank" style="--hero:${COLORS[kid.color]}">
+      <div class="label">In your bank</div><div class="big num">${money(st.balance)}</div>
+      ${g ? `<button class="goalline" type="button" id="goalBtn"><span>Saving for <b>${esc(g.name)}</b></span><span class="meter"><i style="width:${pct}%"></i></span><span class="num">${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}</span></button>` : ''}
+      <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${g ? '' : '<button class="link-w" type="button" id="goalBtn">Set a saving goal</button>'}</div>
+      <button class="earn" type="button" data-tab="jobs">${I.jobs}<span>Earn more on the job board</span>${I.chev}</button>
     </section>
-    <section class="sect"><div class="sect-h"><h3>Bank statement</h3>${L.length > 8 ? `<button class="link" type="button" data-allstmt="${kid.id}">See all ${L.length}</button>` : ''}</div>
-      <div class="list">${L.slice(0, 8).map(l => stmtRow(l, kid, false)).join('')}</div></section>
+    ${mine.length ? `<button class="waitline" type="button" data-tab="ledger">${I.clock}<span><b>${mine.length} job${mine.length > 1 ? 's' : ''}</b> waiting for a parent to check</span></button>` : ''}
+    ${ra ? `<section class="board rdb" id="readBoard">${readBoardHTML(kid)}</section>` : ''}
+    ${sa ? `<section class="board" id="board">${boardHTML(kid)}</section>` : ''}
+    ${ra && sa ? '' : `<section class="starts">
+      ${ra ? '' : `<button class="start rd" type="button" id="startRead"><span class="pl">${I.play}</span><b>Start reading</b><span>${cap ? `+${rw.bonus} of ${cap} bonus min` : 'Log your reading'}</span></button>`}
+      ${sa ? '' : `<button class="start sc ${isScreenDay(kid) && sw.leftSec ? '' : 'off'}" type="button" id="startScr"><span class="pl">${I.play}</span><b>Start screens</b><span>${scrSub}</span></button>`}
+    </section>`}
+    <section class="sect"><div class="sect-h"><h3>This week</h3><button class="link" type="button" data-tab="ledger">See ledger</button></div>
+      <div class="list">${recent.length ? recent.map(r => ledgerRowHTML(r, false)).join('') : '<div class="empty">Nothing logged yet this week.</div>'}</div></section>
     <section class="ptools"><button class="pill soft" id="rulesBtn" type="button">How it works</button></section>`;
+}
+/* Kid ledger: one list of everything, week by week, newest first, each line with its day and time. */
+function kidLedger(kid) {
+  const ws = S.kweek || thisWeek(), f = S.kfilter || 'all', st = stats(kid);
+  return `${weekNav(ws, 'kweek')}${weekSummary(kid, ws)}
+    <div class="filters">${LFILTERS.map(([v, l]) => `<button class="chip" type="button" data-kf="${v}" aria-pressed="${f === v}">${l}</button>`).join('')}</div>
+    ${f === 'money' ? `<section class="buckets"><button class="bucket pd ${st.paid ? '' : 'zero'}" type="button" data-txlist="payout"><span class="label">Paid to you</span><b class="num">${money(st.paid)}</b><span class="see">See list</span></button><button class="bucket sp ${st.spent ? '' : 'zero'}" type="button" data-txlist="purchase"><span class="label">Spent on things</span><b class="num">${money(st.spent)}</b><span class="see">See list</span></button></section>` : ''}
+    ${f === 'screen' ? eqHTML(kid, screenWeek(kid, ws)) : ''}
+    ${ledgerListHTML(kid, ws, f, false)}
+    <div class="ptools"><button class="pill soft" type="button" data-manual="read">+ Reading by hand</button><button class="pill soft" type="button" data-manual="screen">+ Screen time by hand</button></div>`;
+}
+const LFILTERS = [['all', 'All'], ['money', 'Money'], ['reading', 'Reading'], ['screen', 'Screens']];
+function weekNav(ws, key) {
+  return `<div class="weeknav"><button class="pill soft" type="button" data-wk="${key}|${addDays(ws, -7)}" aria-label="Previous week">‹</button><b>${ws === thisWeek() ? 'This week' : 'Week of ' + md(ws)}<small>${short(ws)} – ${short(addDays(ws, 6))}</small></b><button class="pill soft" type="button" data-wk="${key}|${addDays(ws, 7)}" aria-label="Next week" ${ws >= thisWeek() ? 'disabled' : ''}>›</button></div>`;
+}
+/* Compact time for summaries: 44m, 1h 15m. */
+const hm = sec => { const m = Math.floor((sec || 0) / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m` };
+function weekSummary(kid, ws) {
+  const earned = weekTotal(kid, ws), rw = readWeek(kid, ws), sw = screenWeek(kid, ws);
+  return `<section class="wsum"><div><b class="num" style="color:var(--money)">+${money(earned)}</b><span>Earned</span></div><div><b class="num" style="color:var(--read)">${hm(rw.sec)}</b><span>Read</span><small>+${rw.bonus} screen min</small></div><div><b class="num">${hm(sw.usedSec)}</b><span>Screens</span><small>${hm(sw.leftSec)} left</small></div></section>`;
+}
+/* Every line item for one kid and one week. kind filters: all | money | reading | screen. */
+function ledgerItems(kid, ws, f = 'all') {
+  const R = [], money_ = f === 'all' || f === 'money', rd = f === 'all' || f === 'reading', sc = f === 'all' || f === 'screen';
+  if (money_) {
+    const w = weekRow(kid, ws);
+    if (w && Number(w.allowance)) R.push({ date: ws, ts: ms(zonedISO(ws, '00:00')), notime: true, ico: `<span class="ico m">${I.coin}</span>`, title: 'Weekly allowance', sub: 'Allowance', amt: '+' + money(Number(w.allowance)), cls: 'up', edit: `allow|${ws}|${kid.id}` });
+    for (const c of S.credits.filter(c => c.kid_id === kid.id && c.week_start === ws)) {
+      const wait = !isApproved(c), m = Number(c.minutes) || 0;
+      R.push({ date: localDate(ms(c.created_at)), ts: ms(c.created_at), ico: `<span class="ico ${wait ? 'w' : c.kind === 'job' ? 'j' : 'm'}">${wait ? I.clock : c.kind === 'job' ? I.check : I.star}</span>`, title: c.title,
+        sub: (wait ? 'Waiting for a parent' : c.kind === 'job' ? 'Job' : 'Bonus') + (m ? ` · +${m} screen min` : ''), amt: '+' + money(Number(c.amount)), cls: wait ? 'wait' : 'up', edit: `${c.kind === 'job' ? 'job' : 'bonus'}|${c.id}|${kid.id}` });
+    }
+    for (const t of S.tx.filter(t => t.kid_id === kid.id && monday(t.local_date) === ws))
+      R.push({ date: t.local_date, ts: ms(t.created_at), ico: `<span class="ico ${t.kind === 'payout' ? 's' : 'r'}">${t.kind === 'payout' ? I.cash : I.bag}</span>`, title: t.note, sub: t.kind === 'payout' ? 'Paid out' : 'Spent', amt: '−' + money(Number(t.amount)), cls: 'out', edit: `${t.kind}|${t.id}|${kid.id}` });
+  }
+  if (rd) for (const r of S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws))
+    R.push({ date: r.local_date, ts: ms(r.started_at), when: span(r), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: 'Reading' + (r.source === 'manual' ? ' · added by a parent' : !r.ended_at ? (r.running_since ? ' · reading now' : ' · paused') : ''), amt: dur(readSec(r, kid)), cls: 'rd', edit: `read|${r.id}` });
+  if (sc) {
+    for (const x of S.screen.filter(x => x.kid_id === kid.id && x.week_start === ws))
+      R.push({ date: x.local_date, ts: ms(x.started_at), when: span(x), ico: `<span class="ico s">${I.screen}</span>`, title: x.note || 'Screen time', sub: 'Screens' + (x.source === 'manual' ? ' · added by a parent' : !x.ended_at ? (x.running_since ? ' · on now' : ' · paused') : ''), amt: '−' + dur(liveSec(x)), cls: 'out', edit: `screen|${x.id}` });
+    for (const b of S.sbonus.filter(b => b.kid_id === kid.id && b.week_start === ws))
+      R.push({ date: localDate(ms(b.created_at)), ts: ms(b.created_at), ico: `<span class="ico m">${I.star}</span>`, title: b.note, sub: 'Bonus screen minutes', amt: `+${b.minutes} min`, cls: 'up', edit: `sbonus|${b.id}` });
+  }
+  return R.sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
+}
+function ledgerRowHTML(r, parent) {
+  const tg = parent && r.edit ? 'button' : 'div';
+  const time = r.notime ? '' : r.when || clockTime(r.ts);
+  return `<${tg} ${tg === 'button' ? `type="button" data-edit="${r.edit}"` : ''} class="row">${r.ico}<span class="t"><b>${esc(r.title)}</b><span>${time ? time + ' · ' : ''}${esc(r.sub)}</span></span><span class="amt ${r.cls}">${r.amt}</span></${tg}>`;
+}
+function ledgerListHTML(kid, ws, f, parent) {
+  const R = ledgerItems(kid, ws, f); if (!R.length) return '<div class="list"><div class="empty">Nothing logged this week.</div></div>';
+  let last = '', out = '';
+  for (const r of R) { if (r.date !== last) { out += `<div class="lgroup">${short(r.date)}${r.date === today() ? ' · today' : ''}</div>`; last = r.date } out += ledgerRowHTML(r, parent) }
+  return `<div class="list">${out}</div>`;
 }
 function kidJobs(kid) {
   const on = S.jobs.filter(j => j.kid_id === kid.id && j.enabled), mine = pendingClaims(kid);
@@ -436,20 +498,6 @@ function txListSheet(kid, kind) {
     <div class="list">${rows.length ? rows.map(t => `<div class="row"><span class="ico ${kind === 'payout' ? 's' : 'r'}">${kind === 'payout' ? I.cash : I.bag}</span><span class="t"><b>${esc(t.note)}</b><span>${short(t.local_date)}</span></span><span class="amt">${money(Number(t.amount))}</span></div>`).join('') : `<div class="empty">${kind === 'payout' ? 'Nothing paid out yet. Your money is waiting in your bank.' : 'Nothing bought yet.'}</div>`}</div>
     <button class="cancel" data-close type="button">Close</button>`);
 }
-function kidRead(kid) {
-  const rw = readWeek(kid), a = activeRead(kid), cap = Number(kid.reading_cap) || 1;
-  const mine = S.reading.filter(r => r.kid_id === kid.id && r !== a).sort((x, y) => ms(y.started_at) - ms(x.started_at)).slice(0, 30);
-  return `<section class="board rdb" id="readBoard">${readBoardHTML(kid)}</section>
-    <section class="card progress"><div class="top"><span class="label">Bonus screen minutes</span><span class="v num" style="color:var(--read)">+${rw.bonus}<small> of ${cap}</small></span></div>
-    <div class="meter"><i style="width:${Math.min(100, 100 * rw.bonus / cap)}%;background:var(--read)"></i></div>
-    <p class="hint"><b>${dur(rw.sec)}</b> read this week. Every second counts, and each full minute adds a screen minute. Chapter books and graphic novels count. Starts over every Monday.</p>
-    <div class="ptools"><button class="pill soft" type="button" data-manual="read">+ Add reading by hand</button></div></section>
-    <section class="sect"><div class="sect-h"><h3>Reading log</h3></div><div class="list">${mine.length ? mine.map(r => readRow(r, kid, false)).join('') : '<div class="empty">Nothing logged yet. Tap Start reading and the time counts itself.</div>'}</div></section>`;
-}
-function readRow(r, kid, parent) {
-  const tg = parent ? 'button' : 'div', st = r.source === 'manual' ? 'Added by a parent' : !r.ended_at ? (r.running_since ? 'Reading now' : 'Paused') : clockTime(ms(r.started_at));
-  return `<${tg} ${parent ? `type="button" data-delread="${r.id}"` : ''} class="row"><span class="ico r">${I.read}</span><span class="t"><b>${esc(r.book)}</b><span>${short(r.local_date)} · ${st}${parent ? ' · tap to edit' : ''}</span></span><span class="amt rd">+${dur(readSec(r, kid))}</span></${tg}>`;
-}
 function readBoardHTML(kid) {
   const a = activeRead(kid);
   if (a) { const run = !!a.running_since, sec = readSec(a, kid);
@@ -463,18 +511,6 @@ function readBoardHTML(kid) {
 let pick = null, confirming = false;
 /* "2:10 PM – 2:42 PM" for a finished session, just the start while it's still going. */
 const span = x => { const st = ms(x.started_at), en = x.ended_at ? ms(x.ended_at) : 0; return en && en - st >= 60000 ? `${clockTime(st)} \u2013 ${clockTime(en)}` : clockTime(st) };
-function screenRow(x) {
-  const man = x.source === 'manual', st = man ? 'Added by a parent' : !x.ended_at ? (x.running_since ? 'Running now' : 'Paused') : '';
-  return `<div class="row"><span class="ico s">${I.screen}</span><span class="t"><b>${man ? esc(x.note || 'Screen time') : 'Screen session'}</b><span>${short(x.local_date)} · ${span(x)}${st ? ' · ' + st : ''}</span></span><span class="amt">${dur(liveSec(x))}</span></div>`;
-}
-function kidScreen(kid) {
-  const x = screenWeek(kid);
-  const rows = [...x.sess].reverse().map(screenRow)
-    .concat(S.sbonus.filter(a => a.kid_id === kid.id && a.week_start === thisWeek()).map(a => `<div class="row"><span class="ico m">${I.star}</span><span class="t"><b>${esc(a.note)}</b><span>Bonus minutes · ${short(localDate(ms(a.created_at)))}</span></span><span class="amt up">+${a.minutes} min</span></div>`))
-    .concat(weekCredits(kid, thisWeek()).filter(c => Number(c.minutes) > 0).map(c => `<div class="row"><span class="ico j">${I.check}</span><span class="t"><b>${esc(c.title)}</b><span>Job bonus minutes</span></span><span class="amt up">+${c.minutes} min</span></div>`));
-  return `<section class="board" id="board">${boardHTML(kid)}</section>${eqHTML(kid, x, '<div class="ptools"><button class="pill soft" type="button" data-manual="screen">+ Add screen time by hand</button></div>')}
-    <section class="sect"><div class="sect-h"><h3>Sessions</h3></div><div class="list">${rows.length ? rows.join('') : '<div class="empty">No sessions yet this week.</div>'}</div></section>`;
-}
 function eqHTML(kid, x, extra = '') {
   return `<section class="card"><span class="label">This week · ${screenDayNames(kid)}</span>
     <div class="eq"><span class="term"><b class="num">${x.base}</b><span>Base</span></span><span class="op">+</span><span class="term"><b class="num" style="color:var(--read)">${x.bonus}</b><span>Reading</span></span>
@@ -485,9 +521,9 @@ function eqHTML(kid, x, extra = '') {
 function boardHTML(kid) {
   const x = screenWeek(kid), a = x.active;
   if (a) { const run = !!a.running_since;
-    return `<div class="bline"><span class="label">${run ? 'Clock running' : 'Paused'}</span><span>This session <b id="sessUsed">${hms(liveSec(a))}</b></span></div>
+    return `<div class="bline"><span class="label">${run ? 'Watching now' : 'Paused'}</span><b>${esc(a.note || 'Screens')}</b></div>
       <div class="digits num ${run ? '' : 'idle'}" id="digits">${hms(x.leftSec)}</div><div class="bar"><i id="barfill" style="width:${x.totalSec ? 100 * x.usedSec / x.totalSec : 100}%"></i></div>
-      <p class="note">${run ? 'Time left this week. Pause whenever you stop. At zero, screens go off.' : 'Clock is paused, so screens are off. Tap Resume to keep going.'}</p>
+      <p class="note">This session <b id="sessUsed">${hms(liveSec(a))}</b>. ${run ? 'That big number is what’s left this week. Pause whenever you stop. At zero, screens go off.' : 'Clock is paused, so screens are off. Tap Resume to keep going.'}</p>
       <div class="row2">${run ? '<button class="ghost" id="pauseScr" type="button">Pause</button>' : '<button class="go" id="resumeScr" type="button">Resume</button>'}<button class="ghost" id="doneScr" type="button">I'm done</button></div>`; }
   if (!isScreenDay(kid)) return `<div class="bline"><span class="label">Screen clock</span><span>Opens <b>${screenDayNames(kid)}</b></span></div>
     <div class="digits idle num">${hms(x.leftSec)}</div><p class="note">That's your time so far. Reading this week adds more.</p>`;
@@ -551,10 +587,13 @@ function timeRowHTML(r) {
 }
 function pPay() {
   if (!S.kids.length) return `<div class="card"><p class="hint">Add a kid first.</p></div>`;
-  if (!kidById(S.lk)) S.lk = S.kids[0].id; const k = kidById(S.lk), view = S.lview || 'money', ws = S.lweek || thisWeek();
+  if (!kidById(S.lk)) S.lk = S.kids[0].id; const k = kidById(S.lk), view = S.lview || 'all', ws = S.lweek || thisWeek();
   let h = `${S.kids.length > 1 ? `<div class="kpick">${S.kids.map(x => `<button class="chip" type="button" data-lk="${x.id}" aria-pressed="${x.id === k.id}"><span class="dot" style="background:${COLORS[x.color]}"></span>${esc(x.name)}</button>`).join('')}</div>` : ''}
-    <div class="seg">${[['money', 'Money'], ['screen', 'Screen time'], ['reading', 'Reading']].map(([v, l]) => `<button type="button" data-lview="${v}" aria-pressed="${view === v}">${l}</button>`).join('')}</div>`;
-  if (view === 'money') {
+    <div class="seg">${[['all', 'All'], ['money', 'Money'], ['screen', 'Screens'], ['reading', 'Reading']].map(([v, l]) => `<button type="button" data-lview="${v}" aria-pressed="${view === v}">${l}</button>`).join('')}</div>`;
+  if (view === 'all') {
+    const st = stats(k);
+    h += `${weekNav(ws, 'lweek')}<button class="owedline-b" type="button" data-lview="money"><span>You owe ${esc(k.name)} <b class="num">${money(st.balance)}</b></span><span class="see">Pay or log a purchase ${I.chev}</span></button>${weekSummary(k, ws)}${ledgerListHTML(k, ws, 'all', true)}`;
+  } else if (view === 'money') {
     const st = stats(k), L = statement(k), o = owedInfo(k), g = goalOf(k);
     h += `<div class="card bankcard"><span class="label">You owe ${esc(k.name)}</span><b class="bankbig num">${money(st.balance)}</b>
         <p class="hint owedhint">${o.last ? `Last paid <b>${short(o.last)}</b>, ${ago(o.days)}.` : 'Nothing paid out yet.'}${g ? ` Saving for <b>${esc(g.name)}</b> (${money(g.amount)}).` : ''}</p>
@@ -730,6 +769,8 @@ function bindAll() {
   each('[data-lk]', el => { S.lk = el.dataset.lk; render() });
   each('[data-lview]', el => { S.lview = el.dataset.lview; render() });
   each('[data-lweek]', el => { S.lweek = el.dataset.lweek; render() });
+  each('[data-wk]', el => { const [k, v] = el.dataset.wk.split('|'); S[k] = v; render() });
+  each('[data-kf]', el => { S.kfilter = el.dataset.kf; render() });
   each('[data-addtime]', el => { const [kind, kid, ws] = el.dataset.addtime.split('|'); entrySheet(kind, kidById(kid), null, ws) });
   on('saveFam', () => act(() => q(sb.from('families').update({ name: titleCase($('sFam').value) || 'Our Family', timezone: $('sTz').value }).eq('id', S.family.id)), 'Saved'));
   on('changePin', () => newPinSheet());
@@ -747,15 +788,27 @@ function bindAll() {
 function bindBoards() {
   const kid = kidById(S.profile); if (!kid) return;
   const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn };
-  on('startBtn', () => startScreen(kid)); on('pauseScr', () => pauseTimer('screen_sessions', screenWeek(kid).active));
+  on('startBtn', () => screenStartSheet(kid)); on('startScr', () => screenStartSheet(kid)); on('pauseScr', () => pauseTimer('screen_sessions', screenWeek(kid).active));
   on('resumeScr', () => { unlockAudio(); resumeTimer('screen_sessions', screenWeek(kid).active) }); on('doneScr', async () => { await doneTimer('screen_sessions', screenWeek(kid).active, null); celebrate('Screens off. Nice job!', `You still have ${dur(screenWeek(kid).leftSec)} saved for later.`, { power: .5, icon: 'check' }) });
   on('startRead', () => readStartSheet(kid)); on('pauseRead', () => pauseTimer('reading_sessions', activeRead(kid), kid));
   on('resumeRead', () => resumeTimer('reading_sessions', activeRead(kid))); on('stopRead', () => stopRead(kid));
 }
 function rerenderBoards() { const kid = kidById(S.profile); if (!kid) return; const b = $('board'); if (b) b.innerHTML = boardHTML(kid); const r = $('readBoard'); if (r) r.innerHTML = readBoardHTML(kid); bindBoards() }
-async function startScreen(kid) {
+async function startScreen(kid, note) {
   if (screenWeek(kid).active) return; unlockAudio(); const d = today(), now = new Date().toISOString();
-  await act(() => q(sb.from('screen_sessions').insert({ family_id: S.family.id, kid_id: kid.id, local_date: d, week_start: monday(d), started_at: now, running_since: now, seconds: 0, source: 'clock' })));
+  await act(() => q(sb.from('screen_sessions').insert({ family_id: S.family.id, kid_id: kid.id, local_date: d, week_start: monday(d), started_at: now, running_since: now, seconds: 0, source: 'clock', note: note || null })));
+}
+function screenStartSheet(kid) {
+  const sw = screenWeek(kid);
+  if (!isScreenDay(kid)) return toast(`Screens open ${screenDayNames(kid)}. You have ${dur(sw.leftSec) || '0 min'} so far.`);
+  if (!sw.leftSec) return toast('All of this week’s screen time is used. New time starts Monday.');
+  const recent = [...new Set(S.screen.filter(x => x.kid_id === kid.id && x.note && x.source !== 'manual').sort((a, b) => ms(b.started_at) - ms(a.started_at)).map(x => x.note))].slice(0, 6);
+  openSheet(`<span class="label">${dur(sw.leftSec)} left this week</span><h2>Start screens</h2><div class="field"><label class="label" for="watchIn">What are you watching or playing?</label><input id="watchIn" maxlength="80" placeholder="Show, game or app" value="${esc(recent[0] || '')}">
+    ${recent.length ? `<div class="chips">${recent.map(b => `<button class="chip" type="button" data-watch="${esc(b)}">${esc(b)}</button>`).join('')}</div>` : ''}</div>
+    <p class="hint">The clock counts down while screens are on. Pause it whenever you stop.</p><button class="save" id="scrGo" type="button">Start the clock</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+    layer.querySelectorAll('[data-watch]').forEach(b => b.onclick = () => { $('watchIn').value = b.dataset.watch });
+    $('scrGo').onclick = async () => { const note = capFirst($('watchIn').value.trim()); if (!note) return toast('What are you watching?'); closeSheet(); await startScreen(kid, note); toast(`Enjoy ${note}!`) };
+  });
 }
 const timerSec = (row, kid) => kid ? Math.min(liveSec(row), capSec(kid)) : liveSec(row);
 async function pauseTimer(table, row, kid) { if (!row || !row.running_since) return; await act(() => q(sb.from(table).update({ seconds: timerSec(row, kid), running_since: null }).eq('id', row.id)), 'Paused. Your time is saved.') }
