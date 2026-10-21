@@ -79,7 +79,7 @@ async function ensureWeeks() {
     S.weeks = await q(sb.from('weeks').select('*').eq('family_id', S.family.id));
   }
 }
-async function refresh() { try { await loadAll() } catch (e) { toast(errMsg(e)) } render() }
+async function refresh() { try { await loadAll() } catch (e) { toast(errMsg(e)) } render(); if (S.view === 'kid' && kidById(S.profile) && !$('scrim')) cheerNews(kidById(S.profile)) }
 const errMsg = e => (e && e.message && /fetch|network/i.test(e.message)) ? 'You’re offline. Try again when you’re connected.' : 'That didn’t save. Try again.';
 async function act(fn, ok) { try { await fn(); if (ok) toast(ok); await refresh() } catch (e) { console.error(e); toast(errMsg(e)) } }
 
@@ -189,6 +189,52 @@ const brandName = () => { const w = APP.split(' '); return w.length > 1 ? `${esc
   el.innerHTML = items.map(([svg, x, y, size, rot, anim], i) => `<svg class="pr pr-${anim}" style="left:${x}%;top:${y}%;width:${size}px;--r:${rot}deg;animation-delay:-${i * 7}s" viewBox="0 0 32 32">${svg}</svg>`).join('') + '<div class="floor"></div>';
   document.body.prepend(el);
 })();
+/* ---------- celebrations: confetti, a cheer card and a little chime for good things ---------- */
+const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+function confetti(power = 1) {
+  if (reduceMotion()) return;
+  const c = document.createElement('canvas'); c.className = 'confetti'; document.body.appendChild(c);
+  const dpr = Math.min(2, window.devicePixelRatio || 1), W = innerWidth, H = innerHeight; c.width = W * dpr; c.height = H * dpr;
+  const g = c.getContext('2d'); g.scale(dpr, dpr);
+  const cols = ['#FFD31A', '#1A5FD0', '#E3192F', '#1FA34A', '#7A3FF2', '#FF6B1A', '#F0418C', '#0FA3A3'];
+  const N = Math.round(140 * power), P = [];
+  for (let i = 0; i < N; i++) { const left = i % 2 === 0; P.push({ x: left ? -10 : W + 10, y: H * (0.55 + Math.random() * 0.3), vx: (left ? 1 : -1) * (5 + Math.random() * 9), vy: -(10 + Math.random() * 12), r: 5 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - .5) * .4, col: cols[i % cols.length], shape: i % 3 }) }
+  const t0 = performance.now();
+  (function frame(t) {
+    const el = t - t0; g.clearRect(0, 0, W, H);
+    for (const q of P) { q.vy += 0.38; q.vx *= 0.985; q.x += q.vx; q.y += q.vy; q.rot += q.vr;
+      g.save(); g.translate(q.x, q.y); g.rotate(q.rot); g.fillStyle = q.col; g.globalAlpha = Math.max(0, 1 - Math.max(0, el - 1800) / 700);
+      if (q.shape === 0) g.fillRect(-q.r, -q.r / 2, q.r * 2, q.r); else if (q.shape === 1) { g.beginPath(); g.arc(0, 0, q.r * .6, 0, 7); g.fill() } else { g.beginPath(); g.moveTo(0, -q.r); g.lineTo(q.r, q.r); g.lineTo(-q.r, q.r); g.closePath(); g.fill() }
+      g.restore() }
+    if (el < 2500) requestAnimationFrame(frame); else c.remove();
+  })(t0);
+}
+function chime() { try { unlockAudio(); if (!audio) return; [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => { const o = audio.createOscillator(), v = audio.createGain(), t = audio.currentTime + i * .09; o.type = 'triangle'; o.frequency.value = f; o.connect(v); v.connect(audio.destination); v.gain.setValueAtTime(0.0001, t); v.gain.exponentialRampToValueAtTime(.12, t + .02); v.gain.exponentialRampToValueAtTime(.0001, t + .35); o.start(t); o.stop(t + .4) }) } catch (e) { } }
+let cheerTimer;
+function celebrate(title, sub, { power = 1, icon = 'star', sound = true } = {}) {
+  confetti(power); if (sound) chime();
+  document.querySelector('.cheer')?.remove(); clearTimeout(cheerTimer);
+  const el = document.createElement('div'); el.className = 'cheer'; el.setAttribute('role', 'status');
+  el.innerHTML = `<div class="cheer-card"><span class="cheer-ico">${I[icon] || I.star}</span><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
+  el.onclick = () => el.remove(); document.body.appendChild(el);
+  cheerTimer = setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 350) }, 3200);
+}
+const PRAISE = ['Way to go!', 'Awesome!', 'You did it!', 'Nice work!', 'Look at you go!', 'High five!', 'Super job!'];
+const praise = () => PRAISE[Math.floor(Math.random() * PRAISE.length)];
+/* When a kid opens their screen, cheer for anything good that happened since they last looked. */
+function cheerNews(kid) {
+  const key = 'seen-' + kid.id, raw = store.get(key), ok = approvedCredits(kid), weeks = kidWeeks(kid).map(w => w.week_start);
+  const now = { c: ok.map(c => c.id), w: weeks, b: S.sbonus.filter(b => b.kid_id === kid.id).map(b => b.id) };
+  store.set(key, JSON.stringify(now));
+  if (!raw) return;
+  let seen; try { seen = JSON.parse(raw) } catch (e) { return }
+  const newC = ok.filter(c => !(seen.c || []).includes(c.id)), newW = weeks.filter(w => !(seen.w || []).includes(w)), newB = S.sbonus.filter(b => b.kid_id === kid.id && !(seen.b || []).includes(b.id));
+  const amt = r2(newC.reduce((a, c) => a + Number(c.amount), 0) + newW.reduce((a, w) => a + Number(S.weeks.find(x => x.kid_id === kid.id && x.week_start === w)?.allowance || 0), 0));
+  const mins = newB.reduce((a, b) => a + Number(b.minutes), 0) + newC.reduce((a, c) => a + (Number(c.minutes) || 0), 0);
+  if (!amt && !mins) return;
+  const what = newC.length === 1 && !newW.length ? `${newC[0].title} was approved` : newW.length && !newC.length ? 'Your weekly allowance landed' : 'New money in your bank';
+  setTimeout(() => celebrate(amt ? `+${money(amt)}!` : `+${mins} screen minutes!`, amt && mins ? `${what}, plus ${mins} screen minutes` : what, { power: 1.2, icon: 'coin' }), 500);
+}
 /* ---------- top-level render ---------- */
 const app = $('app');
 function render() {
@@ -295,7 +341,7 @@ function whoHTML() {
     ${S.kids.length ? '' : '<p class="hint">No kids yet. Choose Parent to add one.</p>'}
     <div class="foot"><button class="link" id="signOutWho" type="button">Switch account</button></div></section>`;
 }
-function setProfile(p) { S.profile = p; store.set('profile', p); S.view = p === 'parent' ? 'parent' : 'kid'; S.tab = 'home' }
+function setProfile(p) { S.profile = p; store.set('profile', p); S.view = p === 'parent' ? 'parent' : 'kid'; S.tab = 'home'; if (p !== 'parent') { const k = kidById(p); if (k) setTimeout(() => cheerNews(k), 50) } }
 function chooseProfile(p) {
   if (p !== 'parent') { setProfile(p); render(); window.scrollTo(0, 0); return }
   if (S.parentOk) { setProfile('parent'); render(); return }
@@ -356,7 +402,8 @@ function claimSheet(kid, job) {
     <div class="done-box"><span class="label">Done means</span><b>${esc(job.done_means || 'Finished all the way')}</b></div>
     <p class="hint">A parent will check it. Then <b>${money(Number(job.price))}</b>${Number(job.bonus_minutes) ? ` and <b>${job.bonus_minutes} screen minutes</b>` : ''} go to you.</p>
     <button class="save" id="clGo" type="button" style="background:var(--money)">I did it</button><button class="cancel" data-close type="button">Not yet</button>`, () => {
-    $('clGo').onclick = async () => { closeSheet(); await act(() => q(sb.from('credits').insert({ family_id: S.family.id, kid_id: kid.id, week_start: thisWeek(), kind: 'job', title: job.title, amount: Number(job.price), minutes: Number(job.bonus_minutes) || 0, job_id: job.id, status: 'pending' })), 'Sent to a parent to check') };
+    $('clGo').onclick = async () => { closeSheet(); unlockAudio(); await act(() => q(sb.from('credits').insert({ family_id: S.family.id, kid_id: kid.id, week_start: thisWeek(), kind: 'job', title: job.title, amount: Number(job.price), minutes: Number(job.bonus_minutes) || 0, job_id: job.id, status: 'pending' })));
+      celebrate(praise(), `${job.title} is waiting for a parent to check. ${money(Number(job.price))} is on the way!`, { icon: 'check' }) };
   });
 }
 function goalSheet(kid) {
@@ -366,7 +413,8 @@ function goalSheet(kid) {
     <div class="field"><label class="label" for="gAmt">It costs ($)</label><input id="gAmt" type="number" inputmode="decimal" min="1" step="0.01" placeholder="0.00" value="${g ? g.amount : ''}"></div>
     <button class="save" id="gGo" type="button" style="background:var(--money)">Save goal</button>${g ? '<button class="cancel danger-link" id="gClear" type="button">Remove goal</button>' : ''}<button class="cancel" data-close type="button">Cancel</button>`, () => {
     $('gGo').onclick = async () => { const name = capFirst($('gName').value), amt = r2(parseFloat($('gAmt').value) || 0); if (!name) return toast('What are you saving for?'); if (amt <= 0) return toast('How much does it cost?'); closeSheet();
-      await act(() => q(sb.from('kids').update({ goal_name: name, goal_amount: amt }).eq('id', kid.id)), 'Goal saved') };
+      unlockAudio(); await act(() => q(sb.from('kids').update({ goal_name: name, goal_amount: amt }).eq('id', kid.id)));
+      const bal = stats(kid).balance; celebrate(bal >= amt ? 'You already have enough!' : 'Goal set!', bal >= amt ? `Ask a grown-up to buy ${name}.` : `Saving for ${name}. ${money(amt - bal)} to go!`, { power: .8 }) };
     if ($('gClear')) $('gClear').onclick = async () => { closeSheet(); await act(() => q(sb.from('kids').update({ goal_name: null, goal_amount: null }).eq('id', kid.id)), 'Goal removed') };
   });
 }
@@ -684,7 +732,7 @@ function bindBoards() {
   const kid = kidById(S.profile); if (!kid) return;
   const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn };
   on('startBtn', () => startScreen(kid)); on('pauseScr', () => pauseTimer('screen_sessions', screenWeek(kid).active));
-  on('resumeScr', () => { unlockAudio(); resumeTimer('screen_sessions', screenWeek(kid).active) }); on('doneScr', () => doneTimer('screen_sessions', screenWeek(kid).active, 'Clock stopped'));
+  on('resumeScr', () => { unlockAudio(); resumeTimer('screen_sessions', screenWeek(kid).active) }); on('doneScr', async () => { await doneTimer('screen_sessions', screenWeek(kid).active, null); celebrate('Screens off. Nice job!', `You still have ${dur(screenWeek(kid).leftSec)} saved for later.`, { power: .5, icon: 'check' }) });
   on('startRead', () => readStartSheet(kid)); on('pauseRead', () => pauseTimer('reading_sessions', activeRead(kid), kid));
   on('resumeRead', () => resumeTimer('reading_sessions', activeRead(kid))); on('stopRead', () => stopRead(kid));
 }
@@ -698,8 +746,10 @@ async function pauseTimer(table, row, kid) { if (!row || !row.running_since) ret
 async function resumeTimer(table, row) { if (!row || row.running_since) return; await act(() => q(sb.from(table).update({ running_since: new Date().toISOString() }).eq('id', row.id))) }
 async function doneTimer(table, row, msg, kid, secOverride) { if (!row) return; const sec = secOverride ?? timerSec(row, kid); await act(() => q(sb.from(table).update({ seconds: sec, running_since: null, ended_at: new Date().toISOString() }).eq('id', row.id)), msg) }
 async function stopRead(kid) {
-  const a = activeRead(kid); if (!a) return; const sec = timerSec(a, kid);
-  await doneTimer('reading_sessions', a, sec >= 60 ? `+${dur(sec)} of reading` : `+${sec} sec. It all adds up.`, kid);
+  const a = activeRead(kid); if (!a) return; const sec = timerSec(a, kid), before = Math.min(Number(kid.reading_cap) || 0, Math.floor((readWeek(kid).sec - readSec(a, kid)) / 60));
+  await doneTimer('reading_sessions', a, null, kid);
+  const after = readWeek(kid).bonus, earned = after - before;
+  celebrate(`You read ${dur(sec)}!`, earned > 0 ? `+${earned} screen minute${earned > 1 ? 's' : ''} earned${after >= kid.reading_cap ? '. You maxed out this week!' : ''}` : 'Every second counts toward your next minute.', { power: earned > 0 ? 1.3 : .6, icon: 'read' });
 }
 function txSheet(kid, kind, pre = {}) {
   const st = stats(kid), pay = kind === 'payout';
@@ -795,7 +845,7 @@ function readStartSheet(kid) {
     <p class="hint">Chapter books and graphic novels count. Audiobooks don't.</p><button class="save" id="rdGo" type="button" style="background:var(--read)">Start the timer</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
     layer.querySelectorAll('[data-book]').forEach(b => b.onclick = () => { $('bookIn').value = b.dataset.book });
     $('rdGo').onclick = async () => { const book = $('bookIn').value.trim(); if (!book) return toast('Type the book’s title.'); if (activeRead(kid)) return closeSheet(); closeSheet(); const d = today();
-      const now = new Date().toISOString(); await act(() => q(sb.from('reading_sessions').insert({ family_id: S.family.id, kid_id: kid.id, book, local_date: d, week_start: monday(d), started_at: now, running_since: now, seconds: 0, source: 'timer' }))) };
+      unlockAudio(); const now = new Date().toISOString(); await act(() => q(sb.from('reading_sessions').insert({ family_id: S.family.id, kid_id: kid.id, book, local_date: d, week_start: monday(d), started_at: now, running_since: now, seconds: 0, source: 'timer' }))); toast(`Happy reading! Enjoy ${book}.`) };
   });
 }
 function manualSheet(kid, kind) { entrySheet(kind === 'read' ? 'read' : 'screen', kid, null, thisWeek()) }
