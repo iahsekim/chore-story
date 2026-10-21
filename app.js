@@ -458,9 +458,11 @@ function readBoardHTML(kid) {
     <div class="digits idle num">00:00</div><button class="go white" id="startRead" type="button">Start reading</button>`;
 }
 let pick = null, confirming = false;
+/* "2:10 PM – 2:42 PM" for a finished session, just the start while it's still going. */
+const span = x => { const st = ms(x.started_at), en = x.ended_at ? ms(x.ended_at) : 0; return en && en - st >= 60000 ? `${clockTime(st)} \u2013 ${clockTime(en)}` : clockTime(st) };
 function screenRow(x) {
-  const man = x.source === 'manual', st = man ? 'Added by a parent' : !x.ended_at ? (x.running_since ? 'Running now' : 'Paused') : clockTime(ms(x.started_at));
-  return `<div class="row"><span class="ico s">${I.screen}</span><span class="t"><b>${man ? esc(x.note || 'Screen time') : 'Screen session'}</b><span>${short(x.local_date)} · ${st}</span></span><span class="amt">${dur(liveSec(x))}</span></div>`;
+  const man = x.source === 'manual', st = man ? 'Added by a parent' : !x.ended_at ? (x.running_since ? 'Running now' : 'Paused') : '';
+  return `<div class="row"><span class="ico s">${I.screen}</span><span class="t"><b>${man ? esc(x.note || 'Screen time') : 'Screen session'}</b><span>${short(x.local_date)} · ${span(x)}${st ? ' · ' + st : ''}</span></span><span class="amt">${dur(liveSec(x))}</span></div>`;
 }
 function kidScreen(kid) {
   const x = screenWeek(kid);
@@ -531,18 +533,18 @@ function pJobs() {
 function timeRows(kid, view, ws) {
   const R = [];
   if (view === 'screen') {
-    for (const x of S.screen.filter(x => x.kid_id === kid.id && x.week_start === ws)) R.push({ date: x.local_date, ts: ms(x.started_at), ico: `<span class="ico s">${I.screen}</span>`, title: x.source === 'manual' ? (x.note || 'Screen time') : 'Screen session', sub: x.source === 'manual' ? 'Added by a parent' : !x.ended_at ? (x.running_since ? 'Running now' : 'Paused') : 'Clock', v: -liveSec(x), edit: `screen|${x.id}` });
+    for (const x of S.screen.filter(x => x.kid_id === kid.id && x.week_start === ws)) R.push({ date: x.local_date, ts: ms(x.started_at), when: span(x), ico: `<span class="ico s">${I.screen}</span>`, title: x.source === 'manual' ? (x.note || 'Screen time') : 'Screen session', sub: x.source === 'manual' ? 'Added by a parent' : !x.ended_at ? (x.running_since ? 'Running now' : 'Paused') : 'Clock', v: -liveSec(x), edit: `screen|${x.id}` });
     for (const b of S.sbonus.filter(b => b.kid_id === kid.id && b.week_start === ws)) R.push({ date: localDate(ms(b.created_at)), ts: ms(b.created_at), ico: `<span class="ico m">${I.star}</span>`, title: b.note, sub: 'Bonus minutes', v: b.minutes * 60, edit: `sbonus|${b.id}` });
     for (const c of weekCredits(kid, ws).filter(c => Number(c.minutes) > 0)) R.push({ date: localDate(ms(c.created_at)), ts: ms(c.created_at), ico: `<span class="ico j">${I.check}</span>`, title: c.title, sub: 'Job bonus minutes', v: c.minutes * 60, edit: `credit|${c.id}` });
     const rw = readWeek(kid, ws); if (rw.bonus) R.push({ date: addDays(ws, 6) > today() ? today() : addDays(ws, 6), ts: 0, ico: `<span class="ico r">${I.read}</span>`, title: 'Earned from reading', sub: `${dur(rw.sec)} read this week`, v: rw.bonus * 60, edit: '' });
   } else {
-    for (const r of S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws)) R.push({ date: r.local_date, ts: ms(r.started_at), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: r.source === 'manual' ? 'Added by a parent' : !r.ended_at ? (r.running_since ? 'Reading now' : 'Paused') : 'Timer', v: readSec(r, kid), edit: `read|${r.id}` });
+    for (const r of S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws)) R.push({ date: r.local_date, ts: ms(r.started_at), when: span(r), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: r.source === 'manual' ? 'Added by a parent' : !r.ended_at ? (r.running_since ? 'Reading now' : 'Paused') : 'Timer', v: readSec(r, kid), edit: `read|${r.id}` });
   }
   return R.sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
 }
 function timeRowHTML(r) {
   const tg = r.edit ? 'button' : 'div', pos = r.v >= 0;
-  return `<${tg} ${r.edit ? `type="button" data-edit="${r.edit}"` : ''} class="row">${r.ico}<span class="t"><b>${esc(r.title)}</b><span>${short(r.date)}${r.ts ? ' · ' + clockTime(r.ts) : ''} · ${esc(r.sub)}${r.edit ? ' · tap to edit' : ''}</span></span><span class="amt ${pos ? 'up' : 'out'}">${pos ? '+' : '\u2212'}${dur(Math.abs(r.v))}</span></${tg}>`;
+  return `<${tg} ${r.edit ? `type="button" data-edit="${r.edit}"` : ''} class="row">${r.ico}<span class="t"><b>${esc(r.title)}</b><span>${short(r.date)}${r.when ? ' · ' + r.when : r.ts ? ' · ' + clockTime(r.ts) : ''} · ${esc(r.sub)}${r.edit ? ' · tap to edit' : ''}</span></span><span class="amt ${pos ? 'up' : 'out'}">${pos ? '+' : '\u2212'}${dur(Math.abs(r.v))}</span></${tg}>`;
 }
 function pPay() {
   if (!S.kids.length) return `<div class="card"><p class="hint">Add a kid first.</p></div>`;
