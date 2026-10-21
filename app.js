@@ -187,14 +187,15 @@ const supportHTML = (open = false) => `<details class="support" ${open ? 'open' 
   <span class="support-note">It&rsquo;s free! Tips keep it running.</span></div></details>`;
 
 const brandName = () => { const w = APP.split(' '); return w.length > 1 ? `${esc(w.slice(0, -1).join(' '))} <span class="story">${esc(w[w.length - 1])}</span>` : esc(APP) };
-/* ---------- playroom backdrop: a few faint paper airplanes, stars and crayon loops drifting slowly behind everything ---------- */
+/* ---------- night-sky backdrop: a few faint gold sparkles, coins and a little ghost bobbing slowly behind everything ---------- */
+const PIGGY = 'piggy.png';
 (function playroom() {
-  const plane = '<path d="M2 14 30 2 20 30 15 19z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M15 19 30 2" stroke="currentColor" stroke-width="2"/>';
-  const star = '<path d="m16 3 3.6 8 8.4.8-6.4 5.6 1.9 8.4L16 21.4 8.5 25.8l1.9-8.4L4 11.8l8.4-.8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>';
-  const loop = '<path d="M2 20c6-14 12 6 16-6s8 4 12-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>';
-  const items = [[plane, 8, 14, 46, -8, 'a'], [star, 82, 9, 30, 12, 'b'], [loop, 74, 40, 54, 0, 'c'], [plane, 14, 58, 38, 14, 'b'], [star, 88, 72, 26, -10, 'a'], [loop, 6, 86, 48, 8, 'c'], [star, 46, 30, 18, 0, 'b']];
+  const sparkle = '<path d="M16 2c1.3 7.6 3.4 9.8 11 11-7.6 1.3-9.7 3.4-11 11-1.3-7.6-3.4-9.7-11-11 7.6-1.2 9.7-3.4 11-11z" fill="currentColor"/>';
+  const coin = '<circle cx="16" cy="16" r="12" fill="currentColor"/><circle cx="16" cy="16" r="7.5" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2"/>';
+  const ghost = '<path d="M6 29V15a10 10 0 0 1 20 0v14l-3.4-2.6L19.3 29 16 26.4 12.7 29l-3.3-2.6z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12.5" cy="15" r="1.6" fill="currentColor"/><circle cx="19.5" cy="15" r="1.6" fill="currentColor"/>';
+  const items = [[sparkle, 'g', 8, 12, 26, 'a'], [coin, 'g', 84, 9, 22, 'b'], [ghost, 'p', 78, 38, 40, 'c'], [sparkle, 'g', 12, 52, 18, 'b'], [coin, 'g', 90, 70, 18, 'a'], [ghost, 'p', 6, 84, 34, 'c'], [sparkle, 'g', 50, 28, 14, 'a'], [sparkle, 'g', 70, 90, 22, 'b']];
   const el = document.createElement('div'); el.className = 'playroom'; el.setAttribute('aria-hidden', 'true');
-  el.innerHTML = items.map(([svg, x, y, size, rot, anim], i) => `<svg class="pr pr-${anim}" style="left:${x}%;top:${y}%;width:${size}px;--r:${rot}deg;animation-delay:-${i * 7}s" viewBox="0 0 32 32">${svg}</svg>`).join('') + '<div class="floor"></div>';
+  el.innerHTML = items.map(([svg, tone, x, y, size, anim], i) => `<svg class="pr pr-${anim} ${tone}" style="left:${x}%;top:${y}%;width:${size}px;animation-delay:-${i * 5}s" viewBox="0 0 32 32">${svg}</svg>`).join('');
   document.body.prepend(el);
 })();
 /* ---------- celebrations: confetti, a cheer card and a little chime for good things ---------- */
@@ -204,7 +205,7 @@ function confetti(power = 1) {
   const c = document.createElement('canvas'); c.className = 'confetti'; document.body.appendChild(c);
   const dpr = Math.min(2, window.devicePixelRatio || 1), W = innerWidth, H = innerHeight; c.width = W * dpr; c.height = H * dpr;
   const g = c.getContext('2d'); g.scale(dpr, dpr);
-  const cols = ['#FFC61A', '#F5A300', '#F49AA8', '#D23C66', '#FFE27A', '#1FA34A', '#0B1733', '#7A3FF2'];
+  const cols = ['#FFC61A', '#FFD84A', '#F5A300', '#F49AA8', '#FFC61A', '#FFF3C4'];
   const N = Math.round(140 * power), P = [];
   for (let i = 0; i < N; i++) { const left = i % 2 === 0; P.push({ x: left ? -10 : W + 10, y: H * (0.55 + Math.random() * 0.3), vx: (left ? 1 : -1) * (5 + Math.random() * 9), vy: -(10 + Math.random() * 12), r: 5 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - .5) * .4, col: cols[i % cols.length], shape: i % 3 }) }
   const t0 = performance.now();
@@ -212,7 +213,9 @@ function confetti(power = 1) {
     const el = t - t0; g.clearRect(0, 0, W, H);
     for (const q of P) { q.vy += 0.38; q.vx *= 0.985; q.x += q.vx; q.y += q.vy; q.rot += q.vr;
       g.save(); g.translate(q.x, q.y); g.rotate(q.rot); g.fillStyle = q.col; g.globalAlpha = Math.max(0, 1 - Math.max(0, el - 1800) / 700);
-      if (q.shape === 0) g.fillRect(-q.r, -q.r / 2, q.r * 2, q.r); else if (q.shape === 1) { g.beginPath(); g.arc(0, 0, q.r * .6, 0, 7); g.fill() } else { g.beginPath(); g.moveTo(0, -q.r); g.lineTo(q.r, q.r); g.lineTo(-q.r, q.r); g.closePath(); g.fill() }
+      if (q.shape === 0) { /* a spinning gold coin */ g.scale(Math.max(.12, Math.abs(Math.cos(q.rot * 2))), 1); g.beginPath(); g.arc(0, 0, q.r, 0, 7); g.fillStyle = '#FFC61A'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#E09A00'; g.stroke(); g.beginPath(); g.arc(0, 0, q.r * .55, 0, 7); g.strokeStyle = 'rgba(255,255,255,.6)'; g.stroke() }
+      else if (q.shape === 1) { /* a four-point sparkle */ const r = q.r * 1.2; g.beginPath(); g.moveTo(0, -r); g.quadraticCurveTo(r * .12, -r * .12, r, 0); g.quadraticCurveTo(r * .12, r * .12, 0, r); g.quadraticCurveTo(-r * .12, r * .12, -r, 0); g.quadraticCurveTo(-r * .12, -r * .12, 0, -r); g.fill() }
+      else { g.beginPath(); g.arc(0, 0, q.r * .45, 0, 7); g.fill() }
       g.restore() }
     if (el < 2500) requestAnimationFrame(frame); else c.remove();
   })(t0);
@@ -223,7 +226,7 @@ function celebrate(title, sub, { power = 1, icon = 'star', sound = true } = {}) 
   confetti(power); if (sound) chime();
   document.querySelector('.cheer')?.remove(); clearTimeout(cheerTimer);
   const el = document.createElement('div'); el.className = 'cheer'; el.setAttribute('role', 'status');
-  el.innerHTML = `<div class="cheer-card"><span class="cheer-ico">${I[icon] || I.star}</span><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
+  el.innerHTML = `<div class="cheer-card"><img class="cheer-pig" src="${PIGGY}" alt="" width="120" height="109"><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
   el.onclick = () => el.remove(); document.body.appendChild(el);
   cheerTimer = setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 350) }, 3200);
 }
@@ -248,7 +251,7 @@ const app = $('app');
 function render() {
   document.title = APP;
   const v = S.view;
-  if (v === 'loading') app.innerHTML = `<div class="loading">Loading…</div>`;
+  if (v === 'loading') app.innerHTML = `<div class="loading"><img src="${PIGGY}" alt="" width="88" height="80"><span>Loading…</span></div>`;
   else if (v === 'auth') app.innerHTML = authHTML();
   else if (v === 'onboard') app.innerHTML = onboardHTML();
   else if (v === 'who') app.innerHTML = whoHTML();
