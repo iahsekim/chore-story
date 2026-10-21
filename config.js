@@ -3,7 +3,7 @@
 window.CHORE_JAR_CONFIG = {
   supabaseUrl: 'https://wddbtkmtqunsbpfyzkxd.supabase.co',
   supabaseAnonKey: 'sb_publishable_nvKmj2yOomzogvrTKwXVNw_jr6EZjSG',
-  appName: 'Chore Story',
+  appName: 'PiggyBoo',
   venmo: 'mike-shai',
   cashapp: 'mikeshai',
   paypal: 'mikeshai',   // paypal.me username

@@ -1,6 +1,6 @@
-/* Chore Story — allowance, job board, reading log and weekend screen clock for families. */
+/* PiggyBoo — allowance, job board, reading log and weekend screen clock for families. */
 const CFG = window.CHORE_JAR_CONFIG;
-const APP = CFG.appName || 'Chore Story';
+const APP = CFG.appName || 'PiggyBoo';
 const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
 const COLORS = { green: '#1FA34A', blue: '#2F6BFF', purple: '#7A3FF2', orange: '#FF6B1A', pink: '#F0418C', teal: '#0FA3A3' };
@@ -204,7 +204,7 @@ function confetti(power = 1) {
   const c = document.createElement('canvas'); c.className = 'confetti'; document.body.appendChild(c);
   const dpr = Math.min(2, window.devicePixelRatio || 1), W = innerWidth, H = innerHeight; c.width = W * dpr; c.height = H * dpr;
   const g = c.getContext('2d'); g.scale(dpr, dpr);
-  const cols = ['#FFD31A', '#1A5FD0', '#E3192F', '#1FA34A', '#7A3FF2', '#FF6B1A', '#F0418C', '#0FA3A3'];
+  const cols = ['#FFC61A', '#F5A300', '#F49AA8', '#D23C66', '#FFE27A', '#1FA34A', '#0B1733', '#7A3FF2'];
   const N = Math.round(140 * power), P = [];
   for (let i = 0; i < N; i++) { const left = i % 2 === 0; P.push({ x: left ? -10 : W + 10, y: H * (0.55 + Math.random() * 0.3), vx: (left ? 1 : -1) * (5 + Math.random() * 9), vy: -(10 + Math.random() * 12), r: 5 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - .5) * .4, col: cols[i % cols.length], shape: i % 3 }) }
   const t0 = performance.now();
@@ -261,7 +261,7 @@ function render() {
 function authHTML() {
   const code = S.authStep === 'code';
   return `<section class="screen-center">
-    <h1 class="logo-h"><img src="logo-900.png" alt="${esc(APP)}" width="900" height="304"></h1>
+    <h1 class="logo-h"><img src="logo-900.png" alt="${esc(APP)}" width="900" height="800"></h1>
     <p class="lede">Allowance, chores, reading and screen time, all in one place kids can see and trust.</p>
     <div class="card form">
       ${code ? `<div class="field"><label class="label" for="codeIn">Enter the code we sent to ${esc(S.authEmail)}</label>
@@ -342,7 +342,7 @@ async function hashPin(fid, pin) {
 
 /* ---------- who's using ---------- */
 function whoHTML() {
-  return `<section class="screen-center"><h1 class="logo-h"><img src="logo-900.png" alt="${esc(APP)}" width="900" height="304"></h1>
+  return `<section class="screen-center"><h1 class="logo-h"><img src="logo-900.png" alt="${esc(APP)}" width="900" height="800"></h1>
     <p class="lede">Who's using ${esc(APP)}?</p>
     <div class="who">${S.kids.map(k => `<button type="button" data-who="${k.id}">${avatar(k)}${esc(k.name)}</button>`).join('')}
       <button type="button" class="par" data-who="parent"><span class="avatar">${I.lock}</span>Parent</button></div>
