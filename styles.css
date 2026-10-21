@@ -435,7 +435,7 @@ main>*,.card>*,.sect>*,.list>*,.kcard>*,.board>*,.hero>*,.sheet>*{min-width:0}
 .tog::before{content:"";position:absolute;inset:-9px -4px}
 .step button{width:36px;height:36px}
 .chip{min-height:40px}
-.kact{grid-template-columns:repeat(3,minmax(0,1fr))}
+.kact{grid-template-columns:repeat(2,minmax(0,1fr))}
 .kact .pill{min-width:0;white-space:normal;line-height:1.1;text-align:center}
 .decide{flex-wrap:wrap}
 .row .t b,.row .t span{overflow-wrap:anywhere}
