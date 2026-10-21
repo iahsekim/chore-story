@@ -211,7 +211,7 @@ function authHTML() {
     <p class="lede">Allowance, chores, reading and screen time, all in one place kids can see and trust.</p>
     <div class="card form">
       ${code ? `<div class="field"><label class="label" for="codeIn">Enter the code we sent to ${esc(S.authEmail)}</label>
-        <input id="codeIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Code"></div>
+        <input id="codeIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" maxlength="12" placeholder="Code"></div>
         <button class="save" id="codeGo" type="button">Sign in</button>
         <p class="hint">Or tap the link in the email on this device. <button class="link" id="authBack" type="button">Use a different email</button></p>`
       : `<div class="field"><label class="label" for="emailIn">Parent email</label>
@@ -230,7 +230,7 @@ async function sendCode() {
   S.authEmail = email; S.authStep = 'code'; render(); setTimeout(() => $('codeIn')?.focus(), 50);
 }
 async function verifyCode() {
-  const token = $('codeIn').value.replace(/\D/g, ''), b = $('codeGo');
+  const token = $('codeIn').value.replace(/[\s-]/g, ''), b = $('codeGo');
   if (token.length < 6) return toast('Enter the whole code from the email.');
   if (b.disabled) return; b.disabled = true; b.textContent = 'Checking\u2026';
   let { error } = await sb.auth.verifyOtp({ email: S.authEmail, token, type: 'email' });
