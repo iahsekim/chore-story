@@ -265,7 +265,7 @@ function render() {
 function authHTML() {
   const code = S.authStep === 'code';
   return `<section class="screen-center">
-    <h1 class="logo-h"><img src="logo-900.png" alt="${esc(APP)}" width="900" height="335"></h1>
+    <h1 class="logo-h"><img src="logo-900.png" alt="${esc(APP)}" width="900" height="348"></h1>
     <p class="lede">Allowance, chores, reading and screen time, all in one place kids can see and trust.</p>
     <div class="card form">
       ${code ? `<div class="field"><label class="label" for="codeIn">Enter the code we sent to ${esc(S.authEmail)}</label>
@@ -346,7 +346,7 @@ async function hashPin(fid, pin) {
 
 /* ---------- who's using ---------- */
 function whoHTML() {
-  return `<section class="screen-center"><h1 class="logo-h"><img src="logo-900.png" alt="${esc(APP)}" width="900" height="335"></h1>
+  return `<section class="screen-center"><h1 class="logo-h"><img src="logo-900.png" alt="${esc(APP)}" width="900" height="348"></h1>
     <p class="lede">Who's using ${esc(APP)}?</p>
     <div class="who">${S.kids.map(k => `<button type="button" data-who="${k.id}">${avatar(k)}${esc(k.name)}</button>`).join('')}
       <button type="button" class="par" data-who="parent"><span class="avatar">${I.lock}</span>Parent</button></div>
