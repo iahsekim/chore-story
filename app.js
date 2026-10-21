@@ -210,8 +210,8 @@ function authHTML() {
     <h1 class="logo-h"><img src="logo-900.png" alt="${esc(APP)}" width="900" height="304"></h1>
     <p class="lede">Allowance, chores, reading and screen time, all in one place kids can see and trust.</p>
     <div class="card form">
-      ${code ? `<div class="field"><label class="label" for="codeIn">Enter the 6-digit code we sent to ${esc(S.authEmail)}</label>
-        <input id="codeIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>
+      ${code ? `<div class="field"><label class="label" for="codeIn">Enter the code we sent to ${esc(S.authEmail)}</label>
+        <input id="codeIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Code"></div>
         <button class="save" id="codeGo" type="button">Sign in</button>
         <p class="hint">Or tap the link in the email on this device. <button class="link" id="authBack" type="button">Use a different email</button></p>`
       : `<div class="field"><label class="label" for="emailIn">Parent email</label>
@@ -230,10 +230,12 @@ async function sendCode() {
   S.authEmail = email; S.authStep = 'code'; render(); setTimeout(() => $('codeIn')?.focus(), 50);
 }
 async function verifyCode() {
-  const token = $('codeIn').value.replace(/\D/g, '');
-  if (token.length < 6) return toast('Enter all 6 digits.');
-  const { error } = await sb.auth.verifyOtp({ email: S.authEmail, token, type: 'email' });
-  if (error) return toast('That code didn’t work. Check the newest email and try again.');
+  const token = $('codeIn').value.replace(/\D/g, ''), b = $('codeGo');
+  if (token.length < 6) return toast('Enter the whole code from the email.');
+  if (b.disabled) return; b.disabled = true; b.textContent = 'Checking\u2026';
+  let { error } = await sb.auth.verifyOtp({ email: S.authEmail, token, type: 'email' });
+  if (error && /expired|invalid/i.test(error.message)) ({ error } = await sb.auth.verifyOtp({ email: S.authEmail, token, type: 'signup' }).then(r => r.error ? { error } : r));
+  if (error) { console.error(error); b.disabled = false; b.textContent = 'Sign in'; return toast(/expired|invalid/i.test(error.message) ? 'That code didn\u2019t match or has expired. Use the code in the newest email.' : 'Couldn\u2019t sign in: ' + error.message) }
 }
 
 /* ---------- onboarding ---------- */
@@ -524,7 +526,7 @@ function bindAll() {
   // auth
   on('emailGo', sendCode); on('codeGo', verifyCode); on('authBack', () => { S.authStep = 'email'; render() });
   if ($('emailIn')) $('emailIn').onkeydown = e => { if (e.key === 'Enter') sendCode() };
-  if ($('codeIn')) $('codeIn').oninput = e => { if (e.target.value.replace(/\D/g, '').length === 6) verifyCode() };
+  if ($('codeIn')) $('codeIn').onkeydown = e => { if (e.key === 'Enter') verifyCode() };
   // onboarding
   if ($('famName')) $('famName').onblur = e => { e.target.value = titleCase(e.target.value) };
   on('ob0', () => { S.onboard.name = titleCase($('famName').value) || 'Our Family'; S.onboard.step = 1; render() });
