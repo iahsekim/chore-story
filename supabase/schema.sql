@@ -1,4 +1,4 @@
--- Coin Story database schema for Supabase.
+-- PiggyBoo database schema for Supabase.
 -- Run once in the Supabase dashboard: SQL Editor > New query > paste > Run.
 -- Every table is scoped to a family. Row Level Security makes sure a signed-in
 -- parent can only ever read or write rows for the family they belong to.

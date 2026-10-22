@@ -1,32 +1,33 @@
 /* Layout: a phone app in a "storybook toybox" look — rounded friendly type, chunky buttons that press down, bright page colors on a warm paper ground. Each area owns a color: money green, jobs blue, reading violet, screen sunshine. */
 :root{
-  --bg:#FFFAEB; --surface:#FFFFFF; --sunk:#FFF0C7; --ink:#10224A; --muted:#55627F; --line:#F1E3B8; --edge:#0F3F86;
-  --money:#1FA34A; --money-deep:#147A36; --money-soft:#DCF5D9; --hero:#1FA34A;
-  --jobs:#1A5FD0; --jobs-soft:#E1EBFF;
-  --read:#7A3FF2; --read-soft:#ECE2FF;
-  --screen:#FFD31A; --board:#0F2A5C; --board-raise:#1B3A74; --board-line:#2B4C8A; --board-ink:#FFFAEB; --board-muted:#AFC0E0;
-  --danger:#E3192F; --danger-soft:#FFE0E3;
-  --press:rgba(15,63,134,.22);
-  --shadow:0 2px 0 rgba(36,33,58,.06),0 6px 18px rgba(36,33,58,.06);
+  /* PiggyBoo: cream paper, black ink outlines, the gold coin and the pink snout from the logo */
+  --bg:#FDF7EC; --surface:#FFFFFF; --sunk:#F8EEDC; --ink:#161311; --muted:#6A5F55; --line:#EADCC3; --edge:#161311;
+  --money:#1E8A4A; --money-deep:#156637; --money-soft:#DEF2E3; --hero:#1E8A4A;
+  --jobs:#C9442F; --jobs-soft:#FFE1D9;
+  --read:#6E4FD8; --read-soft:#ECE5FF;
+  --screen:#FCBE12; --board:#1C1916; --board-raise:#2A2621; --board-line:#3A342D; --board-ink:#FDF7EC; --board-muted:#B6AB9B;
+  --danger:#D63A2B; --danger-soft:#FFE1DC;
+  --press:rgba(22,19,17,.22);
+  --shadow:0 2px 0 rgba(22,19,17,.06),0 6px 18px rgba(22,19,17,.06);
   --display:"Baloo 2","Fredoka","Arial Rounded MT Bold",system-ui,sans-serif;
   --body:"Nunito","Segoe UI",system-ui,-apple-system,sans-serif;
   --mono:"Baloo 2","Nunito",ui-rounded,system-ui,sans-serif;
   --r:24px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0B1430; --surface:#13204A; --sunk:#1A2A5A; --ink:#FFF7DE; --muted:#AEBBDD; --line:#25386E; --edge:#040A1C;
-  --money:#4BD873; --money-deep:#11592A; --money-soft:#173A22; --hero:#178A3D;
-  --jobs:#5B91FF; --jobs-soft:#1D2F66;
-  --read:#AE8BFF; --read-soft:#30244F;
-  --screen:#FFD84A; --board:#060E26; --board-raise:#15224A; --board-line:#25386E;
-  --danger:#FF7A6E; --danger-soft:#43211F; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}}
+  --bg:#14110E; --surface:#1F1B17; --sunk:#29241E; --ink:#FBF4E8; --muted:#B9AE9E; --line:#3A332B; --edge:#000000;
+  --money:#4FCB7C; --money-deep:#145A31; --money-soft:#173322; --hero:#1E8A4A;
+  --jobs:#FF8A72; --jobs-soft:#3D221C;
+  --read:#A68BFF; --read-soft:#2C2445;
+  --screen:#FFC93A; --board:#0B0A08; --board-raise:#1B1814; --board-line:#3A332B; --board-ink:#FBF4E8; --board-muted:#A79C8C;
+  --danger:#FF7A6E; --danger-soft:#42201B; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0B1430; --surface:#13204A; --sunk:#1A2A5A; --ink:#FFF7DE; --muted:#AEBBDD; --line:#25386E; --edge:#040A1C;
-  --money:#4BD873; --money-deep:#11592A; --money-soft:#173A22; --hero:#178A3D;
-  --jobs:#5B91FF; --jobs-soft:#1D2F66;
-  --read:#AE8BFF; --read-soft:#30244F;
-  --screen:#FFD84A; --board:#060E26; --board-raise:#15224A; --board-line:#25386E;
-  --danger:#FF7A6E; --danger-soft:#43211F; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}
+  --bg:#14110E; --surface:#1F1B17; --sunk:#29241E; --ink:#FBF4E8; --muted:#B9AE9E; --line:#3A332B; --edge:#000000;
+  --money:#4FCB7C; --money-deep:#145A31; --money-soft:#173322; --hero:#1E8A4A;
+  --jobs:#FF8A72; --jobs-soft:#3D221C;
+  --read:#A68BFF; --read-soft:#2C2445;
+  --screen:#FFC93A; --board:#0B0A08; --board-raise:#1B1814; --board-line:#3A332B; --board-ink:#FBF4E8; --board-muted:#A79C8C;
+  --danger:#FF7A6E; --danger-soft:#42201B; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body);
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
@@ -318,11 +319,11 @@ input,select{border:2.5px solid var(--edge);background:var(--surface)}
 
 /* ---------- Chore Story logo ---------- */
 .logo-h{margin:0;display:block}
-.logo-h img{display:block;width:100%;max-width:420px;height:auto;margin:0 auto 4px;filter:drop-shadow(0 3px 0 rgba(15,63,134,.18))}
+.logo-h img{display:block;width:100%;max-width:420px;height:auto;margin:0 auto 4px;filter:none}
 .screen-center .lede{text-align:center;margin-inline:auto}
 .save{background:var(--jobs);color:#fff}
-.go{background:var(--screen);color:#10224A}
-.tabbar button[aria-selected="true"] .ic{background:var(--screen);color:#10224A}
+.go{background:var(--screen);color:#161311}
+.tabbar button[aria-selected="true"] .ic{background:var(--screen);color:#161311}
 .brand{justify-content:center}
 
 /* ---------- bank ledger ---------- */
@@ -501,10 +502,10 @@ input,select,textarea{font-size:16px}
 
 /* ---------- celebrations ---------- */
 .confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
-.cheer{position:fixed;inset:0;z-index:55;display:grid;place-items:center;padding:24px;background:rgba(16,34,74,.25);animation:cheer-in .2s ease-out}
+.cheer{position:fixed;inset:0;z-index:55;display:grid;place-items:center;padding:24px;background:rgba(22,19,17,.35);animation:cheer-in .2s ease-out}
 .cheer.out{animation:cheer-out .3s ease-in forwards}
 .cheer-card{background:var(--surface);color:var(--ink);border:3px solid var(--edge);box-shadow:6px 6px 0 var(--edge);border-radius:28px;padding:26px 24px 22px;max-width:340px;width:100%;display:grid;justify-items:center;gap:8px;text-align:center;animation:cheer-pop .5s cubic-bezier(.2,1.6,.4,1)}
-.cheer-ico{width:76px;height:76px;border-radius:24px;display:grid;place-items:center;background:var(--screen);color:#10224A;border:3px solid var(--edge);box-shadow:3px 3px 0 var(--edge);animation:cheer-wiggle 1s ease-in-out .3s 2}
+.cheer-ico{width:76px;height:76px;border-radius:24px;display:grid;place-items:center;background:var(--screen);color:#161311;border:3px solid var(--edge);box-shadow:3px 3px 0 var(--edge);animation:cheer-wiggle 1s ease-in-out .3s 2}
 .cheer-ico svg{width:42px;height:42px}
 .cheer-card b{font:800 30px/1.1 var(--display);margin-top:6px}
 .cheer-card span{font:700 22px/1.3 var(--hand);color:var(--muted)}
@@ -563,3 +564,51 @@ input,select,textarea{font-size:16px}
 .tip[aria-expanded="true"]{background:var(--jobs);color:#fff}
 .tipbox{display:block;font-size:13px;font-weight:600;line-height:1.4;color:var(--ink);background:var(--sunk);border:2px dashed var(--line);border-radius:12px;padding:8px 10px}
 .tipbox[hidden]{display:none}
+
+/* ---------- PiggyBoo touches: night-sky sparkles, ghost-hem edges, coin stickers ---------- */
+:root{--sparkle:#FCBE12;--ghosty:#FD8066}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--sparkle:#FFC93A;--ghosty:#FF9A84}}
+:root[data-theme="dark"]{--sparkle:#FFC93A;--ghosty:#FF9A84}
+.playroom{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.wrap,#layer{position:relative;z-index:1}
+.pr{position:absolute;opacity:.22}
+.pr.g{color:var(--sparkle)} .pr.p{color:var(--ghosty);opacity:.28}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pr{opacity:.18}}
+:root[data-theme="dark"] .pr{opacity:.18}
+@media (prefers-reduced-motion:no-preference){
+  .pr-a{animation:bob-a 9s ease-in-out infinite alternate}
+  .pr-b{animation:bob-b 12s ease-in-out infinite alternate}
+  .pr-c{animation:bob-c 7s ease-in-out infinite alternate}
+}
+@keyframes bob-a{from{transform:translateY(0) scale(1)}to{transform:translateY(-10px) scale(1.12)}}
+@keyframes bob-b{from{transform:translateY(0) rotate(-8deg)}to{transform:translateY(12px) rotate(8deg)}}
+@keyframes bob-c{from{transform:translate(0,0) rotate(-4deg)}to{transform:translate(8px,-14px) rotate(4deg)}}
+/* the tab bar's top edge is a wavy ghost hem */
+.tabbar{border-top:0!important;padding-top:14px}
+.tabbar::before{content:"";position:absolute;left:0;right:0;top:-6px;height:12px;background:var(--edge);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='12'%3E%3Cpath d='M0 7c5.5 0 5.5-5 11-5s5.5 5 11 5 5.5-5 11-5 5.5 5 11 5' fill='none' stroke='black' stroke-width='2.6'/%3E%3C/svg%3E") repeat-x 0 0/44px 12px;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='12'%3E%3Cpath d='M0 7c5.5 0 5.5-5 11-5s5.5 5 11 5 5.5-5 11-5 5.5 5 11 5' fill='none' stroke='black' stroke-width='2.6'/%3E%3C/svg%3E") repeat-x 0 0/44px 12px}
+.empty::before{content:"";display:block;width:52px;height:47px;margin:0 auto 8px;background:url(piggy.png) center/contain no-repeat;opacity:.55}
+/* a gold sparkle sticker on the bank card and boards */
+.hero::before,.board::before{content:"";position:absolute;top:-14px;left:16px;width:30px;height:30px;transform:rotate(-10deg);z-index:2;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2c1.3 7.6 3.4 9.8 11 11-7.6 1.3-9.7 3.4-11 11-1.3-7.6-3.4-9.7-11-11 7.6-1.2 9.7-3.4 11-11z' fill='%23FCBE12' stroke='%23161311' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.hero,.board{position:relative;overflow:visible}
+.hero::after{border-radius:0 28px 0 0}
+.hero::after{right:12px;top:12px;width:96px;height:96px}
+/* main buttons are gold like the "Boo" */
+.save{background:var(--screen)!important;color:#161311!important}
+/* loading: the piggy bobs */
+.loading{gap:10px;font:800 16px var(--display)}
+.loading img{width:88px;height:auto}
+@media (prefers-reduced-motion:no-preference){.loading img,.cheer-pig{animation:float 1.6s ease-in-out infinite alternate}}
+@keyframes float{from{transform:translateY(0) rotate(-3deg)}to{transform:translateY(-8px) rotate(3deg)}}
+.logo-h img{filter:none!important}
+
+/* coral buttons need dark text in dark mode */
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill:not(.soft):not(.ok):not(.no):not(.wait){color:#161311}}
+:root[data-theme="dark"] .pill:not(.soft):not(.ok):not(.no):not(.wait){color:#161311}
+.cheer-pig{width:120px;height:auto;margin-top:-62px;filter:drop-shadow(3px 4px 0 rgba(22,19,17,.18))}
+@media (prefers-reduced-motion:reduce){.cheer-pig{animation:none}}
+/* reading cards keep the deeper purple in dark mode so white text stays readable */
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.start.rd,.board.rdb){background:#6E4FD8}}
+:root[data-theme="dark"] :is(.start.rd,.board.rdb){background:#6E4FD8}
