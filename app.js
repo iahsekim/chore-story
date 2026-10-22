@@ -421,7 +421,7 @@ function kidHome(kid) {
     ${ra ? `<section class="board rdb" id="readBoard">${readBoardHTML(kid)}</section>` : ''}
     ${sa ? `<section class="board" id="board">${boardHTML(kid)}</section>` : ''}
     ${ra && sa ? '' : `<section class="starts">
-      ${ra ? '' : `<button class="start rd" type="button" id="startRead"><span class="pl">${I.play}</span><b>Start reading</b><span>${cap ? `+${rw.bonus} of ${cap} bonus min` : 'Log your reading'}</span></button>`}
+      ${ra ? '' : `<button class="start rd" type="button" id="startRead"><span class="pl">${I.play}</span><b>Start reading</b><span>${cap ? `${rw.bonus} of ${cap} min` : `${rw.minutes} min`}</span></button>`}
       ${sa ? '' : `<button class="start sc ${isScreenDay(kid) && sw.leftSec ? '' : 'off'}" type="button" id="startScr"><span class="pl">${I.play}</span><b>Start screens</b><span>${scrSub}</span></button>`}
     </section>`}
     <section class="sect"><div class="sect-h"><h3>This week</h3><button class="link" type="button" data-tab="ledger">See ledger</button></div>
