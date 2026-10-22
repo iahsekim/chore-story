@@ -202,6 +202,21 @@ const PIGGY = 'piggy.png';
   el.innerHTML = items.map(([svg, tone, x, y, size, anim], i) => `<svg class="pr pr-${anim} ${tone}" style="left:${x}%;top:${y}%;width:${size}px;animation-delay:-${i * 5}s" viewBox="0 0 32 32">${svg}</svg>`).join('');
   document.body.prepend(el);
 })();
+/* ---------- the PiggyBoo coin, drawn in code so it can spin, drop and roll ---------- */
+const COIN_RIDGES = [-52, -34, -16, 2, 20, 38, 56].map(d => { const t = d * Math.PI / 180, y = (56 + 45 * Math.sin(t)).toFixed(1), c = Math.cos(t); return `M${(49 + 33 * c).toFixed(1)} ${y}H${(55 + 33 * c).toFixed(1)}` }).join('');
+const coinSVG = (cls = '') => `<svg class="coin ${cls}" viewBox="0 0 104 112" aria-hidden="true"><defs><linearGradient id="coinface" x1="0" y1="0" x2=".35" y2="1"><stop offset="0" stop-color="#FFE34D"/><stop offset="1" stop-color="#FCB80F"/></linearGradient></defs>
+  <g transform="rotate(-10 52 56)" stroke="#161311" stroke-linecap="round" stroke-linejoin="round">
+  <ellipse cx="59" cy="56" rx="33" ry="45" fill="#F2A400" stroke-width="7"/><path d="${COIN_RIDGES}" stroke-width="3.6" fill="none"/>
+  <ellipse cx="47" cy="56" rx="33" ry="45" fill="url(#coinface)" stroke-width="7"/>
+  <path d="M29 71C26 46 35 27 50 20" stroke-width="5.5" fill="none"/><path d="M57 18c9 6 15 17 17 30" stroke-width="5.5" fill="none"/></g></svg>`;
+/* Canvas version for confetti: same shapes, squashed sideways as it spins. */
+function drawCoin(g, r, sx) {
+  g.save(); g.scale(Math.max(.14, Math.abs(sx)), 1); g.lineJoin = 'round';
+  g.beginPath(); g.ellipse(r * .18, 0, r * .74, r, 0, 0, 7); g.fillStyle = '#F2A400'; g.fill(); g.lineWidth = r * .16; g.strokeStyle = '#161311'; g.stroke();
+  g.beginPath(); g.ellipse(0, 0, r * .74, r, 0, 0, 7); g.fillStyle = '#FFD12E'; g.fill(); g.stroke();
+  g.beginPath(); g.ellipse(-r * .06, 0, r * .48, r * .7, 0, Math.PI * .95, Math.PI * 1.45); g.lineWidth = r * .12; g.lineCap = 'round'; g.stroke();
+  g.restore();
+}
 /* ---------- celebrations: confetti, a cheer card and a little chime for good things ---------- */
 const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 function confetti(power = 1) {
@@ -217,7 +232,7 @@ function confetti(power = 1) {
     const el = t - t0; g.clearRect(0, 0, W, H);
     for (const q of P) { q.vy += 0.38; q.vx *= 0.985; q.x += q.vx; q.y += q.vy; q.rot += q.vr;
       g.save(); g.translate(q.x, q.y); g.rotate(q.rot); g.fillStyle = q.col; g.globalAlpha = Math.max(0, 1 - Math.max(0, el - 1800) / 700);
-      if (q.shape === 0) { /* a spinning gold coin */ g.scale(Math.max(.12, Math.abs(Math.cos(q.rot * 2))), 1); g.beginPath(); g.arc(0, 0, q.r, 0, 7); g.fillStyle = '#FCBE12'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#161311'; g.stroke(); g.beginPath(); g.arc(0, 0, q.r * .55, 0, 7); g.strokeStyle = 'rgba(255,255,255,.6)'; g.stroke() }
+      if (q.shape === 0) drawCoin(g, q.r * 1.7, Math.cos(q.rot * 2));
       else if (q.shape === 1) { /* a four-point sparkle */ const r = q.r * 1.2; g.beginPath(); g.moveTo(0, -r); g.quadraticCurveTo(r * .12, -r * .12, r, 0); g.quadraticCurveTo(r * .12, r * .12, 0, r); g.quadraticCurveTo(-r * .12, r * .12, -r, 0); g.quadraticCurveTo(-r * .12, -r * .12, 0, -r); g.fill() }
       else { g.beginPath(); g.arc(0, 0, q.r * .45, 0, 7); g.fill() }
       g.restore() }
@@ -248,7 +263,7 @@ function cheerNews(kid) {
   const mins = newB.reduce((a, b) => a + Number(b.minutes), 0) + newC.reduce((a, c) => a + (Number(c.minutes) || 0), 0);
   if (!amt && !mins) return;
   const what = newC.length === 1 && !newW.length ? `${newC[0].title} was approved` : newW.length && !newC.length ? 'Your weekly allowance landed' : 'New money in your bank';
-  setTimeout(() => celebrate(amt ? `+${money(amt)}!` : `+${mins} screen minutes!`, amt && mins ? `${what}, plus ${mins} screen minutes` : what, { power: 1.2, icon: 'coin' }), 500);
+  setTimeout(() => celebrate(amt ? `+${money(amt)}!` : `+${mins} screen minutes!`, amt && mins ? `${what}, plus ${mins} screen minutes` : what, { power: 1.2, icon: 'coin' }), Math.max(500, bankAnimUntil - Date.now()));
 }
 /* ---------- top-level render ---------- */
 const app = $('app');
@@ -262,6 +277,7 @@ function render() {
   else if (v === 'kid') app.innerHTML = kidAppHTML();
   else if (v === 'parent') app.innerHTML = parentAppHTML();
   bindAll();
+  if (v === 'kid' && S.tab === 'home') bankAnim(kidById(S.profile));
 }
 
 /* ---------- sign in ---------- */
@@ -392,8 +408,8 @@ function kidHome(kid) {
   const scrSub = !isScreenDay(kid) ? `Opens ${screenDayNames(kid)}` : sw.leftSec ? `${dur(sw.leftSec)} left` : 'All used this week';
   const recent = ledgerItems(kid, thisWeek()).slice(0, 4);
   return `<section class="hero bank" style="--hero:${COLORS[kid.color]}">
-      <div class="label">In your bank</div><div class="big num">${money(st.balance)}</div>
-      ${g ? `<button class="goalline" type="button" id="goalBtn"><span>Saving for <b>${esc(g.name)}</b></span><span class="meter"><i style="width:${pct}%"></i></span><span class="num">${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}</span></button>` : ''}
+      <span class="hero-coin">${coinSVG()}</span><div class="label">In your bank</div><div class="big num" id="bankBig">${money(st.balance)}</div>
+      ${g ? `<button class="goalline" type="button" id="goalBtn"><span>Saving for <b>${esc(g.name)}</b></span><span class="meter" id="goalMeter" data-pct="${pct}"><i style="width:${pct}%"></i><span class="goalcoin" style="left:${pct}%">${coinSVG()}</span></span><span class="num">${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}</span></button>` : ''}
       <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${g ? '' : '<button class="link-w" type="button" id="goalBtn">Set a saving goal</button>'}</div>
       <button class="earn" type="button" data-tab="jobs">${I.jobs}<span>Earn more on the job board</span>${I.chev}</button>
     </section>
@@ -469,7 +485,7 @@ function kidJobs(kid) {
   return `<section class="card"><p class="hint" style="font-size:15px;color:var(--ink)">Pick any job and do it. Then tap it and press <b>I did it</b>. A parent checks, and the money goes in your bank.</p></section>
     ${mine.length ? `<section class="sect"><div class="sect-h"><h3>Waiting for a parent</h3></div><div class="list">${mine.map(c => `<div class="row wait-row"><span class="ico j">${I.clock}</span><span class="t"><b>${esc(c.title)}</b><span>${short(localDate(ms(c.created_at)))}</span></span><span class="amt">+${money(Number(c.amount))}</span></div>`).join('')}</div></section>` : ''}
     ${on.length ? `<section class="sect"><div class="filters">${cats.map(c => `<button class="chip" type="button" data-cat="${esc(c)}" aria-pressed="${c === S.jobFilter}">${esc(c)}</button>`).join('')}</div>
-    <div class="list">${on.filter(j => S.jobFilter === 'All' || j.category === S.jobFilter).sort((a, b) => a.price - b.price).map(j => `<button class="row" type="button" data-claim="${j.id}"><span class="t"><b>${esc(j.title)}</b><span>${esc(j.done_means)}</span></span><span class="stack"><span class="price num">${money(Number(j.price))}</span>${Number(j.bonus_minutes) ? `<span class="bal">+${j.bonus_minutes} screen min</span>` : ''}</span></button>`).join('')}</div></section>`
+    <div class="list">${on.filter(j => S.jobFilter === 'All' || j.category === S.jobFilter).sort((a, b) => a.price - b.price).map(j => `<button class="row" type="button" data-claim="${j.id}"><span class="t"><b>${esc(j.title)}</b><span>${esc(j.done_means)}</span></span><span class="stack"><span class="price num">${coinSVG('mini')}${money(Number(j.price))}</span>${Number(j.bonus_minutes) ? `<span class="bal">+${j.bonus_minutes} screen min</span>` : ''}</span></button>`).join('')}</div></section>`
       : `<div class="list"><div class="empty">No jobs on your board yet.</div></div>`}`;
 }
 function claimSheet(kid, job) {
@@ -1094,3 +1110,22 @@ document.addEventListener('click', e => {
   const box = b.closest('.field')?.querySelector('.tipbox'); if (!box) return;
   e.preventDefault(); box.hidden = !box.hidden; b.setAttribute('aria-expanded', String(!box.hidden));
 });
+
+/* When a kid's bank goes up: count up to the new balance and drop coins into the card.
+   When it goes down (a withdrawal or purchase): count down. The goal coin rolls to its new spot.
+   Remembers the last balance per kid on this device, so it only plays when something changed. */
+let bankAnimUntil = 0;
+function bankAnim(kid) {
+  const el = $('bankBig'); if (!kid || !el) return;
+  const now = stats(kid).balance, key = 'bal-' + kid.id, raw = store.get(key); store.set(key, String(now));
+  const m = $('goalMeter'), gkey = 'goal-' + kid.id, gRaw = store.get(gkey);
+  if (m) { const pct = Number(m.dataset.pct); store.set(gkey, String(pct));
+    if (gRaw !== null && Number(gRaw) !== pct && !reduceMotion()) { const bar = m.querySelector('i'), c = m.querySelector('.goalcoin');
+      bar.style.width = gRaw + '%'; c.style.left = gRaw + '%'; c.style.setProperty('--r', '0deg');
+      requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = pct + '%'; c.style.left = pct + '%'; c.style.setProperty('--r', ((pct - Number(gRaw)) * 9) + 'deg') })) } }
+  if (raw === null) return;
+  const prev = Number(raw); if (!isFinite(prev) || Math.abs(prev - now) < .005 || reduceMotion()) return;
+  const t0 = performance.now(), D = 1100; if (now > prev) bankAnimUntil = Date.now() + 1700;
+  (function step(t) { const p = Math.min(1, (t - t0) / D), e = 1 - (1 - p) ** 3; el.textContent = money(r2(prev + (now - prev) * e)); if (p < 1) requestAnimationFrame(step); else { el.textContent = money(now); el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 500) } })(t0);
+  if (now > prev) { const hero = el.closest('.hero'); for (let i = 0; i < 3; i++) { const c = document.createElement('span'); c.className = 'coin-drop'; c.style.setProperty('--x', (52 + i * 14) + '%'); c.style.setProperty('--d', (i * 0.16) + 's'); c.innerHTML = coinSVG(); hero.appendChild(c); setTimeout(() => c.remove(), 1900) } }
+}
