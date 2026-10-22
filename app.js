@@ -226,17 +226,17 @@ function confetti(power = 1) {
   const g = c.getContext('2d'); g.scale(dpr, dpr);
   const cols = ['#FCBE12', '#FD8066', '#FCBE12', '#FFE08A', '#1E8A4A', '#FDF7EC'];
   const N = Math.round(140 * power), P = [];
-  for (let i = 0; i < N; i++) { const left = i % 2 === 0; P.push({ x: left ? -10 : W + 10, y: H * (0.55 + Math.random() * 0.3), vx: (left ? 1 : -1) * (5 + Math.random() * 9), vy: -(10 + Math.random() * 12), r: 5 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - .5) * .4, col: cols[i % cols.length], shape: i % 3 }) }
+  for (let i = 0; i < N; i++) { const left = i % 2 === 0; P.push({ x: left ? -10 : W + 10, y: H * (0.55 + Math.random() * 0.3), vx: (left ? 1 : -1) * (5 + Math.random() * 9) * .5, vy: -(10 + Math.random() * 12) * .5, r: 5 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - .5) * .2, col: cols[i % cols.length], shape: i % 3 }) }
   const t0 = performance.now();
   (function frame(t) {
     const el = t - t0; g.clearRect(0, 0, W, H);
-    for (const q of P) { q.vy += 0.38; q.vx *= 0.985; q.x += q.vx; q.y += q.vy; q.rot += q.vr;
-      g.save(); g.translate(q.x, q.y); g.rotate(q.rot); g.fillStyle = q.col; g.globalAlpha = Math.max(0, 1 - Math.max(0, el - 1800) / 700);
+    for (const q of P) { q.vy += 0.095; q.vx *= 0.9925; q.x += q.vx; q.y += q.vy; q.rot += q.vr;
+      g.save(); g.translate(q.x, q.y); g.rotate(q.rot); g.fillStyle = q.col; g.globalAlpha = Math.max(0, 1 - Math.max(0, el - 3600) / 1400);
       if (q.shape === 0) drawCoin(g, q.r * 1.7, Math.cos(q.rot * 2));
       else if (q.shape === 1) { /* a four-point sparkle */ const r = q.r * 1.2; g.beginPath(); g.moveTo(0, -r); g.quadraticCurveTo(r * .12, -r * .12, r, 0); g.quadraticCurveTo(r * .12, r * .12, 0, r); g.quadraticCurveTo(-r * .12, r * .12, -r, 0); g.quadraticCurveTo(-r * .12, -r * .12, 0, -r); g.fill() }
       else { g.beginPath(); g.arc(0, 0, q.r * .45, 0, 7); g.fill() }
       g.restore() }
-    if (el < 2500) requestAnimationFrame(frame); else c.remove();
+    if (el < 5000) requestAnimationFrame(frame); else c.remove();
   })(t0);
 }
 function chime() { try { unlockAudio(); if (!audio) return; [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => { const o = audio.createOscillator(), v = audio.createGain(), t = audio.currentTime + i * .09; o.type = 'triangle'; o.frequency.value = f; o.connect(v); v.connect(audio.destination); v.gain.setValueAtTime(0.0001, t); v.gain.exponentialRampToValueAtTime(.12, t + .02); v.gain.exponentialRampToValueAtTime(.0001, t + .35); o.start(t); o.stop(t + .4) }) } catch (e) { } }
