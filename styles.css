@@ -556,3 +556,10 @@ input,select,textarea{font-size:16px}
 .wsum small{font-size:11px;font-weight:700;color:var(--muted)}
 .seg{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
 .seg button{min-width:0;padding-inline:4px}
+
+/* ---------- little ? tooltips on settings ---------- */
+.tiplabel{display:flex;align-items:center;gap:6px}
+.tip{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:900 13px/1 var(--body);background:var(--jobs-soft);color:var(--jobs);border:2px solid var(--edge)}
+.tip[aria-expanded="true"]{background:var(--jobs);color:#fff}
+.tipbox{display:block;font-size:13px;font-weight:600;line-height:1.4;color:var(--ink);background:var(--sunk);border:2px dashed var(--line);border-radius:12px;padding:8px 10px}
+.tipbox[hidden]{display:none}

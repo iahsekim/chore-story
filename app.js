@@ -142,7 +142,9 @@ function creditWeek() { return thisWeek() }
 /* Everything is counted in seconds, so 10:40 + 10:20 = 21:00. A timer can be paused;
    its saved seconds plus the running stretch since running_since is the live total. */
 const liveSec = r => (Number(r.seconds) || 0) + (r.running_since && !r.ended_at ? Math.max(0, Math.floor((Date.now() - ms(r.running_since)) / 1000)) : 0);
-const capSec = kid => (Number(kid.max_read_session) || 60) * 60;
+/* No per-kid session limit. A 3-hour guard only catches a timer someone forgot to stop. */
+const READ_GUARD_SEC = 3 * 60 * 60;
+const capSec = () => READ_GUARD_SEC;
 const readSec = (r, kid) => r.source === 'manual' ? Number(r.seconds) || 0 : Math.min(liveSec(r), capSec(kid));
 const activeRead = kid => S.reading.find(r => r.kid_id === kid.id && !r.ended_at && r.source !== 'manual' && r.week_start === thisWeek());
 function readWeek(kid, ws = thisWeek()) { const sec = S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws).reduce((a, r) => a + readSec(r, kid), 0); const minutes = Math.floor(sec / 60); return { sec, minutes, bonus: Math.min(minutes, Number(kid.reading_cap) || 0) } }
@@ -502,7 +504,7 @@ function readBoardHTML(kid) {
   if (a) { const run = !!a.running_since, sec = readSec(a, kid);
     return `<div class="bline"><span class="label">${run ? 'Reading now' : 'Paused'}</span><b>${esc(a.book)}</b></div>
     <div class="digits num ${run ? '' : 'idle'}" id="readDigits">${hms(sec)}</div>
-    <p class="note">${run ? `Stops itself at ${kid.max_read_session}:00. Pause any time.` : 'Your time is saved. Tap Resume when you pick the book back up.'}</p>
+    <p class="note">${run ? 'Every second counts. Pause any time.' : 'Your time is saved. Tap Resume when you pick the book back up.'}</p>
     <div class="row2">${run ? '<button class="ghost" id="pauseRead" type="button">Pause</button>' : '<button class="ghost" id="resumeRead" type="button">Resume</button>'}<button class="go white" id="stopRead" type="button">I'm done</button></div>`; }
   return `<div class="bline"><span class="label">Reading timer</span><span>1 min = <b>1 screen min</b></span></div>
     <div class="digits idle num">00:00</div><button class="go white" id="startRead" type="button">Start reading</button>`;
@@ -683,7 +685,7 @@ function pSettings() {
     ${S.kids.length ? `<section class="sect"><div class="sect-h"><h3>Screen time</h3></div>${S.kids.map(k => `<div class="card scrset">
       <div class="kidform-h">${avatar(k)}<b>${esc(k.name)}</b></div>
       <div class="row2"><div class="field"><label class="label" for="sb-${k.id}">Base minutes / week</label><input id="sb-${k.id}" type="number" inputmode="numeric" min="0" step="5" value="${k.base_screen_minutes}"></div>
-      <div class="field"><label class="label" for="sr-${k.id}">Reading bonus limit</label><input id="sr-${k.id}" type="number" inputmode="numeric" min="0" step="5" value="${k.reading_cap}"></div></div>
+      <div class="field"><span class="tiplabel"><label class="label" for="sr-${k.id}">Reading bonus limit</label><button class="tip" type="button" aria-label="What is the reading bonus limit?" aria-expanded="false">?</button></span><span class="tipbox" hidden>The most extra screen minutes reading can earn in one week. Every minute read adds a screen minute, up to this number.</span><input id="sr-${k.id}" type="number" inputmode="numeric" min="0" step="5" value="${k.reading_cap}"></div></div>
       <div class="field"><span class="label">Screen days</span><div class="chips daychips">${[1, 2, 3, 4, 5, 6, 0].map(d => `<button class="chip" type="button" data-sday="${k.id}|${d}" aria-pressed="${(k.screen_days || []).includes(d)}">${DOW[d]}</button>`).join('')}</div></div>
       <button class="pill" type="button" data-savescr="${k.id}" style="justify-self:start">Save ${esc(k.name)}'s screen time</button></div>`).join('')}</section>` : ''}
     <section class="card"><span class="label">Family</span>
@@ -857,7 +859,7 @@ setInterval(() => {
   }
   if (a && a.running_since) { const d = $('digits'); if (d) d.textContent = hms(x.leftSec); const su = $('sessUsed'); if (su) su.textContent = hms(liveSec(a)); const f = $('barfill'); if (f) f.style.width = (x.totalSec ? 100 * x.usedSec / x.totalSec : 100) + '%'; const el = $('eqLeft'); if (el) el.textContent = hms(x.leftSec); const eu = $('eqUsed'); if (eu) eu.textContent = hms(x.usedSec) }
   const r = activeRead(kid);
-  if (r && r.running_since) { if (liveSec(r) >= capSec(kid) && !autoStopping) { autoStopping = true; doneTimer('reading_sessions', r, `Reading timer stopped at ${kid.max_read_session}:00`, kid).finally(() => { autoStopping = false }); return } const rd = $('readDigits'); if (rd) rd.textContent = hms(readSec(r, kid)) }
+  if (r && r.running_since) { if (liveSec(r) >= capSec(kid) && !autoStopping) { autoStopping = true; doneTimer('reading_sessions', r, 'Reading timer stopped after 3 hours. Was it left on?', kid).finally(() => { autoStopping = false }); return } const rd = $('readDigits'); if (rd) rd.textContent = hms(readSec(r, kid)) }
 }, 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.family && (S.view === 'kid' || S.view === 'parent')) refresh() });
 setInterval(() => { if (!document.hidden && S.family && (S.view === 'kid' || S.view === 'parent') && !$('scrim')) refresh() }, 60000);
@@ -975,18 +977,17 @@ function kidSheet(kid) {
     <div class="field"><span class="label">Color</span>${swatchesHTML(K.color, 'data-ksw')}</div>
     <div class="row2"><div class="field"><label class="label" for="kA">Weekly allowance ($)</label><input id="kA" type="number" min="0" step="0.5" value="${K.weekly_allowance}"></div>
     <div class="field"><label class="label" for="kS">Screen min / week</label><input id="kS" type="number" min="0" step="5" value="${K.base_screen_minutes}"></div></div>
-    <div class="row2"><div class="field"><label class="label" for="kR">Reading bonus limit</label><input id="kR" type="number" min="0" step="5" value="${K.reading_cap}"></div>
-    <div class="field"><label class="label" for="kM">Longest reading session</label><input id="kM" type="number" min="5" step="5" value="${K.max_read_session}"></div></div>
+    <div class="field"><span class="tiplabel"><label class="label" for="kR">Reading bonus limit</label><button class="tip" type="button" aria-label="What is the reading bonus limit?" aria-expanded="false">?</button></span><span class="tipbox" hidden>The most extra screen minutes reading can earn in one week. Every minute read adds a screen minute, up to this number.</span><input id="kR" type="number" min="0" step="5" value="${K.reading_cap}"></div>
     <div class="field"><span class="label">Screen days</span><div class="chips">${[1, 2, 3, 4, 5, 6, 0].map(d => `<button class="chip" type="button" data-kd="${d}" aria-pressed="${K.screen_days.includes(d)}">${DOW[d]}</button>`).join('')}</div></div>
     ${kid ? '<p class="hint">A new allowance amount starts next Monday. This week stays the same.</p>' : '<p class="hint">Starts with the standard job board. You can edit it after.</p>'}
     <button class="save" id="kGo" type="button">${kid ? 'Save' : 'Add kid'}</button>
     ${kid ? `<button class="cancel danger-link" id="kDel" type="button">Remove ${esc(kid.name)} and their history</button>` : ''}<button class="cancel" data-close type="button">Cancel</button>`, () => {
-    const keep = () => { K.name = $('kN').value; K.weekly_allowance = $('kA').value; K.base_screen_minutes = $('kS').value; K.reading_cap = $('kR').value; K.max_read_session = $('kM').value };
+    const keep = () => { K.name = $('kN').value; K.weekly_allowance = $('kA').value; K.base_screen_minutes = $('kS').value; K.reading_cap = $('kR').value };
     bindSwatches(layer, 'data-ksw', c => { K.color = c });
     $('kN').onblur = e => { e.target.value = capFirst(e.target.value) };
     layer.querySelectorAll('[data-kd]').forEach(b => b.onclick = () => { keep(); const d = Number(b.dataset.kd); K.screen_days = K.screen_days.includes(d) ? K.screen_days.filter(x => x !== d) : [...K.screen_days, d]; draw() });
     $('kGo').onclick = async () => { keep(); const name = capFirst(K.name); if (!name) { toast('Type a first name.'); return $('kN').focus() } closeSheet();
-      const body = { name, color: K.color, weekly_allowance: Math.max(0, Number(K.weekly_allowance) || 0), base_screen_minutes: Math.max(0, parseInt(K.base_screen_minutes) || 0), reading_cap: Math.max(0, parseInt(K.reading_cap) || 0), max_read_session: Math.min(240, Math.max(5, parseInt(K.max_read_session) || 60)), screen_days: K.screen_days };
+      const body = { name, color: K.color, weekly_allowance: Math.max(0, Number(K.weekly_allowance) || 0), base_screen_minutes: Math.max(0, parseInt(K.base_screen_minutes) || 0), reading_cap: Math.max(0, parseInt(K.reading_cap) || 0), screen_days: K.screen_days };
       if (kid) await act(() => q(sb.from('kids').update(body).eq('id', kid.id)), 'Saved');
       else await act(() => addKid(name, body.weekly_allowance, body.color).then(k => q(sb.from('kids').update(body).eq('id', k.id))), `${name} added`) };
     if (kid) $('kDel').onclick = () => confirmSheet(`Remove ${kid.name}?`, 'This deletes their job board, earnings history, reading and screen time. It can’t be undone.', 'Remove for good', () => q(sb.from('kids').delete().eq('id', kid.id)), 'Removed');
@@ -1085,3 +1086,10 @@ sb.auth.onAuthStateChange((ev, session) => {
 });
 sb.auth.getSession().then(({ data }) => { if (!data.session) { S.view = 'auth'; render() } });
 render();
+
+/* Tap a ? to show or hide its explanation. */
+document.addEventListener('click', e => {
+  const b = e.target.closest('.tip'); if (!b) return;
+  const box = b.closest('.field')?.querySelector('.tipbox'); if (!box) return;
+  e.preventDefault(); box.hidden = !box.hidden; b.setAttribute('aria-expanded', String(!box.hidden));
+});
