@@ -244,11 +244,15 @@ let cheerTimer;
 function celebrate(title, sub, { power = 1, icon = 'star', sound = true } = {}) {
   confetti(power); if (sound) chime();
   document.querySelector('.cheer')?.remove(); clearTimeout(cheerTimer);
-  const el = document.createElement('div'); el.className = 'cheer'; el.setAttribute('role', 'status');
-  el.innerHTML = `<div class="cheer-card"><img class="cheer-pig" src="${PIGGY}" alt="" width="120" height="118"><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
-  el.onclick = () => el.remove(); document.body.appendChild(el);
-  cheerTimer = setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 350) }, 3200);
+  // Stays until the kid closes it: tap the button, tap outside the card, or press Escape.
+  const el = document.createElement('div'); el.className = 'cheer'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', title);
+  el.innerHTML = `<div class="cheer-card"><img class="cheer-pig" src="${PIGGY}" alt="" width="120" height="118"><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}<button class="save cheer-ok" type="button">${esc(CHEER_OK[Math.floor(Math.random() * CHEER_OK.length)])}</button></div>`;
+  const close = () => { document.removeEventListener('keydown', onKey); el.classList.add('out'); setTimeout(() => el.remove(), 300) };
+  const onKey = e => { if (e.key === 'Escape') close() };
+  el.onclick = e => { if (e.target === el || e.target.closest('.cheer-ok')) close() };
+  document.addEventListener('keydown', onKey); document.body.appendChild(el); el.querySelector('.cheer-ok').focus({ preventScroll: true });
 }
+const CHEER_OK = ['Yay!', 'Awesome!', 'Got it!', 'Woo-hoo!'];
 const PRAISE = ['Way to go!', 'Awesome!', 'You did it!', 'Nice work!', 'Look at you go!', 'High five!', 'Super job!'];
 const praise = () => PRAISE[Math.floor(Math.random() * PRAISE.length)];
 /* When a kid opens their screen, cheer for anything good that happened since they last looked. */
