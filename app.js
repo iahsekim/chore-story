@@ -409,7 +409,7 @@ function kidHome(kid) {
   const recent = ledgerItems(kid, thisWeek()).slice(0, 4);
   return `<section class="hero bank" style="--hero:${COLORS[kid.color]}">
       <span class="hero-coin">${coinSVG()}</span><div class="label">In your bank</div><div class="big num" id="bankBig">${money(st.balance)}</div>
-      ${g ? `<button class="goalline" type="button" id="goalBtn"><span>Saving for <b>${esc(g.name)}</b></span><span class="meter" id="goalMeter" data-pct="${pct}"><i style="width:${pct}%"></i><span class="goalcoin" style="left:${pct}%">${coinSVG()}</span></span><span class="num">${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}</span></button>` : ''}
+      ${g ? `<button class="goalline" type="button" id="goalBtn"><span>Saving for <b>${esc(g.name)}</b></span><span class="meter" id="goalMeter" data-pct="${pct}"><i style="width:${pct}%"></i></span><span class="num">${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}</span></button>` : ''}
       <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${g ? '' : '<button class="link-w" type="button" id="goalBtn">Set a saving goal</button>'}</div>
       <button class="earn" type="button" data-tab="jobs">${I.jobs}<span>Earn more on the job board</span>${I.chev}</button>
     </section>
@@ -1112,7 +1112,7 @@ document.addEventListener('click', e => {
 });
 
 /* When a kid's bank goes up: count up to the new balance and drop coins into the card.
-   When it goes down (a withdrawal or purchase): count down. The goal coin rolls to its new spot.
+   When it goes down (a withdrawal or purchase): count down. The goal bar grows to its new spot.
    Remembers the last balance per kid on this device, so it only plays when something changed. */
 let bankAnimUntil = 0;
 function bankAnim(kid) {
@@ -1120,9 +1120,9 @@ function bankAnim(kid) {
   const now = stats(kid).balance, key = 'bal-' + kid.id, raw = store.get(key); store.set(key, String(now));
   const m = $('goalMeter'), gkey = 'goal-' + kid.id, gRaw = store.get(gkey);
   if (m) { const pct = Number(m.dataset.pct); store.set(gkey, String(pct));
-    if (gRaw !== null && Number(gRaw) !== pct && !reduceMotion()) { const bar = m.querySelector('i'), c = m.querySelector('.goalcoin');
-      bar.style.width = gRaw + '%'; c.style.left = gRaw + '%'; c.style.setProperty('--r', '0deg');
-      requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = pct + '%'; c.style.left = pct + '%'; c.style.setProperty('--r', ((pct - Number(gRaw)) * 9) + 'deg') })) } }
+    if (gRaw !== null && Number(gRaw) !== pct && !reduceMotion()) { const bar = m.querySelector('i');
+      bar.style.width = gRaw + '%';
+      requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = pct + '%' })) } }
   if (raw === null) return;
   const prev = Number(raw); if (!isFinite(prev) || Math.abs(prev - now) < .005 || reduceMotion()) return;
   const t0 = performance.now(), D = 1100; if (now > prev) bankAnimUntil = Date.now() + 1700;
