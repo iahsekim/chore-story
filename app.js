@@ -208,7 +208,7 @@ const coinSVG = (cls = '') => `<svg class="coin ${cls}" viewBox="0 0 104 112" ar
   <g transform="rotate(-10 52 56)" stroke="#161311" stroke-linecap="round" stroke-linejoin="round">
   <ellipse cx="59" cy="56" rx="33" ry="45" fill="#F2A400" stroke-width="7"/><path d="${COIN_RIDGES}" stroke-width="3.6" fill="none"/>
   <ellipse cx="47" cy="56" rx="33" ry="45" fill="url(#coinface)" stroke-width="7"/>
-  <path d="M29 71C26 46 35 27 50 20" stroke-width="5.5" fill="none"/><path d="M57 18c9 6 15 17 17 30" stroke-width="5.5" fill="none"/></g></svg>`;
+  <path d="M29 71C26 46 35 27 50 20" stroke-width="5.5" fill="none"/></g></svg>`;
 /* Canvas version for confetti: same shapes, squashed sideways as it spins. */
 function drawCoin(g, r, sx) {
   g.save(); g.scale(Math.max(.14, Math.abs(sx)), 1); g.lineJoin = 'round';
