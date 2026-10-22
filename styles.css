@@ -682,3 +682,9 @@ input,select,textarea{font-size:16px}
 :root[data-theme="dark"] .cat-ico{color:color-mix(in srgb,var(--c) 55%,#fff)}
 .jobrow{align-items:center;gap:12px}
 @media (max-width:360px){.steps4 b{font-size:11px}.steps4>div{padding-inline:3px}}
+/* screen-time icons: gold tile so they read on light and midnight backgrounds */
+.ico.s{background:color-mix(in srgb,var(--screen) 22%,var(--surface));color:color-mix(in srgb,var(--screen) 55%,var(--ink));border:2px solid color-mix(in srgb,var(--screen) 50%,transparent)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .ico.s{color:var(--screen)}
+  :root:not([data-theme="light"]) .cat-ico{background:color-mix(in srgb,var(--c) 32%,var(--surface));border-color:color-mix(in srgb,var(--c) 70%,#fff 10%);color:color-mix(in srgb,var(--c) 40%,#fff)}}
+:root[data-theme="dark"] .ico.s{color:var(--screen)}
+:root[data-theme="dark"] .cat-ico{background:color-mix(in srgb,var(--c) 32%,var(--surface));border-color:color-mix(in srgb,var(--c) 70%,#fff 10%);color:color-mix(in srgb,var(--c) 40%,#fff)}

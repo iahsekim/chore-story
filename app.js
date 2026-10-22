@@ -237,7 +237,7 @@ const CAT = {
   'Laundry': ['#5B8DEF', '<path d="M8 4 3 7l2 4 3-1v11h8V10l3 1 2-4-5-3c-1 2-2 3-4 3S9 6 8 4z"/>'],
   'Pets': ['#C98A3A', '<circle cx="7" cy="10" r="2"/><circle cx="11" cy="6" r="2"/><circle cx="16" cy="7" r="2"/><circle cx="19" cy="11.5" r="2"/><path d="M8.5 18c0-3 2-5.5 4.5-5.5s4.5 2.5 4.5 5.5c0 2-1.5 3-4.5 3s-4.5-1-4.5-3z"/>'],
   'Outside': ['#1E8A4A', '<path d="M12 21v-5M12 3l6 8h-3l4 5H5l4-5H6z"/>'],
-  'Car': ['#13204A', '<path d="M4 16v-3l2-5h12l2 5v3zM3 16h18v3H3z"/><circle cx="7.5" cy="19" r="1.5"/><circle cx="16.5" cy="19" r="1.5"/>'],
+  'Car': ['#1597A3', '<path d="M4 16v-3l2-5h12l2 5v3zM3 16h18v3H3z"/><circle cx="7.5" cy="19" r="1.5"/><circle cx="16.5" cy="19" r="1.5"/>'],
   'Family helper': ['#E4578F', '<path d="M12 20s-8-4.8-8-10a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 5.2-8 10-8 10z"/>'],
   'Around the house': ['#6E4FD8', '<path d="M3 11 12 4l9 7M6 10v10h12V10M10 20v-5h4v5"/>'],
 };
