@@ -191,15 +191,29 @@ const supportHTML = (open = false) => `<details class="support" ${open ? 'open' 
   <span class="support-note">It&rsquo;s free! Tips keep it running.</span></div></details>`;
 
 const brandName = () => { const w = APP.split(' '); return w.length > 1 ? `${esc(w.slice(0, -1).join(' '))} <span class="story">${esc(w[w.length - 1])}</span>` : esc(APP) };
-/* ---------- night-sky backdrop: a few faint gold sparkles, coins and a little ghost bobbing slowly behind everything ---------- */
+/* ---------- playful backdrop: coins, sparkles, little ghosts, books, clocks and TVs drifting and bobbing behind everything ---------- */
 const PIGGY = 'piggy.png';
 (function playroom() {
-  const sparkle = '<path d="M16 2c1.3 7.6 3.4 9.8 11 11-7.6 1.3-9.7 3.4-11 11-1.3-7.6-3.4-9.7-11-11 7.6-1.2 9.7-3.4 11-11z" fill="currentColor"/>';
-  const coin = '<circle cx="16" cy="16" r="12" fill="currentColor"/><circle cx="16" cy="16" r="7.5" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2"/>';
-  const ghost = '<path d="M6 29V15a10 10 0 0 1 20 0v14l-3.4-2.6L19.3 29 16 26.4 12.7 29l-3.3-2.6z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12.5" cy="15" r="1.6" fill="currentColor"/><circle cx="19.5" cy="15" r="1.6" fill="currentColor"/>';
-  const items = [[sparkle, 'g', 8, 12, 26, 'a'], [coin, 'g', 84, 9, 22, 'b'], [ghost, 'p', 78, 38, 40, 'c'], [sparkle, 'g', 12, 52, 18, 'b'], [coin, 'g', 90, 70, 18, 'a'], [ghost, 'p', 6, 84, 34, 'c'], [sparkle, 'g', 50, 28, 14, 'a'], [sparkle, 'g', 70, 90, 22, 'b']];
+  const W2 = 'fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"';
+  const SH = {
+    sparkle: '<path d="M16 2c1.3 7.6 3.4 9.8 11 11-7.6 1.3-9.7 3.4-11 11-1.3-7.6-3.4-9.7-11-11 7.6-1.2 9.7-3.4 11-11z" fill="currentColor"/>',
+    coin: '<ellipse cx="17.5" cy="16" rx="9" ry="12" fill="currentColor" opacity=".7"/><ellipse cx="14.5" cy="16" rx="9" ry="12" fill="currentColor"/><path d="M10 20c-1-6 1-10 4-12" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2" stroke-linecap="round"/>',
+    ghost: `<path d="M6 29V15a10 10 0 0 1 20 0v14l-3.4-2.6L19.3 29 16 26.4 12.7 29l-3.3-2.6z" ${W2}/><circle cx="12.5" cy="15" r="1.6" fill="currentColor"/><circle cx="19.5" cy="15" r="1.6" fill="currentColor"/>`,
+    book: `<path d="M4 8c4-1.5 8-1.5 12 1 4-2.5 8-2.5 12-1v16c-4-1.5-8-1.5-12 1-4-2.5-8-2.5-12-1z" ${W2}/><path d="M16 9v16" ${W2}/>`,
+    clock: `<circle cx="16" cy="17" r="10" ${W2}/><path d="M16 11v6l4 3M13 4h6" ${W2}/>`,
+    tv: `<rect x="4" y="8" width="24" height="16" rx="3" ${W2}/><path d="M11 28h10M12 4l4 4 4-4" ${W2}/>`,
+    star: `<path d="m16 4 3.5 7.3 8 1-5.9 5.5 1.5 7.9L16 21.9l-7.1 3.8 1.5-7.9-5.9-5.5 8-1z" ${W2}/>`,
+    heart: '<path d="M16 27S4 19.5 4 12a6 6 0 0 1 12-1 6 6 0 0 1 12 1c0 7.5-12 15-12 15z" fill="currentColor"/>',
+  };
+  // [shape, tone, x%, y%, size px, motion]; tones: g gold, p pink, b blue, m muted ink
+  const items = [
+    ['sparkle', 'g', 6, 8, 26, 'twinkle'], ['coin', 'g', 82, 6, 24, 'flip'], ['ghost', 'p', 74, 30, 40, 'float'], ['book', 'b', 10, 30, 30, 'bob'],
+    ['sparkle', 'g', 46, 18, 14, 'twinkle'], ['clock', 'm', 88, 46, 26, 'bob'], ['coin', 'g', 18, 58, 20, 'flip'], ['star', 'g', 60, 52, 20, 'spin'],
+    ['ghost', 'p', 4, 78, 34, 'float'], ['tv', 'b', 64, 74, 30, 'bob'], ['heart', 'p', 36, 88, 16, 'twinkle'], ['sparkle', 'g', 92, 86, 20, 'twinkle'],
+    ['coin', 'g', 40, 40, 16, 'flip'], ['book', 'b', 84, 64, 24, 'float'], ['star', 'g', 26, 14, 16, 'spin'], ['sparkle', 'g', 54, 94, 14, 'twinkle'],
+  ];
   const el = document.createElement('div'); el.className = 'playroom'; el.setAttribute('aria-hidden', 'true');
-  el.innerHTML = items.map(([svg, tone, x, y, size, anim], i) => `<svg class="pr pr-${anim} ${tone}" style="left:${x}%;top:${y}%;width:${size}px;animation-delay:-${i * 5}s" viewBox="0 0 32 32">${svg}</svg>`).join('');
+  el.innerHTML = items.map(([k, tone, x, y, size, mo], i) => `<span class="pr ${tone} m-${mo}" style="left:${x}%;top:${y}%;width:${size}px;--d:${(7 + (i * 37) % 9)}s;animation-delay:-${(i * 1.7).toFixed(1)}s"><svg viewBox="0 0 32 32">${SH[k]}</svg></span>`).join('');
   document.body.prepend(el);
 })();
 /* ---------- the PiggyBoo coin, drawn in code so it can spin, drop and roll ---------- */
@@ -217,6 +231,17 @@ function drawCoin(g, r, sx) {
   g.beginPath(); g.ellipse(-r * .06, 0, r * .48, r * .7, 0, Math.PI * .95, Math.PI * 1.45); g.lineWidth = r * .12; g.lineCap = 'round'; g.stroke();
   g.restore();
 }
+/* A friendly icon and colour for each job category. */
+const CAT = {
+  'Kitchen': ['#FD8066', '<path d="M8 3v7a3 3 0 0 0 3 3v8M5 3v5M11 3v5M17 3c-2 1-3 4-3 7 0 2 1 3 3 3v8"/>'],
+  'Laundry': ['#5B8DEF', '<path d="M8 4 3 7l2 4 3-1v11h8V10l3 1 2-4-5-3c-1 2-2 3-4 3S9 6 8 4z"/>'],
+  'Pets': ['#C98A3A', '<circle cx="7" cy="10" r="2"/><circle cx="11" cy="6" r="2"/><circle cx="16" cy="7" r="2"/><circle cx="19" cy="11.5" r="2"/><path d="M8.5 18c0-3 2-5.5 4.5-5.5s4.5 2.5 4.5 5.5c0 2-1.5 3-4.5 3s-4.5-1-4.5-3z"/>'],
+  'Outside': ['#1E8A4A', '<path d="M12 21v-5M12 3l6 8h-3l4 5H5l4-5H6z"/>'],
+  'Car': ['#13204A', '<path d="M4 16v-3l2-5h12l2 5v3zM3 16h18v3H3z"/><circle cx="7.5" cy="19" r="1.5"/><circle cx="16.5" cy="19" r="1.5"/>'],
+  'Family helper': ['#E4578F', '<path d="M12 20s-8-4.8-8-10a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 5.2-8 10-8 10z"/>'],
+  'Around the house': ['#6E4FD8', '<path d="M3 11 12 4l9 7M6 10v10h12V10M10 20v-5h4v5"/>'],
+};
+const catIco = c => { const [col, p] = CAT[c] || ['#6A5F55', '<circle cx="12" cy="12" r="7"/>']; return `<span class="cat-ico" style="--c:${col}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${p}</svg></span>` };
 /* ---------- celebrations: confetti, a cheer card and a little chime for good things ---------- */
 const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 function confetti(power = 1) {
@@ -389,8 +414,8 @@ const KTABS = [['home', 'Home', 'home'], ['jobs', 'Jobs', 'jobs'], ['ledger', 'L
 function kidAppHTML() {
   const kid = kidById(S.profile); if (!kid) { S.view = 'who'; return whoHTML() }
   if (!['home', 'jobs', 'ledger'].includes(S.tab)) S.tab = 'home';
-  const greet = { home: 'Hi there', jobs: 'Ways to earn extra', ledger: 'Everything logged' }[S.tab];
-  return `<header><div class="hello"><small>${greet}</small><h1>${esc(kid.name)}</h1></div>
+  const greet = { home: 'Hi there!', jobs: 'Pick a job, earn money', ledger: 'Everything logged' }[S.tab];
+  return `<header><div class="hello">${S.tab === 'home' ? `<img class="hi-pig" src="${PIGGY}" alt="" width="52" height="51">` : ''}<div><small>${greet}</small><h1>${esc(kid.name)}</h1></div></div>
     <button class="lock" id="swapBtn" type="button">${I.swap} Switch</button></header>
     <main>${({ home: kidHome, jobs: kidJobs, ledger: kidLedger })[S.tab](kid)}</main>
     ${tabbar(KTABS, S.tab)}`;
@@ -421,8 +446,8 @@ function kidHome(kid) {
     ${ra ? `<section class="board rdb" id="readBoard">${readBoardHTML(kid)}</section>` : ''}
     ${sa ? `<section class="board" id="board">${boardHTML(kid)}</section>` : ''}
     ${ra && sa ? '' : `<section class="starts">
-      ${ra ? '' : `<button class="start rd" type="button" id="startRead"><span class="pl">${I.play}</span><b>Start reading</b><span>${cap ? `${rw.bonus} of ${cap} min` : `${rw.minutes} min`}</span></button>`}
-      ${sa ? '' : `<button class="start sc ${isScreenDay(kid) && sw.leftSec ? '' : 'off'}" type="button" id="startScr"><span class="pl">${I.play}</span><b>Start screens</b><span>${scrSub}</span></button>`}
+      ${ra ? '' : `<button class="start rd" type="button" id="startRead"><span class="pl">${I.read}</span><b>Start reading</b>${cap ? `<span class="mini-bar"><i style="width:${Math.min(100, 100 * rw.bonus / cap)}%"></i></span>` : ''}<span>${cap ? `${rw.bonus} of ${cap} min` : `${rw.minutes} min`}</span></button>`}
+      ${sa ? '' : `<button class="start sc ${isScreenDay(kid) && sw.leftSec ? '' : 'off'}" type="button" id="startScr"><span class="pl">${I.screen}</span><b>Start screens</b><span class="mini-bar"><i style="width:${sw.totalSec ? Math.min(100, 100 * sw.leftSec / sw.totalSec) : 0}%"></i></span><span>${scrSub}</span></button>`}
     </section>`}
     <section class="sect"><div class="sect-h"><h3>This week</h3><button class="link" type="button" data-tab="ledger">See ledger</button></div>
       <div class="list">${recent.length ? recent.map(r => ledgerRowHTML(r, false)).join('') : '<div class="empty">Nothing logged yet this week.</div>'}</div></section>
@@ -486,10 +511,10 @@ function ledgerListHTML(kid, ws, f, parent) {
 function kidJobs(kid) {
   const on = S.jobs.filter(j => j.kid_id === kid.id && j.enabled), mine = pendingClaims(kid);
   const cats = ['All', ...new Set(on.map(j => j.category))]; if (!cats.includes(S.jobFilter)) S.jobFilter = 'All';
-  return `<section class="card"><p class="hint" style="font-size:15px;color:var(--ink)">Pick any job and do it. Then tap it and press <b>I did it</b>. A parent checks, and the money goes in your bank.</p></section>
+  return `<section class="steps4" aria-label="How jobs work">${[['jobs', 'Pick a job'], ['check', 'Do it'], ['play', 'Tap I did it'], ['coin', 'Grown-up OKs it']].map(([ic, t], i) => `<div><span class="n">${i + 1}</span><span class="si">${I[ic]}</span><b>${t}</b></div>`).join('')}</section>
     ${mine.length ? `<section class="sect"><div class="sect-h"><h3>Waiting for a parent</h3></div><div class="list">${mine.map(c => `<div class="row wait-row"><span class="ico j">${I.clock}</span><span class="t"><b>${esc(c.title)}</b><span>${short(localDate(ms(c.created_at)))}</span></span><span class="amt">+${money(Number(c.amount))}</span></div>`).join('')}</div></section>` : ''}
     ${on.length ? `<section class="sect"><div class="filters">${cats.map(c => `<button class="chip" type="button" data-cat="${esc(c)}" aria-pressed="${c === S.jobFilter}">${esc(c)}</button>`).join('')}</div>
-    <div class="list">${on.filter(j => S.jobFilter === 'All' || j.category === S.jobFilter).sort((a, b) => a.price - b.price).map(j => `<button class="row" type="button" data-claim="${j.id}"><span class="t"><b>${esc(j.title)}</b><span>${esc(j.done_means)}</span></span><span class="stack"><span class="price num">${coinSVG('mini')}${money(Number(j.price))}</span>${Number(j.bonus_minutes) ? `<span class="bal">+${j.bonus_minutes} screen min</span>` : ''}</span></button>`).join('')}</div></section>`
+    <div class="list">${on.filter(j => S.jobFilter === 'All' || j.category === S.jobFilter).sort((a, b) => a.price - b.price).map(j => `<button class="row jobrow" type="button" data-claim="${j.id}">${catIco(j.category)}<span class="t"><b>${esc(j.title)}</b><span>${esc(j.done_means)}</span></span><span class="stack"><span class="price num">${coinSVG('mini')}${money(Number(j.price))}</span>${Number(j.bonus_minutes) ? `<span class="bal">+${j.bonus_minutes} screen min</span>` : ''}</span></button>`).join('')}</div></section>`
       : `<div class="list"><div class="empty">No jobs on your board yet.</div></div>`}`;
 }
 function claimSheet(kid, job) {
