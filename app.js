@@ -411,12 +411,30 @@ async function hashPin(fid, pin) {
 }
 
 /* ---------- who's using ---------- */
+/* Money a kid hasn't seen yet (approved jobs, bonuses, new allowance weeks), without marking it seen. */
+function unseenMoney(kid) {
+  let seen; try { seen = JSON.parse(store.get('seen-' + kid.id) || 'null') } catch (e) { seen = null }
+  if (!seen) return 0;
+  const c = approvedCredits(kid).filter(c => !(seen.c || []).includes(c.id)).reduce((a, c) => a + Number(c.amount), 0);
+  const w = kidWeeks(kid).filter(w => !(seen.w || []).includes(w.week_start)).reduce((a, w) => a + Number(w.allowance || 0), 0);
+  return r2(c + w);
+}
+const hello = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' };
+/* Who's using: each kid is their own paper pig, in their color, with a reason to tap. */
 function whoHTML() {
-  return `<section class="screen-center"><h1 class="logo-h"><img class="logo-l" src="logo-900.png" alt="${esc(APP)}" width="900" height="389"><img class="logo-d" src="logo-900-dark.png" alt="${esc(APP)}" width="900" height="370"></h1>
-    <p class="lede">Who's using ${esc(APP)}?</p>
-    <div class="who">${S.kids.map(k => `<button type="button" data-who="${k.id}">${avatar(k)}${esc(k.name)}</button>`).join('')}
-      <button type="button" class="par" data-who="parent"><span class="avatar">${I.lock}</span>Parent</button></div>
-    ${S.kids.length ? '' : '<p class="hint">No kids yet. Choose Parent to add one.</p>'}
+  const tiles = S.kids.map((k, i) => {
+    const st = stats(k), sw = screenWeek(k), news = unseenMoney(k);
+    const scr = !isScreenDay(k) ? `Opens ${DAYS[(k.screen_days || [6])[0]] || 'soon'}` : sw.leftSec ? mins(sw.left) : 'All used';
+    return `<button class="kidtile" type="button" data-who="${k.id}" style="--kc:${COLORS[k.color]};--i:${i}">
+      ${news > 0 ? `<span class="news">+${money(news)} new!</span>` : ''}
+      <span class="kt-face">${esc((k.name || '?').slice(0, 1).toUpperCase())}</span>
+      <b class="kt-name">${esc(k.name)}</b>
+      <span class="kt-stats"><span>${coinSVG('mini')}${money(st.balance)}</span><span>${I.screen}${scr}</span></span></button>`;
+  }).join('');
+  return `<section class="screen-center whoscreen"><h1 class="logo-h"><img class="logo-l" src="logo-900.png" alt="${esc(APP)}" width="900" height="389"><img class="logo-d" src="logo-900-dark.png" alt="${esc(APP)}" width="900" height="370"></h1>
+    <h2 class="who-q">${hello()}! Who's here?</h2>
+    ${S.kids.length ? `<div class="kidtiles ${S.kids.length === 1 ? 'one' : ''}">${tiles}</div>` : '<p class="hint" style="text-align:center">No kids yet. Choose Parent to add one.</p>'}
+    <button class="partile" type="button" data-who="parent"><span class="pt-lock">${I.lock}</span><span class="t"><b>Parent</b><span>Settings, approvals and the ledger. PIN needed.</span></span>${I.chev}</button>
     <div class="foot"><button class="link" id="signOutWho" type="button">Switch account</button></div></section>`;
 }
 function setProfile(p) { S.profile = p; store.set('profile', p); S.view = p === 'parent' ? 'parent' : 'kid'; S.tab = 'home'; if (p !== 'parent') { const k = kidById(p); if (k) setTimeout(() => cheerNews(k), 50) } }

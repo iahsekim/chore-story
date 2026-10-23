@@ -375,11 +375,6 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--blue);outline-of
 .steps{display:flex;gap:6px}
 .steps i{flex:1;height:8px;border-radius:4px;background:var(--paper);border:2px solid var(--edge)}
 .steps i.on{background:var(--pink)}
-.who{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-.who button{padding:22px 12px 18px;display:grid;justify-items:center;gap:10px;box-shadow:var(--pop-lg);font:400 22px/1.1 var(--display);min-width:0}
-.who .avatar{width:76px;height:76px;font-size:36px}
-.who .par .avatar{background:var(--ink);color:#fff}
-.who .par .avatar svg{width:30px;height:30px}
 .support{width:100%;max-width:320px;margin:0 auto}
 .card .support{max-width:none}
 .support summary{list-style:none;display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;background:var(--paper);border:var(--line-w) solid var(--edge);box-shadow:var(--pop);font-weight:600;font-size:15px;cursor:pointer;user-select:none}
@@ -450,7 +445,6 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
   .card,.board{padding:16px} .hero.bank{padding:28px 16px 16px}
   .row{padding:12px 12px;gap:10px} .ico{width:36px;height:36px}
   .tabbar button{font-size:12px} .steps4 b{font-size:11px}
-  .who .avatar{width:62px;height:62px;font-size:30px}
   .kact .pill,.row2>.pill{font-size:14px;padding:6px}
 }
 @media (max-height:560px) and (orientation:landscape){.screen-center{min-height:0;padding-block:12px}}
@@ -487,3 +481,43 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
 .st-what{flex:1;min-width:0;font-weight:500}
 .st-row b{font-weight:600;white-space:nowrap}
 .st-used b{color:var(--pink-deep)}
+
+/* ---------- who's using: every kid is their own paper pig ---------- */
+.whoscreen{gap:18px}
+.whoscreen .logo-h img{max-width:300px}
+.who-q{font:400 clamp(26px,7.5vw,32px)/1.1 var(--display);text-align:center;color:var(--text)}
+.kidtiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 14px;padding-top:6px}
+.kidtiles.one{grid-template-columns:minmax(0,1fr)}
+.kidtiles .kidtile:last-child:nth-child(odd):not(:first-child){grid-column:1/-1}
+.kidtile{position:relative;display:grid;justify-items:center;gap:8px;padding:30px 12px 16px;min-width:0;
+  background:var(--kc);color:#fff;border:3px solid var(--edge);border-radius:0 0 26px 26px;box-shadow:0 6px 0 var(--edge);
+  transition:transform .12s ease,box-shadow .12s ease}
+/* the two white ears, folded down from the top corners */
+.kidtile::before,.kidtile::after{content:"";position:absolute;top:-3px;width:38px;height:38px;border-bottom:3px solid var(--edge);pointer-events:none}
+.kidtile::before{left:-3px;border-right:3px solid var(--edge);border-bottom-right-radius:11px;background:linear-gradient(to bottom right,var(--under) calc(50% - 2px),var(--edge) calc(50% - 2px),var(--edge) calc(50% + 2px),#fff calc(50% + 2px))}
+.kidtile::after{right:-3px;border-left:3px solid var(--edge);border-bottom-left-radius:11px;background:linear-gradient(to bottom left,var(--under) calc(50% - 2px),var(--edge) calc(50% - 2px),var(--edge) calc(50% + 2px),#fff calc(50% + 2px))}
+.kt-face{width:80px;height:80px;border-radius:50%;display:grid;place-items:center;background:#fff;color:var(--kc);border:3px solid var(--edge);font:400 42px/1 var(--display)}
+.kt-name{font:400 clamp(24px,7vw,30px)/1.05 var(--display);-webkit-text-stroke:6px var(--edge);paint-order:stroke fill;overflow-wrap:anywhere;text-align:center}
+.kt-stats{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.kt-stats>span{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:#fff;color:#14101A;border:2px solid var(--edge);font:600 14px/1.2 var(--body);white-space:nowrap;font-variant-numeric:tabular-nums}
+.kt-stats svg{width:16px;height:16px;flex:none}
+.kt-stats .coin.mini{width:16px}
+.news{position:absolute;top:-14px;left:50%;transform:translateX(-50%) rotate(-4deg);z-index:2;padding:4px 12px;border-radius:999px;background:var(--gold);color:#000;border:2.5px solid var(--edge);font:400 15px/1.2 var(--display);white-space:nowrap}
+.kidtile:active{transform:translateY(5px);box-shadow:0 1px 0 var(--edge)}
+.partile{display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;text-align:left;background:var(--paper);border:var(--line-w) solid var(--edge);border-radius:18px;box-shadow:var(--pop)}
+.partile:active{transform:translate(3px,3px);box-shadow:none}
+.partile .t{flex:1;min-width:0;display:grid;gap:1px}
+.partile b{font:400 20px var(--display)}
+.partile .t span{font-size:13px;color:var(--muted)}
+.pt-lock{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:#fff;border:var(--line-w) solid var(--edge)}
+:root[data-theme="dark"] .pt-lock{background:#fff;color:#000}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pt-lock{background:#fff;color:#000}}
+.pt-lock svg{width:20px;height:20px}
+.partile>svg{width:22px;height:22px;flex:none;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){
+  .kidtile{animation:tile-in .55s cubic-bezier(.2,1.5,.4,1) both;animation-delay:calc(var(--i) * 90ms + 80ms)}
+  .news{animation:news-wiggle 2.4s ease-in-out 1s infinite}
+}
+@keyframes tile-in{0%{opacity:0;transform:translateY(24px) scale(.9) rotate(-3deg)}100%{opacity:1;transform:none}}
+@keyframes news-wiggle{0%,80%,100%{transform:translateX(-50%) rotate(-4deg)}86%{transform:translateX(-50%) rotate(4deg) scale(1.06)}92%{transform:translateX(-50%) rotate(-6deg)}}
+@media (max-width:360px){.kt-face{width:64px;height:64px;font-size:34px}.kidtiles{gap:14px 10px}}
