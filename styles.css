@@ -688,3 +688,24 @@ input,select,textarea{font-size:16px}
   :root:not([data-theme="light"]) .cat-ico{background:color-mix(in srgb,var(--c) 32%,var(--surface));border-color:color-mix(in srgb,var(--c) 70%,#fff 10%);color:color-mix(in srgb,var(--c) 40%,#fff)}}
 :root[data-theme="dark"] .ico.s{color:var(--screen)}
 :root[data-theme="dark"] .cat-ico{background:color-mix(in srgb,var(--c) 32%,var(--surface));border-color:color-mix(in srgb,var(--c) 70%,#fff 10%);color:color-mix(in srgb,var(--c) 40%,#fff)}
+
+/* ---------- Optional jar (small, explained take-aways) ---------- */
+.ico.x{background:var(--danger-soft);color:var(--danger)}
+.kact .pill:last-child:nth-child(odd){grid-column:1/-1}
+.jarpill{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.jarpill svg{width:18px;height:18px;flex:none}
+.card>.jarpill{justify-self:start}
+.bucket.jar{background:var(--danger-soft);grid-column:1/-1} .bucket.jar b{color:var(--danger)}
+.togline{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.togline>span{display:grid;gap:2px}
+.jarset #penMore{display:grid;gap:10px} .jarset #penMore[hidden]{display:none}
+.link.quiet{color:var(--muted);font-weight:700;font-size:13px;text-decoration:underline;justify-self:start}
+.warnline{margin:0;padding:10px 12px;border-radius:12px;background:var(--danger-soft);color:var(--danger);font-weight:700;font-size:14px}
+/* Start cards: room above the title for the round icon, so they never overlap. */
+.start{padding-top:70px;min-height:0}
+/* A longer equation (when the jar adds a term) shrinks, then wraps as a last resort. */
+.eq.many{flex-wrap:wrap;row-gap:10px}
+.eq.many .term b{font-size:clamp(15px,4.4vw,26px)}
+.eq.many .op{font-size:15px}
+.eq.many{justify-content:center;column-gap:6px}
+.eq.many .term{flex:0 0 auto;min-width:52px}

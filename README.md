@@ -4,7 +4,7 @@ A free web app for families: a weekly allowance, a job board with prices, a read
 
 - **Parents** sign in with just an email (a 6-digit code or magic link, no password), add their kids, and set up each kid's job board, allowance and screen-time rules.
 - **Kids** sign in on the same email, pick their profile, and see their week: the allowance, every job and bonus with the reason, what's in their bank, and what's been withdrawn or spent.
-- **A bank for each kid.** Every Monday the kid earns their allowance, plus any jobs and bonuses. It all builds up as a balance in their bank. Money only comes out when you record a withdrawal (cash or a transfer) or a purchase you made for them with their money. Every entry needs an explanation, and nothing is ever taken away as a punishment.
+- **A bank for each kid.** Every Monday the kid earns their allowance, plus any jobs and bonuses. It all builds up as a balance in their bank. Money only comes out when you record a withdrawal (cash or a transfer) or a purchase you made for them with their money. Every entry needs an explanation. Nothing is taken away as a punishment unless you turn on the optional jar (below).
 
 The site is plain HTML, CSS and JavaScript with no build step. It's hosted on Netlify, and Supabase handles sign-in and the database.
 
@@ -76,10 +76,10 @@ That's it. Visit the site, sign in with your email, and set up your family.
 | Withdrawals | **Ledger → Money → Withdraw cash**: type the amount you handed over and an explanation. It comes out of the kid's bank. |
 | Purchases | **Bank → Bought something**: what you bought for them with their money, with an explanation. You can't go below their balance. |
 | Ledger | **Ledger** tab, per kid: Money (every allowance, job, bonus, payment and purchase, with running balance), Screen time and Reading (every session, manual entry and bonus minutes, week by week). Tap any entry to edit its amount, explanation, time or day, or delete it. Adding time lets you pick the day of the week. |
-| Taking money away | There's no deduction feature. Parents can correct or delete an entry that was a mistake. |
+| Optional jar | Off by default. Turn it on in **Settings** and give it your family's name for it (Oops Jar, Swear Jar, Not-Nice Bucket…). Each kid card then gets a jar button for small take-aways of money or screen minutes. It suggests 10¢ to 25¢ or 1 to 5 minutes; taking all of it is possible but is a separate, deliberate tap. Every entry needs a reason, shows in both ledgers, and can be edited or deleted. The kid's **How it works** explains the jar while it's on. |
 | Totals per kid | Bank balance, this week, this month, lifetime earned, withdrawn, and spent. Each entry shows the running balance, like a bank statement. |
 | Reading | The kid starts a timer and types the book, and can pause and resume it. Time is kept to the second, so 10:40 + 10:20 = 21 minutes, and each full minute adds a screen minute that week, up to the kid's limit. A forgotten timer stops itself. Parents can add reading by hand. |
-| Screen time | Base minutes plus reading minutes, used on the kid's screen days. The clock counts down the week's time to the second and can be paused. It stops itself at zero. Parents can add screen time used by hand (it counts this week). Time is never taken away as a punishment. Base minutes, screen days and reading limit are in **Settings → Screen time**. |
+| Screen time | Base minutes plus reading minutes, used on the kid's screen days. The clock counts down the week's time to the second and can be paused. It stops itself at zero. Parents can add screen time used by hand (it counts this week). Time is only taken away through the optional jar. Base minutes, screen days and reading limit are in **Settings → Screen time**. |
 | Parent PIN | Kids share the parent's sign-in, so parent tools sit behind a 4-digit PIN. After signing in fresh with the email code, a parent can reset a forgotten PIN. |
 | Second parent | Settings → **Invite another parent**. They sign in with that email and join automatically. |
 | Delete | Settings → **Delete account and all data** removes the family and the login. |

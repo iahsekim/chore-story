@@ -56,7 +56,7 @@ function bindSwatches(root, attr, onPick) { root.querySelectorAll(`[${attr}]`).f
 async function q(p) { const { data, error } = await p; if (error) throw error; return data }
 async function loadAll() {
   const fid = S.family.id, since = addDays(today(), -70);
-  const [fam, members, invites, kids, jobs, weeks, credits, tx, reading, screen, sbonus] = await Promise.all([
+  const [fam, members, invites, kids, jobs, weeks, credits, tx, reading, screen, sbonus, pen] = await Promise.all([
     q(sb.from('families').select('*').eq('id', fid).single()),
     q(sb.from('family_members').select('email,user_id').eq('family_id', fid)),
     q(sb.from('family_invites').select('email').eq('family_id', fid)),
@@ -68,8 +68,10 @@ async function loadAll() {
     q(sb.from('reading_sessions').select('*').eq('family_id', fid).gte('local_date', since).order('started_at', { ascending: false })),
     q(sb.from('screen_sessions').select('*').eq('family_id', fid).gte('local_date', since)),
     q(sb.from('screen_bonus').select('*').eq('family_id', fid).gte('week_start', since)),
+    // Older databases may not have the jar table yet; the app keeps working without it.
+    Promise.resolve(sb.from('penalties').select('*').eq('family_id', fid).order('created_at', { ascending: false })).then(r => r.error ? [] : r.data || [], () => []),
   ]);
-  Object.assign(S, { family: fam, members, invites, kids, jobs, weeks, credits, tx, reading, screen, sbonus });
+  Object.assign(S, { family: fam, members, invites, kids, jobs, weeks, credits, tx, reading, screen, sbonus, pen });
   await ensureWeeks();
 }
 /* Each Monday a kid's week starts fresh at their allowance. Rows are created lazily. */
@@ -105,7 +107,14 @@ function weekTotal(kid, ws) {
 }
 function kidWeeks(kid) { return S.weeks.filter(w => w.kid_id === kid.id).sort((a, b) => b.week_start.localeCompare(a.week_start)) }
 /* Bank math. Earned = every week's allowance + jobs + bonuses. Money leaves the balance only
-   when a parent pays it out or buys something for the kid with it. Never as a punishment. */
+   when a parent pays it out, buys something for the kid with it, or (only if the family turned it on) a small jar entry. */
+/* Optional jar: small, explained deductions. Off unless a parent turns it on. Entries already
+   made still count if the jar is later switched off, so the bank always adds up. */
+const penOn = () => !!S.family?.penalty_enabled;
+const penName = () => (S.family?.penalty_name || '').trim() || 'Oops Jar';
+const kidPen = kid => (S.pen || []).filter(p => p.kid_id === kid.id);
+const penMoney = kid => r2(kidPen(kid).reduce((a, p) => a + Number(p.amount || 0), 0));
+const penMin = (kid, ws) => kidPen(kid).filter(p => p.week_start === ws).reduce((a, p) => a + (Number(p.minutes) || 0), 0);
 function stats(kid) {
   const cur = thisWeek(), month = today().slice(0, 7);
   let earned = 0, monthT = 0;
@@ -113,7 +122,8 @@ function stats(kid) {
   const tx = S.tx.filter(t => t.kid_id === kid.id);
   const paid = tx.filter(t => t.kind === 'payout').reduce((a, t) => a + Number(t.amount), 0);
   const spent = tx.filter(t => t.kind === 'purchase').reduce((a, t) => a + Number(t.amount), 0);
-  return { week: weekTotal(kid, cur), month: r2(monthT), lifetime: r2(earned), paid: r2(paid), spent: r2(spent), balance: r2(earned - paid - spent) };
+  const pen = penMoney(kid);
+  return { week: weekTotal(kid, cur), month: r2(monthT), lifetime: r2(earned), paid: r2(paid), spent: r2(spent), pen, balance: r2(earned - paid - spent - pen) };
 }
 /* How long the balance has been building: last payment, and what each week since added. */
 function owedInfo(kid) {
@@ -132,6 +142,7 @@ function statement(kid) {
   for (const w of kidWeeks(kid)) L.push({ date: w.week_start, ts: ms(w.week_start + 'T00:00:00Z'), title: 'Weekly allowance', kind: 'Allowance', v: Number(w.allowance), type: 'allow', id: w.week_start, week: w.week_start });
   for (const c of approvedCredits(kid)) L.push({ date: localDate(ms(c.created_at)), ts: ms(c.created_at), title: c.title, kind: c.kind === 'job' ? 'Job' : 'Bonus', v: Number(c.amount), type: c.kind, id: c.id, week: c.week_start });
   for (const t of S.tx.filter(t => t.kid_id === kid.id)) L.push({ date: t.local_date, ts: ms(t.created_at), title: t.note, kind: t.kind === 'payout' ? 'Withdrawal' : 'Bought for ' + kid.name, v: -Number(t.amount), type: t.kind, id: t.id });
+  for (const p of kidPen(kid).filter(p => Number(p.amount) > 0)) L.push({ date: p.local_date, ts: ms(p.created_at), title: p.note, kind: penName(), v: -Number(p.amount), type: 'penalty', id: p.id });
   L.sort((a, b) => a.date.localeCompare(b.date) || a.ts - b.ts);
   let run = 0; for (const l of L) { run = r2(run + l.v); l.bal = run }
   return L.reverse();
@@ -152,9 +163,10 @@ function screenWeek(kid, ws = thisWeek()) {
   const base = Number(kid.base_screen_minutes) || 0, bonus = readWeek(kid, ws).bonus;
   const extra = S.sbonus.filter(a => a.kid_id === kid.id && a.week_start === ws).reduce((a, x) => a + Number(x.minutes), 0) + weekCredits(kid, ws).reduce((a, c) => a + (Number(c.minutes) || 0), 0);
   const sess = S.screen.filter(x => x.kid_id === kid.id && x.week_start === ws).sort((a, b) => ms(a.started_at) - ms(b.started_at));
-  const usedSec = sess.reduce((a, x) => a + liveSec(x), 0), totalSec = Math.max(0, (base + bonus + extra) * 60), leftSec = Math.max(0, totalSec - usedSec);
+  const pen = penMin(kid, ws);
+  const usedSec = sess.reduce((a, x) => a + liveSec(x), 0), totalSec = Math.max(0, (base + bonus + extra - pen) * 60), leftSec = Math.max(0, totalSec - usedSec);
   const active = sess.find(x => !x.ended_at && x.source !== 'manual');
-  return { base, bonus, extra, sess, active, usedSec, totalSec, leftSec, left: Math.floor(leftSec / 60) };
+  return { base, bonus, extra, pen, sess, active, usedSec, totalSec, leftSec, left: Math.floor(leftSec / 60) };
 }
 const hms = sec => { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60; return h ? `${h}:${pad(m)}:${pad(x)}` : `${pad(m)}:${pad(x)}` };
 const dur = sec => { sec = Math.max(0, Math.floor(sec)); const m = Math.floor(sec / 60), x = sec % 60; return m && x ? `${m} min ${x} sec` : m ? `${m} min` : `${x} sec` };
@@ -176,6 +188,7 @@ const I = {
   coin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6.5v11"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
+  jar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8M9 3v3c-2.4 1-4 3.2-4 6v6a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-6c0-2.8-1.6-5-4-6V3"/><path d="M8.5 14h7"/></svg>',
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
   cup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 3c0 1.5 1.5 1.5 1.5 3M12 3c0 1.5 1.5 1.5 1.5 3"/></svg>',
@@ -425,7 +438,7 @@ function tabbar(tabs, cur, badges = {}) {
 }
 function creditRow(c) { return `<div class="row"><span class="ico ${c.kind === 'job' ? 'j' : 'm'}">${c.kind === 'job' ? I.check : I.star}</span><span class="t"><b>${esc(c.title)}</b><span>${c.kind === 'job' ? 'Job' : 'Bonus'} · ${short(localDate(ms(c.created_at)))}</span></span><span class="amt up">+${money(Number(c.amount))}</span></div>` }
 function stmtRow(l, kid, parent) {
-  const ico = l.type === 'job' ? `<span class="ico j">${I.check}</span>` : l.type === 'bonus' ? `<span class="ico m">${I.star}</span>` : l.type === 'payout' ? `<span class="ico s">${I.cash}</span>` : l.type === 'purchase' ? `<span class="ico r">${I.bag}</span>` : `<span class="ico m">${I.coin}</span>`;
+  const ico = l.type === 'job' ? `<span class="ico j">${I.check}</span>` : l.type === 'bonus' ? `<span class="ico m">${I.star}</span>` : l.type === 'payout' ? `<span class="ico s">${I.cash}</span>` : l.type === 'purchase' ? `<span class="ico r">${I.bag}</span>` : l.type === 'penalty' ? `<span class="ico x">${I.jar}</span>` : `<span class="ico m">${I.coin}</span>`;
   const tg = parent && l.id ? 'button' : 'div';
   return `<${tg} ${tg === 'button' ? `type="button" data-edit="${l.type}|${l.id}|${kid.id}"` : ''} class="row">${ico}<span class="t"><b>${esc(l.title)}</b><span>${esc(l.kind)} · ${short(l.date)}${l.type !== 'allow' && l.ts ? ' · ' + clockTime(l.ts) : ''}${tg === 'button' ? ' · tap to edit' : ''}</span></span><span class="stack"><span class="amt ${l.v >= 0 ? 'up' : 'out'}">${l.v >= 0 ? '+' : '\u2212'}${money(Math.abs(l.v))}</span><span class="bal num">${money(l.bal)}</span></span></${tg}>`;
 }
@@ -458,7 +471,7 @@ function kidLedger(kid) {
   const ws = S.kweek || thisWeek(), f = S.kfilter || 'all', st = stats(kid);
   return `${weekNav(ws, 'kweek')}${weekSummary(kid, ws)}
     <div class="filters">${LFILTERS.map(([v, l]) => `<button class="chip" type="button" data-kf="${v}" aria-pressed="${f === v}">${l}</button>`).join('')}</div>
-    ${f === 'money' ? `<section class="buckets"><button class="bucket pd ${st.paid ? '' : 'zero'}" type="button" data-txlist="payout"><span class="label">Withdrawn</span><b class="num">${money(st.paid)}</b><span class="see">See list</span></button><button class="bucket sp ${st.spent ? '' : 'zero'}" type="button" data-txlist="purchase"><span class="label">Spent on things</span><b class="num">${money(st.spent)}</b><span class="see">See list</span></button></section>` : ''}
+    ${f === 'money' ? `<section class="buckets"><button class="bucket pd ${st.paid ? '' : 'zero'}" type="button" data-txlist="payout"><span class="label">Withdrawn</span><b class="num">${money(st.paid)}</b><span class="see">See list</span></button><button class="bucket sp ${st.spent ? '' : 'zero'}" type="button" data-txlist="purchase"><span class="label">Spent on things</span><b class="num">${money(st.spent)}</b><span class="see">See list</span></button>${st.pen ? `<div class="bucket jar"><span class="label">${esc(penName())}</span><b class="num">${money(st.pen)}</b><span class="see">In the ledger</span></div>` : ''}</section>` : ''}
     ${f === 'screen' ? eqHTML(kid, screenWeek(kid, ws)) : ''}
     ${ledgerListHTML(kid, ws, f, false)}
     <div class="ptools"><button class="pill soft" type="button" data-manual="read">+ Reading by hand</button><button class="pill soft" type="button" data-manual="screen">+ Screen time by hand</button></div>`;
@@ -486,6 +499,8 @@ function ledgerItems(kid, ws, f = 'all') {
     }
     for (const t of S.tx.filter(t => t.kid_id === kid.id && monday(t.local_date) === ws))
       R.push({ date: t.local_date, ts: ms(t.created_at), ico: `<span class="ico ${t.kind === 'payout' ? 's' : 'r'}">${t.kind === 'payout' ? I.cash : I.bag}</span>`, title: t.note, sub: t.kind === 'payout' ? 'Withdrawal' : 'Spent', amt: '−' + money(Number(t.amount)), cls: 'out', edit: `${t.kind}|${t.id}|${kid.id}` });
+    for (const p of kidPen(kid).filter(p => p.week_start === ws && Number(p.amount) > 0))
+      R.push({ date: p.local_date, ts: ms(p.created_at), ico: `<span class="ico x">${I.jar}</span>`, title: p.note, sub: penName(), amt: '−' + money(Number(p.amount)), cls: 'out', edit: `penalty|${p.id}` });
   }
   if (rd) for (const r of S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws))
     R.push({ date: r.local_date, ts: ms(r.started_at), when: span(r), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: 'Reading' + (r.source === 'manual' ? ' · added by a parent' : !r.ended_at ? (r.running_since ? ' · reading now' : ' · paused') : ''), amt: dur(readSec(r, kid)), cls: 'rd', edit: `read|${r.id}` });
@@ -494,6 +509,8 @@ function ledgerItems(kid, ws, f = 'all') {
       R.push({ date: x.local_date, ts: ms(x.started_at), when: span(x), ico: `<span class="ico s">${I.screen}</span>`, title: x.note || 'Screen time', sub: 'Screens' + (x.source === 'manual' ? ' · added by a parent' : !x.ended_at ? (x.running_since ? ' · on now' : ' · paused') : ''), amt: '−' + dur(liveSec(x)), cls: 'out', edit: `screen|${x.id}` });
     for (const b of S.sbonus.filter(b => b.kid_id === kid.id && b.week_start === ws))
       R.push({ date: localDate(ms(b.created_at)), ts: ms(b.created_at), ico: `<span class="ico m">${I.star}</span>`, title: b.note, sub: 'Bonus screen minutes', amt: `+${b.minutes} min`, cls: 'up', edit: `sbonus|${b.id}` });
+    for (const p of kidPen(kid).filter(p => p.week_start === ws && Number(p.minutes) > 0))
+      R.push({ date: p.local_date, ts: ms(p.created_at), ico: `<span class="ico x">${I.jar}</span>`, title: p.note, sub: penName() + ' · screen minutes', amt: `−${p.minutes} min`, cls: 'out', edit: `penalty|${p.id}` });
   }
   return R.sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
 }
@@ -560,8 +577,9 @@ let pick = null, confirming = false;
 const span = x => { const st = ms(x.started_at), en = x.ended_at ? ms(x.ended_at) : 0; return en && en - st >= 60000 ? `${clockTime(st)} \u2013 ${clockTime(en)}` : clockTime(st) };
 function eqHTML(kid, x, extra = '') {
   return `<section class="card"><span class="label">This week · ${screenDayNames(kid)}</span>
-    <div class="eq"><span class="term"><b class="num">${x.base}</b><span>Base</span></span><span class="op">+</span><span class="term"><b class="num" style="color:var(--read)">${x.bonus}</b><span>Reading</span></span>
+    <div class="eq ${[x.extra, x.pen, x.usedSec].filter(Boolean).length >= 3 || (x.pen && x.usedSec) ? 'many' : ''}"><span class="term"><b class="num">${x.base}</b><span>Base</span></span><span class="op">+</span><span class="term"><b class="num" style="color:var(--read)">${x.bonus}</b><span>Reading</span></span>
     ${x.extra ? `<span class="op">+</span><span class="term"><b class="num" style="color:var(--money)">${x.extra}</b><span>Bonus</span></span>` : ''}
+    ${x.pen ? `<span class="op">\u2212</span><span class="term"><b class="num" style="color:var(--danger)">${x.pen}</b><span>Jar</span></span>` : ''}
     ${x.usedSec ? `<span class="op">\u2212</span><span class="term"><b class="num" id="eqUsed">${hms(x.usedSec)}</b><span>Used</span></span>` : ''}
     <span class="op">=</span><span class="term res"><b class="num" id="eqLeft">${hms(x.leftSec)}</b><span>Left</span></span></div>${extra}</section>`;
 }
@@ -600,7 +618,7 @@ function pKids() {
       <div class="owedline">${o.saving ? `Saving for ${esc(g.name)} · ${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}` : o.last ? `Last withdrawal ${short(o.last)} (${ago(o.days)})` : 'No withdrawals yet'}</div>
       <div class="kstats"><div><b class="num">${money(st.week)}</b><span>This week</span></div><div><b class="num">${money(st.month)}</b><span>Month</span></div><div><b class="num">${money(st.lifetime)}</b><span>Lifetime</span></div></div>
       <div class="kstats"><div><b class="num">${hms(sw.leftSec)}</b><span>Screen left</span></div><div><b class="num" style="color:var(--read)">+${rw.bonus}</b><span>Reading bonus</span></div><div><b class="num">${hms(rw.sec)}</b><span>Read</span></div></div>
-      <div class="kact"><button class="pill" type="button" data-logjob="${k.id}">Log a job</button><button class="pill ok" type="button" data-bonus="${k.id}">Add bonus</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button><button class="pill soft" type="button" data-more="${k.id}">More</button></div></article>`;
+      <div class="kact"><button class="pill" type="button" data-logjob="${k.id}">Log a job</button><button class="pill ok" type="button" data-bonus="${k.id}">Add bonus</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button>${penOn() ? `<button class="pill soft jarpill" type="button" data-pen="${k.id}">${I.jar}${esc(penName())}</button>` : ''}<button class="pill soft" type="button" data-more="${k.id}">More</button></div></article>`;
   }).join('') + `<button class="pill soft" id="addKidBtn" type="button" style="justify-self:start">+ Add a kid</button>`;
 }
 function pJobs() {
@@ -622,6 +640,7 @@ function timeRows(kid, view, ws) {
     for (const x of S.screen.filter(x => x.kid_id === kid.id && x.week_start === ws)) R.push({ date: x.local_date, ts: ms(x.started_at), when: span(x), ico: `<span class="ico s">${I.screen}</span>`, title: x.source === 'manual' ? (x.note || 'Screen time') : 'Screen session', sub: x.source === 'manual' ? 'Added by a parent' : !x.ended_at ? (x.running_since ? 'Running now' : 'Paused') : 'Clock', v: -liveSec(x), edit: `screen|${x.id}` });
     for (const b of S.sbonus.filter(b => b.kid_id === kid.id && b.week_start === ws)) R.push({ date: localDate(ms(b.created_at)), ts: ms(b.created_at), ico: `<span class="ico m">${I.star}</span>`, title: b.note, sub: 'Bonus minutes', v: b.minutes * 60, edit: `sbonus|${b.id}` });
     for (const c of weekCredits(kid, ws).filter(c => Number(c.minutes) > 0)) R.push({ date: localDate(ms(c.created_at)), ts: ms(c.created_at), ico: `<span class="ico j">${I.check}</span>`, title: c.title, sub: 'Job bonus minutes', v: c.minutes * 60, edit: `credit|${c.id}` });
+    for (const p of kidPen(kid).filter(p => p.week_start === ws && Number(p.minutes) > 0)) R.push({ date: p.local_date, ts: ms(p.created_at), ico: `<span class="ico x">${I.jar}</span>`, title: p.note, sub: penName(), v: -p.minutes * 60, edit: `penalty|${p.id}` });
     const rw = readWeek(kid, ws); if (rw.bonus) R.push({ date: addDays(ws, 6) > today() ? today() : addDays(ws, 6), ts: 0, ico: `<span class="ico r">${I.read}</span>`, title: 'Earned from reading', sub: `${dur(rw.sec)} read this week`, v: rw.bonus * 60, edit: '' });
   } else {
     for (const r of S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws)) R.push({ date: r.local_date, ts: ms(r.started_at), when: span(r), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: r.source === 'manual' ? 'Added by a parent' : !r.ended_at ? (r.running_since ? 'Reading now' : 'Paused') : 'Timer', v: readSec(r, kid), edit: `read|${r.id}` });
@@ -645,16 +664,17 @@ function pPay() {
     h += `<div class="card bankcard"><span class="label">In ${esc(k.name)}’s bank</span><b class="bankbig num">${money(st.balance)}</b>
         <p class="hint owedhint">${o.last ? `Last withdrawal <b>${short(o.last)}</b>, ${ago(o.days)}.` : 'No withdrawals yet.'}${g ? ` Saving for <b>${esc(g.name)}</b> (${money(g.amount)}).` : ''}</p>
         ${o.weeks.length ? `<div class="weeksince">${o.weeks.map(w => `<span><small>Week of ${md(w.ws)}</small><b class="num">${money(w.amt)}</b></span>`).join('')}</div>` : ''}
-        <div class="kstats flat"><div><b class="num">${money(st.lifetime)}</b><span>Earned</span></div><div><b class="num">${money(st.paid)}</b><span>Withdrawn</span></div><div><b class="num">${money(st.spent)}</b><span>Spent</span></div></div>
+        <div class="kstats flat"><div><b class="num">${money(st.lifetime)}</b><span>Earned</span></div><div><b class="num">${money(st.paid)}</b><span>Withdrawn</span></div><div><b class="num">${money(st.spent)}</b><span>Spent</span></div>${st.pen ? `<div><b class="num" style="color:var(--danger)">${money(st.pen)}</b><span>${esc(penName())}</span></div>` : ''}</div>
         <div class="row2"><button class="pill" type="button" data-payout="${k.id}">Withdraw cash</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button></div>
-        <div class="row2"><button class="pill soft" type="button" data-logjob="${k.id}">+ Job</button><button class="pill soft" type="button" data-bonus="${k.id}">+ Bonus</button></div></div>
+        <div class="row2"><button class="pill soft" type="button" data-logjob="${k.id}">+ Job</button><button class="pill soft" type="button" data-bonus="${k.id}">+ Bonus</button></div>
+        ${penOn() ? `<button class="pill soft jarpill" type="button" data-pen="${k.id}">${I.jar}Add to the ${esc(penName())}</button>` : ''}</div>
       <section class="sect"><div class="sect-h"><h3>Every entry</h3><span class="label">${L.length}</span></div>
       <div class="list">${L.length ? (() => { let last = '', out = ''; for (const l of L) { const w = monday(l.date); if (w !== last) { out += `<div class="lgroup">Week of ${md(w)}</div>`; last = w } out += stmtRow(l, k, true) } return out })() : '<div class="empty">No entries yet.</div>'}</div></section>`;
   } else {
     const x = screenWeek(k, ws), rw = readWeek(k, ws), R = timeRows(k, view, ws);
     h += `<div class="weeknav"><button class="pill soft" type="button" data-lweek="${addDays(ws, -7)}" aria-label="Previous week">\u2039</button><b>Week of ${md(ws)}${ws === thisWeek() ? ' · this week' : ''}</b><button class="pill soft" type="button" data-lweek="${addDays(ws, 7)}" aria-label="Next week" ${ws >= thisWeek() ? 'disabled' : ''}>\u203a</button></div>`;
     h += view === 'screen'
-      ? `${eqHTML(k, x, `<div class="row2"><button class="pill soft" type="button" data-addtime="screen|${k.id}|${ws}">+ Time used</button><button class="pill soft" type="button" data-addtime="sbonus|${k.id}|${ws}">+ Bonus minutes</button></div>`)}`
+      ? `${eqHTML(k, x, `<div class="row2"><button class="pill soft" type="button" data-addtime="screen|${k.id}|${ws}">+ Time used</button><button class="pill soft" type="button" data-addtime="sbonus|${k.id}|${ws}">+ Bonus minutes</button></div>${penOn() && ws === thisWeek() ? `<button class="pill soft jarpill" type="button" data-pen="${k.id}|minutes">${I.jar}Add to the ${esc(penName())}</button>` : ''}`)}`
       : `<div class="card"><span class="label">Read this week</span><b class="bankbig num" style="color:var(--read)">${dur(rw.sec)}</b><p class="hint">Earned <b>+${rw.bonus}</b> screen minutes (limit ${k.reading_cap}).</p><button class="pill soft" type="button" data-addtime="read|${k.id}|${ws}" style="justify-self:start">+ Add reading</button></div>`;
     h += `<section class="sect"><div class="sect-h"><h3>${view === 'screen' ? 'Time used and added' : 'Reading sessions'}</h3><span class="label">${R.length}</span></div><div class="list">${R.length ? R.map(timeRowHTML).join('') : '<div class="empty">Nothing this week.</div>'}</div></section>`;
   }
@@ -723,6 +743,7 @@ function openEdit(spec) {
   if (type === 'screen') { const x = S.screen.find(r => r.id === id); return x && entrySheet('screen', kidById(x.kid_id), x) }
   if (type === 'sbonus') { const x = S.sbonus.find(r => r.id === id); return x && entrySheet('sbonus', kidById(x.kid_id), x) }
   if (type === 'read') { const x = S.reading.find(r => r.id === id); return x && entrySheet('read', kidById(x.kid_id), x) }
+  if (type === 'penalty') { const x = (S.pen || []).find(r => r.id === id); return x && penaltySheet(kidById(x.kid_id), x) }
 }
 function pSettings() {
   const F = S.family;
@@ -734,6 +755,11 @@ function pSettings() {
       <div class="field"><span class="tiplabel"><label class="label" for="sr-${k.id}">Reading bonus limit</label><button class="tip" type="button" aria-label="What is the reading bonus limit?" aria-expanded="false">?</button></span><span class="tipbox" hidden>The most extra screen minutes reading can earn in one week. Every minute read adds a screen minute, up to this number.</span><input id="sr-${k.id}" type="number" inputmode="numeric" min="0" step="5" value="${k.reading_cap}"></div></div>
       <div class="field"><span class="label">Screen days</span><div class="chips daychips">${[1, 2, 3, 4, 5, 6, 0].map(d => `<button class="chip" type="button" data-sday="${k.id}|${d}" aria-pressed="${(k.screen_days || []).includes(d)}">${DOW[d]}</button>`).join('')}</div></div>
       <button class="pill" type="button" data-savescr="${k.id}" style="justify-self:start">Save ${esc(k.name)}'s screen time</button></div>`).join('')}</section>` : ''}
+    <section class="card jarset"><div class="togline"><span><span class="label">${esc(F.penalty_name || 'Oops Jar')} (optional)</span><b>Take away a little money or screen time</b></span><button class="tog" id="penTog" type="button" aria-pressed="${!!F.penalty_enabled}" aria-label="Use a jar for small take-aways"></button></div>
+      <p class="hint">Off by default. When it's on, each kid card gets a jar button. Keep it small: 10¢ to 25¢, or 1 to 5 screen minutes. Every entry needs a reason and shows in the ledger.</p>
+      <div id="penMore" ${F.penalty_enabled ? '' : 'hidden'}><div class="field"><label class="label" for="penNm">What your family calls it</label><input id="penNm" maxlength="30" autocapitalize="words" value="${esc(F.penalty_name || 'Oops Jar')}">
+      <div class="chips">${['Oops Jar', 'Swear Jar', 'Not-Nice Bucket', 'Whoops Bucket', 'Grumble Jar'].map(n => `<button class="chip" type="button" data-pnm="${n}">${n}</button>`).join('')}</div></div></div>
+      <button class="pill" id="penSave" type="button" style="justify-self:start">Save</button></section>
     <section class="card"><span class="label">Family</span>
       <div class="field"><label class="label" for="sFam">Family name</label><input id="sFam" maxlength="60" autocapitalize="words" value="${esc(F.name)}"></div>
       <div class="field"><label class="label" for="sTz">Time zone (weeks reset Monday here)</label><select id="sTz">${tzOptions(F.timezone)}</select></div>
@@ -801,6 +827,11 @@ function bindAll() {
   on('goalBtn', () => goalSheet(kidById(S.profile)));
   each('[data-bonus]', el => bonusSheet(kidById(el.dataset.bonus)));
   each('[data-more]', el => kidMoreSheet(kidById(el.dataset.more)));
+  each('[data-pen]', el => { const [id, m] = el.dataset.pen.split('|'); const k = kidById(id); penaltySheet(k); if (m === 'minutes') layer.querySelector('[data-pm="minutes"]')?.click() });
+  on('penTog', () => { const b = $('penTog'), v = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', v); $('penMore').hidden = !v });
+  each('[data-pnm]', el => { $('penNm').value = el.dataset.pnm });
+  on('penSave', () => { const v = $('penTog').getAttribute('aria-pressed') === 'true', nm = titleCase($('penNm').value.trim()) || 'Oops Jar';
+    act(() => q(sb.from('families').update({ penalty_enabled: v, penalty_name: nm }).eq('id', S.family.id)), v ? `${nm} is on` : `${nm} is off`) });
   on('addKidBtn', () => kidSheet());
   each('[data-editkid]', el => kidSheet(kidById(el.dataset.editkid)));
   each('[data-jk]', el => { S.jobKid = el.dataset.jk; render() });
@@ -946,7 +977,7 @@ function rulesSheet(kid) {
     <li><span><b>Jobs add money.</b> Tap a job and press I did it. A parent checks, then it's yours.</span></li>
     <li><span><b>Anything you earn is yours to keep.</b> It stays in your bank until you ask for it or save up for something.</span></li>
     <li><span><b>Your money stays in your bank</b> until you withdraw it or a parent buys something for you with it. Every entry says why.</span></li>
-    <li><span><b>Money is never taken away as a punishment.</b></span></li>
+    ${penOn() ? `<li><span><b>The ${esc(penName())}.</b> Sometimes a parent may take away a little money or a few screen minutes. It's always small, and it's always written in your ledger with the reason.</span></li>` : `<li><span><b>Money is never taken away as a punishment.</b></span></li>`}
     <li><span><b>${kid.base_screen_minutes} screen minutes each week</b> on ${screenDayNames(kid)}.</span></li>
     <li><span><b>1 minute reading = 1 screen minute,</b> up to ${kid.reading_cap} a week. Chapter books and graphic novels count.</span></li>
     <li><span><b>Screens only while the clock runs.</b> Pause it whenever you stop.</span></li>
@@ -994,6 +1025,50 @@ function bonusSheet(kid) {
       else { const m = Math.min(600, Math.round(v)); await act(() => q(sb.from('screen_bonus').insert({ family_id: S.family.id, kid_id: kid.id, week_start: ws, minutes: m, note: why })), `+${m} screen minutes for ${kid.name}`) }
     };
   });
+  draw();
+}
+/* The jar: a small, explained deduction of money or screen minutes. Small amounts are the
+   default and the suggestion; emptying everything is possible but deliberately a second step. */
+const PEN_MONEY = [0.1, 0.25, 0.5, 1], PEN_MIN = [1, 2, 5, 10];
+function penaltySheet(kid, row) {
+  const ws = row ? row.week_start : thisWeek();
+  let mode = row ? (Number(row.amount) > 0 ? 'money' : 'minutes') : 'money', all = false;
+  const st = { why: row ? row.note : '', amt: row ? (Number(row.amount) || Number(row.minutes)) : null };
+  const maxFor = m => m === 'money' ? r2(stats(kid).balance + (row ? Number(row.amount) || 0 : 0)) : screenWeek(kid, ws).left + (row ? Number(row.minutes) || 0 : 0);
+  const fmt = (m, v) => m === 'money' ? money(v) : `${v} min`;
+  const draw = () => {
+    const max = maxFor(mode), presets = (mode === 'money' ? PEN_MONEY : PEN_MIN).filter(v => v <= max);
+    if (st.amt == null) st.amt = presets[0] ?? 0;
+    openSheet(`<span class="label">${esc(kid.name)} · ${money(stats(kid).balance)} banked · ${dur(screenWeek(kid, ws).leftSec)} screens left</span><h2>${row ? 'Edit' : 'Add to the'} ${esc(penName())}${row ? ' entry' : ''}</h2>
+      <div class="seg" style="grid-template-columns:1fr 1fr"><button type="button" data-pm="money" aria-pressed="${mode === 'money'}">Money</button><button type="button" data-pm="minutes" aria-pressed="${mode === 'minutes'}">Screen minutes</button></div>
+      <p class="hint">Keep it small: ${mode === 'money' ? '10¢ to 25¢' : '1 to 5 minutes'} is usually plenty.</p>
+      ${max > 0 ? `<div class="chips">${presets.map(v => `<button class="chip" type="button" data-pa="${v}" aria-pressed="${!all && Number(st.amt) === v}">${mode === 'money' ? (v < 1 ? Math.round(v * 100) + '¢' : '$' + v) : v + ' min'}</button>`).join('')}</div>` : `<p class="hint">${esc(kid.name)} has no ${mode === 'money' ? 'money in the bank' : 'screen minutes left this week'} to take.</p>`}
+      <div class="field"><label class="label" for="pAmt">${mode === 'money' ? 'Amount ($)' : 'Minutes'}</label><input id="pAmt" type="number" inputmode="${mode === 'money' ? 'decimal' : 'numeric'}" min="${mode === 'money' ? '0.01' : '1'}" step="${mode === 'money' ? '0.05' : '1'}" max="${max}" value="${mode === 'money' ? Number(st.amt || 0).toFixed(2) : st.amt || ''}"></div>
+      ${max > 0 ? (all ? `<p class="warnline">That's everything: ${fmt(mode, max)}. Most of the time a little goes a long way.</p>` : `<button class="link quiet" id="pAll" type="button">Take all of it (${fmt(mode, max)})</button>`) : ''}
+      <div class="field"><label class="label" for="pWhy">Why? ${esc(kid.name)} will see this</label><input id="pWhy" maxlength="120" placeholder="What happened" value="${esc(st.why)}"></div>
+      <button class="save" id="pGo" type="button">${row ? 'Save changes' : `Add ${fmt(mode, Number(st.amt) || 0)} to the jar`}</button>
+      ${row ? '<button class="cancel danger-link" id="pDel" type="button">Delete this entry</button>' : ''}
+      <button class="cancel" data-close type="button">Cancel</button>`, () => {
+      const keep = () => { st.why = $('pWhy').value; st.amt = parseFloat($('pAmt').value) || 0 };
+      const label = () => { if (!row) $('pGo').textContent = `Add ${fmt(mode, mode === 'money' ? r2(parseFloat($('pAmt').value) || 0) : Math.round(parseFloat($('pAmt').value) || 0))} to the jar` };
+      layer.querySelectorAll('[data-pm]').forEach(b => b.onclick = () => { if (b.dataset.pm === mode) return; keep(); mode = b.dataset.pm; st.amt = null; all = false; draw() });
+      layer.querySelectorAll('[data-pa]').forEach(b => b.onclick = () => { keep(); st.amt = Number(b.dataset.pa); all = false; draw() });
+      $('pAmt').oninput = () => { layer.querySelectorAll('[data-pa]').forEach(x => x.setAttribute('aria-pressed', Number(x.dataset.pa) === Number($('pAmt').value))); label() };
+      if ($('pAll')) $('pAll').onclick = () => { keep(); st.amt = max; all = true; draw() };
+      $('pGo').onclick = async () => {
+        keep(); const why = capFirst(st.why.trim()), v = mode === 'money' ? r2(st.amt) : Math.round(st.amt), lim = maxFor(mode);
+        if (v <= 0) return toast(mode === 'money' ? 'Enter an amount.' : 'Enter minutes.');
+        if (v > lim + 0.001) return toast(`That's more than ${kid.name} has (${fmt(mode, lim)}).`);
+        if (!why) return toast(`Add a reason so ${kid.name} knows why.`);
+        const body = { amount: mode === 'money' ? v : 0, minutes: mode === 'minutes' ? v : 0, note: why };
+        closeSheet();
+        if (row) return act(() => q(sb.from('penalties').update(body).eq('id', row.id)), 'Saved');
+        const d = today();
+        await act(() => q(sb.from('penalties').insert({ family_id: S.family.id, kid_id: kid.id, local_date: d, week_start: monday(d), ...body })), `${fmt(mode, v)} into the ${penName()}`);
+      };
+      if ($('pDel')) $('pDel').onclick = () => confirmSheet('Delete this entry?', `It comes out of the ${penName()} and goes back to ${kid.name}.`, 'Delete', () => q(sb.from('penalties').delete().eq('id', row.id)), 'Deleted');
+    });
+  };
   draw();
 }
 function kidMoreSheet(kid) {

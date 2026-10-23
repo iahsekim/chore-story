@@ -146,6 +146,23 @@ create table if not exists public.screen_bonus (
   created_at  timestamptz not null default now()
 );
 
+-- Optional "oops jar": small deductions of money or screen minutes, always with a reason.
+-- Off for every family unless a parent turns it on in Settings, and the family picks its name.
+alter table public.families add column if not exists penalty_enabled boolean not null default false;
+alter table public.families add column if not exists penalty_name text not null default 'Oops Jar';
+create table if not exists public.penalties (
+  id          uuid primary key default gen_random_uuid(),
+  family_id   uuid not null references public.families on delete cascade,
+  kid_id      uuid not null references public.kids on delete cascade,
+  local_date  date not null,
+  week_start  date not null,
+  amount      numeric(8,2) not null default 0 check (amount >= 0),
+  minutes     int not null default 0 check (minutes between 0 and 600),
+  note        text not null check (char_length(trim(note)) between 1 and 120),
+  created_at  timestamptz not null default now(),
+  check (amount > 0 or minutes > 0)
+);
+
 -- Older versions used this to take minutes away. The app no longer does that; kept so upgrades don't fail.
 create table if not exists public.screen_adjust (
   id          uuid primary key default gen_random_uuid(),
@@ -251,6 +268,7 @@ alter table public.reading_sessions enable row level security;
 alter table public.screen_sessions  enable row level security;
 alter table public.screen_adjust    enable row level security;
 alter table public.screen_bonus     enable row level security;
+alter table public.penalties        enable row level security;
 
 drop policy if exists fam_select on public.families;
 drop policy if exists fam_update on public.families;
@@ -267,7 +285,7 @@ create policy inv_all on public.family_invites for all to authenticated
 do $$
 declare t text;
 begin
-  foreach t in array array['kids','jobs','reading_sessions','screen_sessions','screen_adjust','screen_bonus'] loop
+  foreach t in array array['kids','jobs','reading_sessions','screen_sessions','screen_adjust','screen_bonus','penalties'] loop
     execute format('drop policy if exists fam_all on public.%I', t);
     execute format('create policy fam_all on public.%I for all to authenticated using (family_id in (select public.my_family_ids())) with check (family_id in (select public.my_family_ids()))', t);
   end loop;
