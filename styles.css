@@ -363,7 +363,7 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--blue);outline-of
 .screen-center .lede{text-align:center;margin-inline:auto}
 .screen-center>h2{font:400 36px/1.05 var(--display)!important}
 .logo-h{margin:0;display:block}
-.logo-h img{display:block;width:100%;max-width:400px;height:auto;margin:0 auto}
+.logo-h>img{display:block;width:100%;max-width:400px;height:auto;margin:0 auto}
 .logo-h .logo-d{display:none}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .logo-h .logo-l{display:none}:root:not([data-theme="light"]) .logo-h .logo-d{display:block}}
 :root[data-theme="dark"] .logo-h .logo-l{display:none} :root[data-theme="dark"] .logo-h .logo-d{display:block}
@@ -478,7 +478,6 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
 
 /* ---------- who's using: every kid is their own paper pig ---------- */
 .whoscreen{gap:18px}
-.whoscreen .logo-h img{max-width:300px}
 .who-q{font:400 clamp(26px,7.5vw,32px)/1.1 var(--display);text-align:center;color:var(--text)}
 .kidtiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 14px;padding-top:6px}
 .kidtiles.one{grid-template-columns:minmax(0,1fr)}
@@ -540,3 +539,37 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
 .person .t{flex:1;min-width:0;display:grid;gap:1px}
 .person b{font-weight:600;overflow-wrap:anywhere}
 .person .t span{font-size:13px;color:var(--muted)}
+
+/* ---------- the logo, folded out of paper ---------- */
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ori-logo{display:flex;align-items:center;justify-content:center;gap:clamp(6px,2vw,12px)}
+.ori{position:relative;flex:none;width:min(168px,40vw);aspect-ratio:360/315;perspective:1600px;perspective-origin:50% 50%}
+.whoscreen .ori{width:min(132px,33vw)}
+.ori>img,.ori-l{position:absolute;top:0;height:100%}
+.ori-r{left:50%;width:50%}
+.ori-l{left:0;width:50%;transform-origin:100% 50%;transform-style:preserve-3d}
+.ori-l img{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.ori-l .back{transform:rotateY(180deg)}
+.ori-head,.ori-ear{left:0;width:100%}
+.ori-head{transform-origin:50% 80%}
+.ori-ear.l{transform-origin:27% 21%} .ori-ear.r{transform-origin:73% 21%}
+.ori-word{flex:none;width:min(190px,46vw)}
+.whoscreen .ori-word{width:min(150px,37vw)}
+.ori-word img{width:100%;height:auto}
+.ori-word .logo-d{display:none}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .ori-word .logo-l{display:none}:root:not([data-theme="light"]) .ori-word .logo-d{display:block}}
+:root[data-theme="dark"] .ori-word .logo-l{display:none} :root[data-theme="dark"] .ori-word .logo-d{display:block}
+@media (prefers-reduced-motion:no-preference){
+  .ori-logo:not(.still) .ori{animation:ori-in .25s ease-out both}
+  .ori-logo:not(.still) .ori-l{animation:ori-open .7s cubic-bezier(.55,0,.25,1) .4s both}
+  .ori-logo:not(.still) .ori-head{animation:ori-head .55s cubic-bezier(.3,1.5,.5,1) 1.1s both}
+  .ori-logo:not(.still) .ori-ear.l{animation:ori-ear-l .4s cubic-bezier(.3,1.6,.5,1) 1.55s both}
+  .ori-logo:not(.still) .ori-ear.r{animation:ori-ear-r .4s cubic-bezier(.3,1.6,.5,1) 1.6s both}
+  .ori-logo:not(.still) .ori-word{animation:ori-word .45s cubic-bezier(.3,1.3,.5,1) 1.45s both}
+}
+@keyframes ori-in{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
+@keyframes ori-open{from{transform:rotateY(180deg)}to{transform:rotateY(0)}}
+@keyframes ori-head{0%{transform:perspective(700px) rotateX(88deg);opacity:0}12%{opacity:1}100%{transform:perspective(700px) rotateX(0)}}
+@keyframes ori-ear-l{0%{transform:rotate(-130deg) scale(.3);opacity:0}30%{opacity:1}100%{transform:none}}
+@keyframes ori-ear-r{0%{transform:rotate(130deg) scale(.3);opacity:0}30%{opacity:1}100%{transform:none}}
+@keyframes ori-word{from{transform:translateX(-14px) rotate(-3deg);opacity:0}to{transform:none;opacity:1}}

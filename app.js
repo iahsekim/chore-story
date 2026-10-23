@@ -328,11 +328,22 @@ function render() {
   if (v === 'kid' && S.tab === 'home') bankAnim(kidById(S.profile));
 }
 
+/* ---------- the logo, folded out of paper ----------
+   The book starts closed, the cover swings open right to left, the white pages show,
+   then the pig pops up out of the spine and its ears fold down. Plays once per visit. */
+let logoPlayed = false;
+function logoAnim() {
+  const still = logoPlayed; logoPlayed = true;
+  return `<h1 class="logo-h ori-logo ${still ? 'still' : ''}"><span class="sr">${esc(APP)}</span>
+    <span class="ori" aria-hidden="true"><img class="ori-r" src="pp-book-r.png" alt=""><span class="ori-l"><img class="face" src="pp-book-l.png" alt=""><img class="back" src="pp-cover.png" alt=""></span>
+      <img class="ori-head" src="pp-head.png" alt=""><img class="ori-ear l" src="pp-ear-l.png" alt=""><img class="ori-ear r" src="pp-ear-r.png" alt=""></span>
+    <span class="ori-word" aria-hidden="true"><img class="logo-l" src="wordmark-l.png" alt=""><img class="logo-d" src="wordmark-d.png" alt=""></span></h1>`;
+}
 /* ---------- sign in ---------- */
 function authHTML() {
   const code = S.authStep === 'code';
   return `<section class="screen-center">
-    <h1 class="logo-h"><img class="logo-l" src="logo-900.png" alt="${esc(APP)}" width="900" height="389"><img class="logo-d" src="logo-900-dark.png" alt="${esc(APP)}" width="900" height="370"></h1>
+    ${logoAnim()}
     <p class="lede">Allowance, chores, reading and screen time, all in one place kids can see and trust.</p>
     <div class="card form">
       ${code ? `<div class="field"><label class="label" for="codeIn">Enter the code we sent to ${esc(S.authEmail)}</label>
@@ -436,7 +447,7 @@ function whoHTML() {
         ${g ? `<span class="kt-goal"><span class="meter"><i style="width:${pct}%"></i></span><span class="kt-sub">${pct >= 100 ? `Enough for ${esc(g.name)}!` : `${pct}% of the way to ${esc(g.name)}`}</span></span>` : '<span class="kt-sub">in the bank</span>'}
         ${extra ? `<span class="kt-line">${extra}</span>` : ''}</span></button>`;
   }).join('');
-  return `<section class="screen-center whoscreen"><h1 class="logo-h"><img class="logo-l" src="logo-900.png" alt="${esc(APP)}" width="900" height="389"><img class="logo-d" src="logo-900-dark.png" alt="${esc(APP)}" width="900" height="370"></h1>
+  return `<section class="screen-center whoscreen">${logoAnim()}
     <h2 class="who-q">${hello()}! Who's here?</h2>
     ${S.kids.length ? `<div class="kidtiles ${S.kids.length === 1 ? 'one' : ''}">${tiles}</div>` : '<p class="hint" style="text-align:center">No kids yet. Choose Parent/guardian to add one.</p>'}
     <button class="partile" type="button" data-who="parent"><span class="pt-lock">${I.lock}</span><span class="t"><b>Parent/guardian</b><span>Settings, approvals and the ledger. PIN needed.</span></span>${I.chev}</button>
