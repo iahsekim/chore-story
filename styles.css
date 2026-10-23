@@ -551,7 +551,13 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
 .ori-word .logo-d{display:none}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .ori-word .logo-l{display:none}:root:not([data-theme="light"]) .ori-word .logo-d{display:block}}
 :root[data-theme="dark"] .ori-word .logo-l{display:none} :root[data-theme="dark"] .ori-word .logo-d{display:block}
-@media (prefers-reduced-motion:no-preference){.ori-logo:not(.still) .ori-word{animation:ori-word .5s cubic-bezier(.3,1.3,.5,1) 2.55s both}}
-@keyframes ori-word{from{transform:translateX(-14px) rotate(-3deg);opacity:0}to{transform:none;opacity:1}}
+/* the book plays centered, then slides over as the wordmark arrives */
+.ori-logo{--wordw:min(190px,46vw)} .whoscreen .ori-logo{--wordw:min(150px,37vw)}
+@media (prefers-reduced-motion:no-preference){
+  .ori-logo:not(.still) .ori-word{animation:ori-word .42s cubic-bezier(.3,1.3,.5,1) 2.88s both}
+  .ori-logo:not(.still) .ori-cv{animation:ori-center .5s cubic-bezier(.4,0,.2,1) 2.45s both}
+}
+@keyframes ori-center{from{transform:translateX(calc(var(--wordw) / 2 + 5px))}to{transform:none}}
+@keyframes ori-word{from{transform:translateX(10px) rotate(3deg) scale(.92);opacity:0}to{transform:none;opacity:1}}
 
 /* the pages that fan across as the book opens: hinged on the spine, white with the logo's ink edge */
