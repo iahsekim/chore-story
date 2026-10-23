@@ -326,24 +326,115 @@ function render() {
   else if (v === 'parent') app.innerHTML = parentAppHTML();
   bindAll();
   if (v === 'kid' && S.tab === 'home') bankAnim(kidById(S.profile));
+  if (v === 'auth' || v === 'who') oriMount();
 }
 
-/* ---------- the logo, folded out of paper ----------
-   The book starts closed, the cover swings open right to left, the white pages show,
-   then the pig pops up out of the spine and its ears fold down. Plays once per visit. */
-let logoPlayed = false;
-// Tap the logo to watch it fold out again.
-document.addEventListener('click', e => {
-  const el = e.target.closest('.ori-logo'); if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  el.classList.add('still'); void el.offsetWidth; el.classList.remove('still');
-});
+/* ---------- the logo, as a book that opens ----------
+   Drawn on a canvas. The book is a set of sheets hinged on the spine. Each sheet has a front
+   (seen while it lies on the right) and a back (seen once it has turned onto the left):
+     sheet 0  front: the closed cover        back: inside of the cover
+     sheet 1  front: a blank page             back: the logo's lower left page
+     sheet 2  front: a blank page             back: the logo's upper left page
+     sheet 3  front: a blank page             back: the left half of the pig
+   Under the turning sheets the right side is the logo's own page stack (and, once the last
+   page lifts, the right half of the pig). Every turning sheet is drawn in thin vertical strips
+   with real perspective and a little curl, so it reads like paper. When every sheet has
+   landed, the picture is the logo itself. Plays once per visit; tap it to play again. */
+const ORI_SRC = { cover: 'pp-cover.png', lcover: 'pp-lcover.png', lp1: 'pp-lp1.png', lp2: 'pp-lp2.png', rpage: 'pp-rpage.png', rbook: 'pp-rbook.png', headl: 'pp-headl.png', headr: 'pp-headr.png', earl: 'pp-earl.png', earr: 'pp-earr.png' };
+let ORI = null, oriLoading = null, logoPlayed = false, oriRaf = 0;
+function oriLoad() {
+  if (ORI) return Promise.resolve(ORI);
+  return oriLoading || (oriLoading = Promise.all(Object.entries(ORI_SRC).map(([k, src]) => new Promise(res => { const im = new Image(); im.onload = () => res([k, im]); im.onerror = () => res([k, null]); im.src = src }))).then(list => (ORI = Object.fromEntries(list))));
+}
 function logoAnim() {
   const still = logoPlayed; logoPlayed = true;
   return `<h1 class="logo-h ori-logo ${still ? 'still' : ''}"><span class="sr">${esc(APP)}</span>
-    <span class="ori" aria-hidden="true"><img class="ori-r" src="pp-book-r.png" alt=""><span class="ori-l"><img class="face" src="pp-lcover.png" alt=""><img class="back" src="pp-cover.png" alt=""></span><span class="ori-pg" style="--n:0"><img class="face" src="pp-lp1.png" alt=""><img class="back" src="pp-lp1b.png" alt=""></span><span class="ori-pg" style="--n:1"><img class="face" src="pp-lp2.png" alt=""><img class="back" src="pp-lp2b.png" alt=""></span>
-      <img class="ori-hr" src="pp-head-r.png" alt=""><span class="ori-hl"><img class="face" src="pp-head-l.png" alt=""><img class="back" src="pp-head-back.png" alt=""></span><img class="ori-ear l" src="pp-ear-l.png" alt=""><img class="ori-ear r" src="pp-ear-r.png" alt=""></span>
+    <canvas class="ori-cv" width="600" height="524" aria-hidden="true"></canvas>
     <span class="ori-word" aria-hidden="true"><img class="logo-l" src="wordmark-l.png" alt=""><img class="logo-d" src="wordmark-d.png" alt=""></span></h1>`;
 }
+const oriEase = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const oriBack = t => { const c = 1.9; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2) };
+const oriClamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+/* the schedule, in seconds */
+const ORI_T = { cover: [.4, 1.0], s1: [1.1, 1.65], s2: [1.7, 2.25], s3: [2.3, 2.9], earl: [2.86, 3.16], earr: [2.92, 3.22], end: 3.25 };
+function oriFrame(cv, t) {
+  const g = cv.getContext('2d'), W = cv.width, H = cv.height, X0 = W / 2, pw = W / 2, cy = H * .6, f = W * 2.6;
+  const I = ORI; g.clearRect(0, 0, W, H);
+  const prog = ([a, b]) => oriClamp((t - a) / (b - a));
+  const pc = prog(ORI_T.cover), p1 = prog(ORI_T.s1), p2 = prog(ORI_T.s2), p3 = prog(ORI_T.s3);
+  // the closed book sits centered, then slides over as it opens
+  const shift = -pw * .5 * (1 - oriEase(pc));
+  const appear = oriClamp(t / .3);
+  g.save(); g.globalAlpha = appear; g.translate(shift, 0);
+  const flat = (img, x) => img && g.drawImage(img, x, 0, img.width * (H / img.height), H);
+  const sheets = [[I.cover, I.lcover, pc], [I.rpage, I.lp1, p1], [I.rpage, I.lp2, p2], [I.rpage, I.headl, p3]];
+  // left side: sheets that have landed, oldest first
+  for (const [, back, p] of sheets) if (p >= 1) flat(back, 0);
+  // right side: the page stack, and the right half of the pig once the last page starts to lift
+  if (pc > 0) { flat(I.rbook, X0); if (p3 > 0) {
+      // the pig is bigger than the pages: a pop-up. Its right half springs up out of the page as the last sheet lifts.
+      const q = oriClamp((p3 - .08) / .55), e = oriBack(q), hy = H * .78;
+      g.save(); g.translate(0, hy); g.scale(1, Math.max(.001, e)); g.translate(0, -hy); flat(I.headr, X0); g.restore();
+    } }
+  // the sheet that is turning (or the closed cover before anything moves)
+  for (const [front, back, p] of sheets) {
+    if (p <= 0 && front === I.cover) { flat(front, X0); break }
+    if (p > 0 && p < 1) { oriTurn(g, front, back, oriEase(p), { X0, pw, H, cy, f }); break }
+  }
+  // the ears fold down last
+  for (const [img, span, hx, sgn] of [[I.earl, ORI_T.earl, .27, -1], [I.earr, ORI_T.earr, .73, 1]]) {
+    const q = prog(span); if (!img || q <= 0) continue;
+    const e = oriBack(q), hy = H * .21, x = W * hx;
+    g.save(); g.globalAlpha = appear * oriClamp(q / .3); g.translate(x, hy); g.rotate(sgn * (1 - e) * 2.2); g.scale(.3 + .7 * e, .3 + .7 * e); g.translate(-x, -hy);
+    g.drawImage(img, 0, 0, W, H); g.restore();
+  }
+  g.restore();
+}
+/* One sheet turning from the right (θ=0) to the left (θ=π), drawn as vertical strips. */
+let oriTmp = null;
+function oriTurn(g, front, back, p, o) {
+  const { X0, pw, H, cy, f } = o, th = p * Math.PI, N = 150, curl = .55 * Math.sin(th);
+  if (!oriTmp) oriTmp = document.createElement('canvas');
+  oriTmp.width = g.canvas.width; oriTmp.height = H; const t = oriTmp.getContext('2d'); t.clearRect(0, 0, oriTmp.width, H);
+  // walk out along the page from the spine; the outer part lags a little so the page curls
+  const P = [[0, 0, th]]; let x = 0, z = 0;
+  for (let j = 1; j <= N; j++) { const u = j / N, phi = oriClamp(th - curl * u * u, 0, Math.PI); x += Math.cos(phi) * pw / N; z += Math.sin(phi) * pw / N; P.push([x, z, phi]) }
+  const scr = ([x, z]) => { const s = f / (f - z); return [X0 + x * s, s, z] };
+  const fw = front ? front.width : 1, bw = back ? back.width : 1, sh = H;
+  const shades = [];
+  for (let j = 0; j < N; j++) {
+    const [xa, sa, za] = scr(P[j]), [xb, sb, zb] = scr(P[j + 1]), s = (sa + sb) / 2, dx = xb - xa, phi = P[j][2], lift = (za + zb) / 2 * s * .2;
+    const useFront = dx >= 0, img = useFront ? front : back; if (!img) continue;
+    const iw = img.width, u0 = j / N, u1 = (j + 1) / N;
+    // front is a right-half picture (spine at its left edge); back is a left-half picture (spine at its right edge)
+    const sx0 = useFront ? u0 * iw : iw - u1 * iw, sw = (u1 - u0) * iw;
+    // seen from a little above: a lifted page rises toward you, so it reads as a flap
+    const left = Math.min(xa, xb), w = Math.abs(dx) + .7, h = sh * s, top = cy - cy * s - lift;
+    t.drawImage(img, sx0, 0, sw, img.height, left, top, w, h);
+    shades.push([left, top, w, h, .22 * (1 - Math.abs(Math.cos(phi)))]);
+  }
+  t.globalCompositeOperation = 'source-atop';
+  for (const [l, tp, w, h, a] of shades) { if (a < .01) continue; t.fillStyle = `rgba(0,0,0,${a})`; t.fillRect(l, tp, w, h) }
+  t.globalCompositeOperation = 'source-over';
+  g.drawImage(oriTmp, 0, 0);
+}
+function oriMount() {
+  const cv = document.querySelector('.ori-cv'); if (!cv) return;
+  const box = cv.closest('.ori-logo'), reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  cancelAnimationFrame(oriRaf);
+  oriLoad().then(() => {
+    if (!cv.isConnected) return;
+    if (box.classList.contains('still') || reduce) { oriFrame(cv, ORI_T.end); return }
+    const t0 = performance.now();
+    const step = now => { if (!cv.isConnected) return; const t = (now - t0) / 1000; oriFrame(cv, Math.min(t, ORI_T.end)); if (t < ORI_T.end) oriRaf = requestAnimationFrame(step) };
+    oriRaf = requestAnimationFrame(step);
+  });
+}
+// Tap the logo to watch the book open again.
+document.addEventListener('click', e => {
+  const el = e.target.closest('.ori-logo'); if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  el.classList.add('still'); void el.offsetWidth; el.classList.remove('still'); oriMount();
+});
 /* ---------- sign in ---------- */
 function authHTML() {
   const code = S.authStep === 'code';
