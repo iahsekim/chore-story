@@ -356,7 +356,7 @@ const oriEase = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const oriBack = t => { const c = 1.9; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2) };
 const oriClamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 /* the schedule, in seconds */
-const ORI_T = { cover: [.4, 1.0], s1: [1.1, 1.65], s2: [1.7, 2.25], s3: [2.3, 2.9], earl: [2.86, 3.16], earr: [2.92, 3.22], end: 3.25 };
+const ORI_T = { cover: [.25, .7], s1: [.78, 1.2], s2: [1.26, 1.68], s3: [1.74, 2.2], earl: [2.16, 2.4], earr: [2.21, 2.45], end: 2.48 };
 function oriFrame(cv, t) {
   const g = cv.getContext('2d'), W = cv.width, H = cv.height, X0 = W / 2, pw = W / 2, cy = H * .6, f = W * 2.6;
   const I = ORI; g.clearRect(0, 0, W, H);
@@ -364,7 +364,7 @@ function oriFrame(cv, t) {
   const pc = prog(ORI_T.cover), p1 = prog(ORI_T.s1), p2 = prog(ORI_T.s2), p3 = prog(ORI_T.s3);
   // the closed book sits centered, then slides over as it opens
   const shift = -pw * .5 * (1 - oriEase(pc));
-  const appear = oriClamp(t / .3);
+  const appear = oriClamp(t / .2);
   g.save(); g.globalAlpha = appear; g.translate(shift, 0);
   const flat = (img, x) => img && g.drawImage(img, x, 0, img.width * (H / img.height), H);
   // [front, back while turning, back once landed, progress]
