@@ -1007,19 +1007,20 @@ function newPinSheet(force, after) {
     $('npGo').onclick = async () => { const a = $('np1').value, b = $('np2').value; if (!/^\d{4}$/.test(a)) return toast('Use 4 digits.'); if (a !== b) return toast('The PINs don’t match.'); closeSheet(); await act(async () => { await q(sb.from('families').update({ pin_hash: await hashPin(S.family.id, a) }).eq('id', S.family.id)) }, 'PIN saved'); if (after) { S.parentOk = true; try { sessionStorage.setItem('cj-parent', '1') } catch (e) { } after() } };
   });
 }
+/* How it works: short, and only the rules this family has actually set up. */
 function rulesSheet(kid) {
-  openSheet(`<h2>How it works</h2><ol class="rules">
-    <li><span><b>Every Monday you get ${money(Number(kid.weekly_allowance))}.</b> That's your allowance, no matter what.</span></li>
-    <li><span><b>Jobs add money.</b> Tap a job and press I did it. A parent checks, then it's yours.</span></li>
-    <li><span><b>Anything you earn is yours to keep.</b> It stays in your bank until you ask for it or save up for something.</span></li>
-    <li><span><b>Your money stays in your bank</b> until you withdraw it or a parent buys something for you with it. Every entry says why.</span></li>
-    ${penOn() ? `<li><span><b>The ${esc(penName())}.</b> Sometimes a parent may take away a little money or a few screen minutes. It's always small, and it's always written in your ledger with the reason.</span></li>` : `<li><span><b>Money is never taken away as a punishment.</b></span></li>`}
-    <li><span><b>${kid.base_screen_minutes} screen minutes each week</b> on ${screenDayNames(kid)}.</span></li>
-    <li><span><b>1 minute reading = 1 screen minute,</b> up to ${kid.reading_cap} a week. Chapter books and graphic novels count.</span></li>
-    <li><span><b>Screens only while the clock runs.</b> Pause it whenever you stop.</span></li>
-    <li><span><b>Extra screen minutes</b> come from reading, some jobs, and bonuses.</span></li>
-    <li><span><b>Every second counts.</b> Reading and screen time add up to the second.</span></li>
-    <li><span><b>If it's not written here, it's not a rule.</b></span></li></ol><button class="save" data-close type="button">Got it</button>`);
+  const allow = Number(kid.weekly_allowance) || 0, base = Number(kid.base_screen_minutes) || 0, cap = Number(kid.reading_cap) || 0;
+  const days = (kid.screen_days || []).length, jobs = S.jobs.some(j => j.kid_id === kid.id && j.enabled);
+  const R = [
+    allow && ['coin', 'm', `<b>${money(allow)} every Monday.</b> It's yours, no matter what.`],
+    jobs && ['jobs', 'j', `<b>Jobs earn more.</b> Do one, tap I did it, and a grown-up checks.`],
+    ['pay', 'p', `<b>Your money stays in your bank</b> until you spend it or take it out.`],
+    penOn() ? ['jar', 'x', `<b>The ${esc(penName())}</b> can take a little, always with a reason.`] : ['star', 'm', `<b>Money is never taken away.</b>`],
+    days && base && ['screen', 's', `<b>${mins(base)} of screens a week,</b> on ${screenDayNames(kid)}.`],
+    days && cap && ['read', 'r', `<b>Every minute you read</b> earns a screen minute, up to ${mins(cap)} a week.`],
+    days && (base || cap) && ['clock', 's', `<b>Screens count only while the clock runs.</b>`],
+  ].filter(Boolean);
+  openSheet(`<h2>How it works</h2><ul class="rules">${R.map(([ic, c, t]) => `<li><span class="ico ${c}">${I[ic]}</span><span>${t}</span></li>`).join('')}</ul><button class="save" data-close type="button">Got it</button>`);
 }
 function readStartSheet(kid) {
   const books = [...new Set(S.reading.filter(r => r.kid_id === kid.id).map(r => r.book))].slice(0, 6);
@@ -1145,7 +1146,8 @@ function kidSheet(kid) {
     layer.querySelectorAll('[data-kd]').forEach(b => b.onclick = () => { keep(); const d = Number(b.dataset.kd); K.screen_days = K.screen_days.includes(d) ? K.screen_days.filter(x => x !== d) : [...K.screen_days, d]; draw() });
     $('kGo').onclick = async () => { keep(); const name = capFirst(K.name); if (!name) { toast('Type a first name.'); return $('kN').focus() } closeSheet();
       const body = { name, color: K.color, weekly_allowance: Math.max(0, Number(K.weekly_allowance) || 0), base_screen_minutes: Math.max(0, parseInt(K.base_screen_minutes) || 0), reading_cap: Math.max(0, parseInt(K.reading_cap) || 0), screen_days: K.screen_days };
-      if (kid) await act(() => q(sb.from('kids').update(body).eq('id', kid.id)), 'Saved');
+      // A new allowance starts this week, so the bank and How it works match what was just set.
+      if (kid) await act(async () => { await q(sb.from('kids').update(body).eq('id', kid.id)); if (Number(kid.weekly_allowance) !== body.weekly_allowance) await q(sb.from('weeks').update({ allowance: body.weekly_allowance }).eq('kid_id', kid.id).eq('week_start', thisWeek())) }, 'Saved');
       else await act(() => addKid(name, body.weekly_allowance, body.color).then(k => q(sb.from('kids').update(body).eq('id', k.id))), `${name} added`) };
     if (kid) $('kDel').onclick = () => confirmSheet(`Remove ${kid.name}?`, 'This deletes their job board, earnings history, reading and screen time. It can’t be undone.', 'Remove for good', () => q(sb.from('kids').delete().eq('id', kid.id)), 'Removed');
   });

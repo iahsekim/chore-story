@@ -5,7 +5,7 @@
    - Kids stand on the pink side. Grown-ups stand on the white side.
    - Every card is a white sheet with the logo's heavy ink outline.
    - Folded ears mean "a pig": they appear only on pigs (the bank, each
-     kid's tile and header pig, the celebration). Nothing else is folded.
+     kid's name tile, the celebration). Nothing else is folded.
    - Pink is the brand and the main action. Blue is reading and good news.
      Gold is the coin, and screen time. Ink does the rest.
    ===================================================================== */
@@ -139,6 +139,7 @@ body[data-side="kid"] main>.ptools .pill.soft{background:var(--paper)}
 .ico.s{background:var(--midnight);color:var(--gold)}
 .ico.x{background:var(--pink);color:#fff}
 .ico.w{background:var(--paper);color:var(--muted);border-style:dashed}
+.ico.p{background:var(--paper);color:var(--text)}
 .ico.d{background:var(--pink-soft);color:var(--pink-deep)}
 .amt{font:600 16px var(--body);white-space:nowrap;font-variant-numeric:tabular-nums}
 .amt.up{color:var(--blue-deep)} .amt.out{color:var(--text)} .amt.rd{color:var(--blue-deep)} .amt.wait{color:var(--muted)}
@@ -335,9 +336,10 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--blue);outline-of
 .daypick .chip small{font:600 11px var(--body);opacity:.75}
 .daypick .chip:disabled{opacity:.3}
 .daypick .chip[aria-pressed="true"]{background:var(--pink);color:#fff}
-.rules{display:grid;gap:12px;margin:0;padding:0;list-style:none;counter-reset:r}
-.rules li{counter-increment:r;display:grid;grid-template-columns:30px 1fr;gap:10px;font-size:16px}
-.rules li::before{content:counter(r);width:30px;height:30px;border-radius:50%;background:var(--pink);color:#fff;border:var(--line-w) solid var(--edge);font:600 14px/26px var(--body);text-align:center}
+.rules{display:grid;gap:12px;margin:0;padding:0;list-style:none}
+.rules li{display:grid;grid-template-columns:36px 1fr;gap:12px;align-items:center;font-size:16px;line-height:1.35}
+.rules .ico{width:36px;height:36px;border-radius:12px;border-width:3px}
+.rules .ico svg{width:19px;height:19px}
 .rules b{font-weight:600}
 .tiplabel{display:flex;align-items:center;gap:6px}
 .tip{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font:600 14px/1 var(--body);background:var(--paper);color:var(--text);border:var(--line-w) solid var(--edge)}
@@ -525,9 +527,5 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) body[data-side="kid"] :is(header h1,.sect-h h3,.weeknav b){-webkit-text-stroke:0;letter-spacing:.01em}}
 :root[data-theme="dark"] body[data-side="kid"] :is(header h1,.sect-h h3,.weeknav b){-webkit-text-stroke:0;letter-spacing:.01em}
 
-/* ---------- the kid's own pig in the header: the same tile they tapped to come in ---------- */
-.mypig{position:relative;flex:none;width:58px;height:58px;display:grid;place-items:center;padding-top:6px;background:var(--kc);border:var(--line-w) solid var(--edge);border-radius:0 0 18px 18px;font:400 30px/1 var(--display);color:#fff;-webkit-text-stroke:7px var(--edge);paint-order:stroke fill;box-shadow:0 4px 0 var(--edge)}
-.mypig::before,.mypig::after{content:"";position:absolute;top:calc(-1 * var(--line-w));width:20px;height:20px;border-bottom:var(--line-w) solid var(--edge)}
-.mypig::before{left:calc(-1 * var(--line-w));border-right:var(--line-w) solid var(--edge);border-bottom-right-radius:7px;background:linear-gradient(to bottom right,var(--under) calc(50% - 2.4px),var(--edge) calc(50% - 2.4px),var(--edge) calc(50% + 2.4px),#fff calc(50% + 2.4px))}
-.mypig::after{right:calc(-1 * var(--line-w));border-left:var(--line-w) solid var(--edge);border-bottom-left-radius:7px;background:linear-gradient(to bottom left,var(--under) calc(50% - 2.4px),var(--edge) calc(50% - 2.4px),var(--edge) calc(50% + 2.4px),#fff calc(50% + 2.4px))}
-@media (prefers-reduced-motion:no-preference){.mypig{animation:hi-wave 3.2s ease-in-out infinite;transform-origin:50% 100%}}
+/* ---------- the kid's initial in the header, in their color ---------- */
+.mypig{flex:none;width:56px;height:56px;display:grid;place-items:center;background:var(--kc);border:var(--line-w) solid var(--edge);border-radius:18px;font:400 30px/1 var(--display);color:#fff;-webkit-text-stroke:7px var(--edge);paint-order:stroke fill;box-shadow:0 4px 0 var(--edge)}
