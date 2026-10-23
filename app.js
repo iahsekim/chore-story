@@ -451,7 +451,7 @@ function kidAppHTML() {
   const kid = kidById(S.profile); if (!kid) { S.view = 'who'; return whoHTML() }
   if (!['home', 'jobs', 'ledger'].includes(S.tab)) S.tab = 'home';
   const greet = { home: 'Hi there!', jobs: 'Pick a job, earn money', ledger: 'Everything logged' }[S.tab];
-  return `<header><div class="hello">${S.tab === 'home' ? `<img class="hi-pig" src="${PIGGY}" alt="" width="52" height="46">` : ''}<div><small>${greet}</small><h1>${esc(kid.name)}</h1></div></div>
+  return `<header><div class="hello"><span class="mypig" style="--kc:${COLORS[kid.color]}" aria-hidden="true">${esc((kid.name || '?').slice(0, 1).toUpperCase())}</span><div><small>${greet}</small><h1>${esc(kid.name)}</h1></div></div>
     <button class="lock" id="swapBtn" type="button">${I.swap} Switch</button></header>
     <main>${({ home: kidHome, jobs: kidJobs, ledger: kidLedger })[S.tab](kid)}</main>
     ${tabbar(KTABS, S.tab)}`;
