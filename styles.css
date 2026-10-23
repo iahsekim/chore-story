@@ -552,7 +552,7 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
 .ori-hr{left:50%;width:50%}
 .ori-hl img,.ori-l img{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;-webkit-backface-visibility:hidden}
 .ori-l .back,.ori-hl .back{transform:rotateY(180deg)}
-.ori-ear{left:0;width:100%}
+.ori-ear,.ori-final{left:0;width:100%}
 .ori-ear.l{transform-origin:27% 21%} .ori-ear.r{transform-origin:73% 21%}
 .ori-word{flex:none;width:min(190px,46vw)}
 .whoscreen .ori-word{width:min(150px,37vw)}
@@ -565,6 +565,7 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
   .ori-logo:not(.still) .ori-l{animation:ori-open .55s cubic-bezier(.55,0,.3,1) .35s both}
   .ori-logo:not(.still) .ori-hr{animation:ori-show .01s linear 1.2s both}
   .ori-logo:not(.still) .ori-hl{animation:ori-face .55s cubic-bezier(.45,0,.25,1) 1.2s both}
+  .ori-logo:not(.still) .ori-final{animation:ori-show .14s linear 1.74s both}
   .ori-logo:not(.still) .ori-ear.l{animation:ori-ear-l .32s cubic-bezier(.3,1.6,.5,1) 1.72s both}
   .ori-logo:not(.still) .ori-ear.r{animation:ori-ear-r .32s cubic-bezier(.3,1.6,.5,1) 1.76s both}
   .ori-logo:not(.still) .ori-word{animation:ori-word .45s cubic-bezier(.3,1.3,.5,1) 1.55s both}
