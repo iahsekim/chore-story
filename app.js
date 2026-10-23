@@ -542,7 +542,7 @@ function claimSheet(kid, job) {
   openSheet(`<span class="label">${esc(job.category)}</span><h2>${esc(job.title)}</h2>
     <div class="done-box"><span class="label">Done means</span><b>${esc(job.done_means || 'Finished all the way')}</b></div>
     <p class="hint">A parent will check it. Then <b>${money(Number(job.price))}</b>${Number(job.bonus_minutes) ? ` and <b>${job.bonus_minutes} screen minutes</b>` : ''} go to you.</p>
-    <button class="save" id="clGo" type="button" style="background:var(--money)">I did it</button><button class="cancel" data-close type="button">Not yet</button>`, () => {
+    <button class="save" id="clGo" type="button">I did it</button><button class="cancel" data-close type="button">Not yet</button>`, () => {
     $('clGo').onclick = async () => { closeSheet(); unlockAudio(); await act(() => q(sb.from('credits').insert({ family_id: S.family.id, kid_id: kid.id, week_start: thisWeek(), kind: 'job', title: job.title, amount: Number(job.price), minutes: Number(job.bonus_minutes) || 0, job_id: job.id, status: 'pending' })));
       celebrate(praise(), `${job.title} is waiting for a parent to check. ${money(Number(job.price))} is on the way!`, { icon: 'check' }) };
   });
@@ -552,7 +552,7 @@ function goalSheet(kid) {
   openSheet(`<h2>${g ? 'Change your goal' : 'Set a saving goal'}</h2><p class="hint">What are you saving for? Money you leave in your bank counts toward it.</p>
     <div class="field"><label class="label" for="gName">I'm saving for</label><input id="gName" maxlength="60" placeholder="Something you want" value="${esc(g?.name || '')}"></div>
     <div class="field"><label class="label" for="gAmt">It costs ($)</label><input id="gAmt" type="number" inputmode="decimal" min="1" step="0.01" placeholder="0.00" value="${g ? g.amount : ''}"></div>
-    <button class="save" id="gGo" type="button" style="background:var(--money)">Save goal</button>${g ? '<button class="cancel danger-link" id="gClear" type="button">Remove goal</button>' : ''}<button class="cancel" data-close type="button">Cancel</button>`, () => {
+    <button class="save" id="gGo" type="button">Save goal</button>${g ? '<button class="cancel danger-link" id="gClear" type="button">Remove goal</button>' : ''}<button class="cancel" data-close type="button">Cancel</button>`, () => {
     $('gGo').onclick = async () => { const name = capFirst($('gName').value), amt = r2(parseFloat($('gAmt').value) || 0); if (!name) return toast('What are you saving for?'); if (amt <= 0) return toast('How much does it cost?'); closeSheet();
       unlockAudio(); await act(() => q(sb.from('kids').update({ goal_name: name, goal_amount: amt }).eq('id', kid.id)));
       const bal = stats(kid).balance; celebrate(bal >= amt ? 'You already have enough!' : 'Goal set!', bal >= amt ? `Ask a grown-up to buy ${name}.` : `Saving for ${name}. ${money(amt - bal)} to go!`, { power: .8 }) };
@@ -955,7 +955,7 @@ function openSheet(html, after) { layer.innerHTML = `<div class="scrim" id="scri
 function closeSheet() { layer.innerHTML = '' }
 let tt; function toast(m) { clearTimeout(tt); let el = $('toast'); if (!el) { el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el) } el.textContent = m; tt = setTimeout(() => el.remove(), 2800) }
 function confirmSheet(title, body, yes, fn, ok, style = 'red') {
-  openSheet(`<h2>${esc(title)}</h2><p class="hint">${esc(body)}</p><button class="save ${style === 'red' ? 'red' : ''}" id="cfYes" type="button" ${style === 'ok' ? 'style="background:var(--money)"' : ''}>${esc(yes)}</button><button class="cancel" data-close type="button">Cancel</button>`,
+  openSheet(`<h2>${esc(title)}</h2><p class="hint">${esc(body)}</p><button class="save ${style === 'red' ? 'red' : ''}" id="cfYes" type="button" >${esc(yes)}</button><button class="cancel" data-close type="button">Cancel</button>`,
     () => { $('cfYes').onclick = async () => { $('cfYes').disabled = true; closeSheet(); await act(fn, ok) } });
 }
 function pinSheet(onOk) {
@@ -1020,7 +1020,7 @@ function bonusSheet(kid) {
     <div class="chips">${(mode === 'money' ? [0.5, 1, 2, 5] : [5, 10, 15, 30]).map(a => `<button class="chip" type="button" data-amt="${a}">${mode === 'money' ? '$' + (a < 1 ? a.toFixed(2) : a) : a + ' min'}</button>`).join('')}</div>
     <div class="field"><label class="label" for="bAmt">${mode === 'money' ? 'Amount ($)' : 'Minutes'}</label><input id="bAmt" type="number" inputmode="decimal" min="${mode === 'money' ? '0.25' : '1'}" step="${mode === 'money' ? '0.25' : '1'}" value="${mode === 'money' ? 1 : 10}"></div>
     <div class="field"><label class="label" for="bWhy">Explanation ${esc(kid.name)} will see</label><input id="bWhy" maxlength="120" placeholder="What they did"></div>
-    <button class="save" id="bGo" type="button" style="background:var(--money)">Add ${mode === 'money' ? 'money' : 'minutes'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+    <button class="save" id="bGo" type="button">Add ${mode === 'money' ? 'money' : 'minutes'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
     layer.querySelectorAll('[data-bm]').forEach(b => b.onclick = () => { draw.why = $('bWhy').value; mode = b.dataset.bm; draw(); $('bWhy').value = draw.why || '' });
     layer.querySelectorAll('[data-amt]').forEach(b => b.onclick = () => { $('bAmt').value = b.dataset.amt });
     $('bGo').onclick = async () => {
