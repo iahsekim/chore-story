@@ -1,6 +1,6 @@
-/* PiggyBoo — allowance, job board, reading log and weekend screen clock for families. */
+/* Paper Pig — allowance, job board, reading log and weekend screen clock for families. */
 const CFG = window.CHORE_JAR_CONFIG;
-const APP = CFG.appName || 'PiggyBoo';
+const APP = CFG.appName || 'Paper Pig';
 const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
 const COLORS = { green: '#1FA34A', blue: '#2F6BFF', purple: '#7A3FF2', orange: '#FF6B1A', pink: '#F0418C', teal: '#0FA3A3' };
@@ -204,14 +204,14 @@ const supportHTML = (open = false) => `<details class="support" ${open ? 'open' 
   <span class="support-note">It&rsquo;s free! Tips keep it running.</span></div></details>`;
 
 const brandName = () => { const w = APP.split(' '); return w.length > 1 ? `${esc(w.slice(0, -1).join(' '))} <span class="story">${esc(w[w.length - 1])}</span>` : esc(APP) };
-/* ---------- playful backdrop: coins, sparkles, little ghosts, books, clocks and TVs drifting and bobbing behind everything ---------- */
+/* ---------- playful backdrop: coins, sparkles, paper planes, books, clocks and TVs drifting and bobbing behind everything ---------- */
 const PIGGY = 'piggy.png';
 (function playroom() {
   const W2 = 'fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"';
   const SH = {
     sparkle: '<path d="M16 2c1.3 7.6 3.4 9.8 11 11-7.6 1.3-9.7 3.4-11 11-1.3-7.6-3.4-9.7-11-11 7.6-1.2 9.7-3.4 11-11z" fill="currentColor"/>',
     coin: '<ellipse cx="17.5" cy="16" rx="9" ry="12" fill="currentColor" opacity=".7"/><ellipse cx="14.5" cy="16" rx="9" ry="12" fill="currentColor"/><path d="M10 20c-1-6 1-10 4-12" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2" stroke-linecap="round"/>',
-    ghost: `<path d="M6 29V15a10 10 0 0 1 20 0v14l-3.4-2.6L19.3 29 16 26.4 12.7 29l-3.3-2.6z" ${W2}/><circle cx="12.5" cy="15" r="1.6" fill="currentColor"/><circle cx="19.5" cy="15" r="1.6" fill="currentColor"/>`,
+    plane: `<path d="M3 15 29 4l-7 23-6.5-9z" ${W2}/><path d="M15.5 18 29 4M15.5 18v8l3.5-4.5" ${W2}/>`,
     book: `<path d="M4 8c4-1.5 8-1.5 12 1 4-2.5 8-2.5 12-1v16c-4-1.5-8-1.5-12 1-4-2.5-8-2.5-12-1z" ${W2}/><path d="M16 9v16" ${W2}/>`,
     clock: `<circle cx="16" cy="17" r="10" ${W2}/><path d="M16 11v6l4 3M13 4h6" ${W2}/>`,
     tv: `<rect x="4" y="8" width="24" height="16" rx="3" ${W2}/><path d="M11 28h10M12 4l4 4 4-4" ${W2}/>`,
@@ -220,16 +220,16 @@ const PIGGY = 'piggy.png';
   };
   // [shape, tone, x%, y%, size px, motion]; tones: g gold, p pink, b blue, m muted ink
   const items = [
-    ['sparkle', 'g', 6, 8, 26, 'twinkle'], ['coin', 'g', 82, 6, 24, 'flip'], ['ghost', 'p', 74, 30, 40, 'float'], ['book', 'b', 10, 30, 30, 'bob'],
+    ['sparkle', 'g', 6, 8, 26, 'twinkle'], ['coin', 'g', 82, 6, 24, 'flip'], ['plane', 'p', 74, 30, 36, 'float'], ['book', 'b', 10, 30, 30, 'bob'],
     ['sparkle', 'g', 46, 18, 14, 'twinkle'], ['clock', 'm', 88, 46, 26, 'bob'], ['coin', 'g', 18, 58, 20, 'flip'], ['star', 'g', 60, 52, 20, 'spin'],
-    ['ghost', 'p', 4, 78, 34, 'float'], ['tv', 'b', 64, 74, 30, 'bob'], ['heart', 'p', 36, 88, 16, 'twinkle'], ['sparkle', 'g', 92, 86, 20, 'twinkle'],
+    ['plane', 'b', 4, 78, 30, 'float'], ['tv', 'b', 64, 74, 30, 'bob'], ['heart', 'p', 36, 88, 16, 'twinkle'], ['sparkle', 'g', 92, 86, 20, 'twinkle'],
     ['coin', 'g', 40, 40, 16, 'flip'], ['book', 'b', 84, 64, 24, 'float'], ['star', 'g', 26, 14, 16, 'spin'], ['sparkle', 'g', 54, 94, 14, 'twinkle'],
   ];
   const el = document.createElement('div'); el.className = 'playroom'; el.setAttribute('aria-hidden', 'true');
   el.innerHTML = items.map(([k, tone, x, y, size, mo], i) => `<span class="pr ${tone} m-${mo}" style="left:${x}%;top:${y}%;width:${size}px;--d:${(7 + (i * 37) % 9)}s;animation-delay:-${(i * 1.7).toFixed(1)}s"><svg viewBox="0 0 32 32">${SH[k]}</svg></span>`).join('');
   document.body.prepend(el);
 })();
-/* ---------- the PiggyBoo coin, drawn in code so it can spin, drop and roll ---------- */
+/* ---------- the Paper Pig coin, drawn in code so it can spin, drop and roll ---------- */
 const COIN_RIDGES = [-52, -34, -16, 2, 20, 38, 56].map(d => { const t = d * Math.PI / 180, y = (56 + 45 * Math.sin(t)).toFixed(1), c = Math.cos(t); return `M${(49 + 33 * c).toFixed(1)} ${y}H${(55 + 33 * c).toFixed(1)}` }).join('');
 const coinSVG = (cls = '') => `<svg class="coin ${cls}" viewBox="0 0 104 112" aria-hidden="true"><defs><linearGradient id="coinface" x1="0" y1="0" x2=".35" y2="1"><stop offset="0" stop-color="#FFE34D"/><stop offset="1" stop-color="#FCB80F"/></linearGradient></defs>
   <g transform="rotate(-10 52 56)" stroke="#161311" stroke-linecap="round" stroke-linejoin="round">
@@ -262,7 +262,7 @@ function confetti(power = 1) {
   const c = document.createElement('canvas'); c.className = 'confetti'; document.body.appendChild(c);
   const dpr = Math.min(2, window.devicePixelRatio || 1), W = innerWidth, H = innerHeight; c.width = W * dpr; c.height = H * dpr;
   const g = c.getContext('2d'); g.scale(dpr, dpr);
-  const cols = ['#FCBE12', '#FD8066', '#FCBE12', '#FFE08A', '#1E8A4A', '#FDF7EC'];
+  const cols = ['#FCBE12', '#FC3067', '#FCBE12', '#2F6BFF', '#FFE08A', '#FDF7EC'];
   const N = Math.round(140 * power), P = [];
   for (let i = 0; i < N; i++) { const left = i % 2 === 0; P.push({ x: left ? -10 : W + 10, y: H * (0.55 + Math.random() * 0.3), vx: (left ? 1 : -1) * (5 + Math.random() * 9) * .5, vy: -(10 + Math.random() * 12) * .5, r: 5 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - .5) * .2, col: cols[i % cols.length], shape: i % 3 }) }
   const t0 = performance.now();
@@ -284,7 +284,7 @@ function celebrate(title, sub, { power = 1, icon = 'star', sound = true } = {}) 
   document.querySelector('.cheer')?.remove(); clearTimeout(cheerTimer);
   // Stays until the kid closes it: tap the button, tap outside the card, or press Escape.
   const el = document.createElement('div'); el.className = 'cheer'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', title);
-  el.innerHTML = `<div class="cheer-card"><img class="cheer-pig" src="${PIGGY}" alt="" width="120" height="118"><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}<button class="save cheer-ok" type="button">${esc(CHEER_OK[Math.floor(Math.random() * CHEER_OK.length)])}</button></div>`;
+  el.innerHTML = `<div class="cheer-card"><img class="cheer-pig" src="${PIGGY}" alt="" width="120" height="105"><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}<button class="save cheer-ok" type="button">${esc(CHEER_OK[Math.floor(Math.random() * CHEER_OK.length)])}</button></div>`;
   const close = () => { document.removeEventListener('keydown', onKey); el.classList.add('out'); setTimeout(() => el.remove(), 300) };
   const onKey = e => { if (e.key === 'Escape') close() };
   el.onclick = e => { if (e.target === el || e.target.closest('.cheer-ok')) close() };
@@ -312,7 +312,7 @@ const app = $('app');
 function render() {
   document.title = APP;
   const v = S.view;
-  if (v === 'loading') app.innerHTML = `<div class="loading"><img src="${PIGGY}" alt="" width="88" height="87"><span>Loading…</span></div>`;
+  if (v === 'loading') app.innerHTML = `<div class="loading"><img src="${PIGGY}" alt="" width="88" height="77"><span>Loading…</span></div>`;
   else if (v === 'auth') app.innerHTML = authHTML();
   else if (v === 'onboard') app.innerHTML = onboardHTML();
   else if (v === 'who') app.innerHTML = whoHTML();
@@ -326,7 +326,7 @@ function render() {
 function authHTML() {
   const code = S.authStep === 'code';
   return `<section class="screen-center">
-    <h1 class="logo-h"><img src="logo-900.png" alt="${esc(APP)}" width="900" height="426"></h1>
+    <h1 class="logo-h"><img class="logo-l" src="logo-900.png" alt="${esc(APP)}" width="900" height="389"><img class="logo-d" src="logo-900-dark.png" alt="${esc(APP)}" width="900" height="370"></h1>
     <p class="lede">Allowance, chores, reading and screen time, all in one place kids can see and trust.</p>
     <div class="card form">
       ${code ? `<div class="field"><label class="label" for="codeIn">Enter the code we sent to ${esc(S.authEmail)}</label>
@@ -407,7 +407,7 @@ async function hashPin(fid, pin) {
 
 /* ---------- who's using ---------- */
 function whoHTML() {
-  return `<section class="screen-center"><h1 class="logo-h"><img src="logo-900.png" alt="${esc(APP)}" width="900" height="426"></h1>
+  return `<section class="screen-center"><h1 class="logo-h"><img class="logo-l" src="logo-900.png" alt="${esc(APP)}" width="900" height="389"><img class="logo-d" src="logo-900-dark.png" alt="${esc(APP)}" width="900" height="370"></h1>
     <p class="lede">Who's using ${esc(APP)}?</p>
     <div class="who">${S.kids.map(k => `<button type="button" data-who="${k.id}">${avatar(k)}${esc(k.name)}</button>`).join('')}
       <button type="button" class="par" data-who="parent"><span class="avatar">${I.lock}</span>Parent</button></div>
@@ -428,7 +428,7 @@ function kidAppHTML() {
   const kid = kidById(S.profile); if (!kid) { S.view = 'who'; return whoHTML() }
   if (!['home', 'jobs', 'ledger'].includes(S.tab)) S.tab = 'home';
   const greet = { home: 'Hi there!', jobs: 'Pick a job, earn money', ledger: 'Everything logged' }[S.tab];
-  return `<header><div class="hello">${S.tab === 'home' ? `<img class="hi-pig" src="${PIGGY}" alt="" width="52" height="51">` : ''}<div><small>${greet}</small><h1>${esc(kid.name)}</h1></div></div>
+  return `<header><div class="hello">${S.tab === 'home' ? `<img class="hi-pig" src="${PIGGY}" alt="" width="52" height="46">` : ''}<div><small>${greet}</small><h1>${esc(kid.name)}</h1></div></div>
     <button class="lock" id="swapBtn" type="button">${I.swap} Switch</button></header>
     <main>${({ home: kidHome, jobs: kidJobs, ledger: kidLedger })[S.tab](kid)}</main>
     ${tabbar(KTABS, S.tab)}`;

@@ -1,9 +1,9 @@
 /* Layout: a phone app in a "storybook toybox" look — rounded friendly type, chunky buttons that press down, bright page colors on a warm paper ground. Each area owns a color: money green, jobs blue, reading violet, screen sunshine. */
 :root{
-  /* PiggyBoo: cream paper, black ink outlines, the gold coin and the pink snout from the logo */
+  /* Paper Pig: cream paper, black ink outlines, the gold coin, the logo's pink and its partner blue */
   --bg:#FDF7EC; --surface:#FFFFFF; --sunk:#F8EEDC; --ink:#161311; --muted:#6A5F55; --line:#EADCC3; --edge:#161311;
   --money:#1E8A4A; --money-deep:#156637; --money-soft:#DEF2E3; --hero:#1E8A4A;
-  --jobs:#C9442F; --jobs-soft:#FFE1D9;
+  --jobs:#D91B55; --jobs-soft:#FFE2EB; --pink:#FC3067; --blue:#2F6BFF; --blue-soft:#E3ECFF;
   --read:#6E4FD8; --read-soft:#ECE5FF;
   --screen:#FCBE12; --board:#0D2252; --board-raise:#17306B; --board-line:#2A4888; --board-ink:#FDF7EC; --board-muted:#A9B6D8;
   --danger:#D63A2B; --danger-soft:#FFE1DC;
@@ -17,14 +17,14 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#08112B; --surface:#101C40; --sunk:#16244E; --ink:#FBF4E8; --muted:#AEB9D8; --line:#24356A; --edge:#02060F;
   --money:#4FCB7C; --money-deep:#145A31; --money-soft:#123229; --hero:#1E8A4A;
-  --jobs:#FF8A72; --jobs-soft:#3A2233;
+  --jobs:#FF5C8A; --jobs-soft:#3A1C3F; --pink:#FF4F7E; --blue:#6B95FF; --blue-soft:#1B2B66;
   --read:#A68BFF; --read-soft:#262457;
   --screen:#FFC93A; --board:#050C22; --board-raise:#101B3D; --board-line:#24356A; --board-ink:#FBF4E8; --board-muted:#A3AFD3;
   --danger:#FF7A6E; --danger-soft:#3E1E2A; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#08112B; --surface:#101C40; --sunk:#16244E; --ink:#FBF4E8; --muted:#AEB9D8; --line:#24356A; --edge:#02060F;
   --money:#4FCB7C; --money-deep:#145A31; --money-soft:#123229; --hero:#1E8A4A;
-  --jobs:#FF8A72; --jobs-soft:#3A2233;
+  --jobs:#FF5C8A; --jobs-soft:#3A1C3F; --pink:#FF4F7E; --blue:#6B95FF; --blue-soft:#1B2B66;
   --read:#A68BFF; --read-soft:#262457;
   --screen:#FFC93A; --board:#050C22; --board-raise:#101B3D; --board-line:#24356A; --board-ink:#FBF4E8; --board-muted:#A3AFD3;
   --danger:#FF7A6E; --danger-soft:#3E1E2A; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}
@@ -565,10 +565,10 @@ input,select,textarea{font-size:16px}
 .tipbox{display:block;font-size:13px;font-weight:600;line-height:1.4;color:var(--ink);background:var(--sunk);border:2px dashed var(--line);border-radius:12px;padding:8px 10px}
 .tipbox[hidden]{display:none}
 
-/* ---------- PiggyBoo touches: night-sky sparkles, ghost-hem edges, coin stickers ---------- */
-:root{--sparkle:#FCBE12;--ghosty:#FD8066}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--sparkle:#FFC93A;--ghosty:#FF9A84}}
-:root[data-theme="dark"]{--sparkle:#FFC93A;--ghosty:#FF9A84}
+/* ---------- Paper Pig touches: night-sky sparkles, paper edges, coin stickers ---------- */
+:root{--sparkle:#FCBE12;--ghosty:#FC3067}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--sparkle:#FFC93A;--ghosty:#FF5C8A}}
+:root[data-theme="dark"]{--sparkle:#FFC93A;--ghosty:#FF5C8A}
 .playroom{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
 .wrap,#layer{position:relative;z-index:1}
 .pr{position:absolute;opacity:.22}
@@ -583,19 +583,19 @@ input,select,textarea{font-size:16px}
 @keyframes bob-a{from{transform:translateY(0) scale(1)}to{transform:translateY(-10px) scale(1.12)}}
 @keyframes bob-b{from{transform:translateY(0) rotate(-8deg)}to{transform:translateY(12px) rotate(8deg)}}
 @keyframes bob-c{from{transform:translate(0,0) rotate(-4deg)}to{transform:translate(8px,-14px) rotate(4deg)}}
-/* the tab bar's top edge is a wavy ghost hem */
+/* the tab bar's top edge is cut with pinking shears, like a paper edge */
 .tabbar{border-top:0!important;padding-top:14px}
 .tabbar::before{content:"";position:absolute;left:0;right:0;top:-6px;height:12px;background:var(--edge);
-  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='12'%3E%3Cpath d='M0 7c5.5 0 5.5-5 11-5s5.5 5 11 5 5.5-5 11-5 5.5 5 11 5' fill='none' stroke='black' stroke-width='2.6'/%3E%3C/svg%3E") repeat-x 0 0/44px 12px;
-          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='12'%3E%3Cpath d='M0 7c5.5 0 5.5-5 11-5s5.5 5 11 5 5.5-5 11-5 5.5 5 11 5' fill='none' stroke='black' stroke-width='2.6'/%3E%3C/svg%3E") repeat-x 0 0/44px 12px}
-.empty::before{content:"";display:block;width:52px;height:47px;margin:0 auto 8px;background:url(piggy.png) center/contain no-repeat;opacity:.55}
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='12'%3E%3Cpath d='M0 8l6-5 6 5 6-5 6 5' fill='none' stroke='black' stroke-width='2.6' stroke-linejoin='round'/%3E%3C/svg%3E") repeat-x 0 0/24px 12px;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='12'%3E%3Cpath d='M0 8l6-5 6 5 6-5 6 5' fill='none' stroke='black' stroke-width='2.6' stroke-linejoin='round'/%3E%3C/svg%3E") repeat-x 0 0/24px 12px}
+.empty::before{content:"";display:block;width:52px;height:46px;margin:0 auto 8px;background:url(piggy.png) center/contain no-repeat;opacity:.55}
 /* a gold sparkle sticker on the bank card and boards */
 .hero::before,.board::before{content:"";position:absolute;top:-14px;left:16px;width:30px;height:30px;transform:rotate(-10deg);z-index:2;
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2c1.3 7.6 3.4 9.8 11 11-7.6 1.3-9.7 3.4-11 11-1.3-7.6-3.4-9.7-11-11 7.6-1.2 9.7-3.4 11-11z' fill='%23FCBE12' stroke='%23161311' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
 .hero,.board{position:relative;overflow:visible}
 .hero::after{border-radius:0 28px 0 0}
 .hero::after{right:12px;top:12px;width:96px;height:96px}
-/* main buttons are gold like the "Boo" */
+/* main buttons are gold like the coin */
 .save{background:var(--screen)!important;color:#161311!important}
 /* loading: the piggy bobs */
 .loading{gap:10px;font:800 16px var(--display)}
@@ -644,7 +644,7 @@ input,select,textarea{font-size:16px}
 /* ---------- playful backdrop ---------- */
 .playroom .pr{position:absolute;display:block;opacity:.3;transform-origin:50% 50%}
 .playroom .pr svg{display:block;width:100%;height:auto;overflow:visible}
-.pr.g{color:var(--sparkle)} .pr.p{color:var(--ghosty)} .pr.b{color:#5B8DEF} .pr.m{color:var(--muted);opacity:.22}
+.pr.g{color:var(--sparkle)} .pr.p{color:var(--ghosty)} .pr.b{color:var(--blue)} .pr.m{color:var(--muted);opacity:.22}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .playroom .pr{opacity:.24}}
 :root[data-theme="dark"] .playroom .pr{opacity:.24}
 @media (prefers-reduced-motion:no-preference){
@@ -709,3 +709,11 @@ input,select,textarea{font-size:16px}
 .eq.many .op{font-size:15px}
 .eq.many{justify-content:center;column-gap:6px}
 .eq.many .term{flex:0 0 auto;min-width:52px}
+
+/* ---------- Paper Pig: logo per theme, pink + blue accents ---------- */
+.logo-h .logo-d{display:none}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .logo-h .logo-l{display:none}:root:not([data-theme="light"]) .logo-h .logo-d{display:block}}
+:root[data-theme="dark"] .logo-h .logo-l{display:none} :root[data-theme="dark"] .logo-h .logo-d{display:block}
+.link{color:var(--blue)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline-color:var(--blue)}
+.tabbar [aria-selected="true"] .badge,.badge{background:var(--pink);color:#fff}
