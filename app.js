@@ -206,8 +206,6 @@ const supportHTML = (open = false) => `<details class="support" ${open ? 'open' 
 const brandName = () => { const w = APP.split(' '); return w.length > 1 ? `${esc(w.slice(0, -1).join(' '))} <span class="story">${esc(w[w.length - 1])}</span>` : esc(APP) };
 /* ---------- playful backdrop: coins, sparkles, paper planes, little pig storybooks, clocks and TVs drifting and bobbing behind everything ---------- */
 const PIGGY = 'piggy.png';
-/* A bookmark ribbon in the kid's own color hangs over the top of their bank page. */
-const RIBBON = '<svg class="ribbon" viewBox="0 0 28 46" aria-hidden="true"><path d="M2 0h24v44l-12-9-12 9z" fill="var(--kc)" stroke="var(--edge)" stroke-width="2.5" stroke-linejoin="round"/><path d="M7 4v26" stroke="#fff" stroke-opacity=".45" stroke-width="2.5" stroke-linecap="round"/></svg>';
 (function playroom() {
   const W2 = 'fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"';
   const SH = {
@@ -266,7 +264,7 @@ function confetti(power = 1) {
   const c = document.createElement('canvas'); c.className = 'confetti'; document.body.appendChild(c);
   const dpr = Math.min(2, window.devicePixelRatio || 1), W = innerWidth, H = innerHeight; c.width = W * dpr; c.height = H * dpr;
   const g = c.getContext('2d'); g.scale(dpr, dpr);
-  const cols = ['#FCBE12', '#FC3067', '#FCBE12', '#2F6BFF', '#FFE08A', '#FDF7EC'];
+  const cols = ['#FC3067', '#FFFFFF', '#FFC21A', '#2F6BFF', '#FC3067', '#FFC21A'];
   const N = Math.round(140 * power), P = [];
   for (let i = 0; i < N; i++) { const left = i % 2 === 0; P.push({ x: left ? -10 : W + 10, y: H * (0.55 + Math.random() * 0.3), vx: (left ? 1 : -1) * (5 + Math.random() * 9) * .5, vy: -(10 + Math.random() * 12) * .5, r: 5 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - .5) * .2, col: cols[i % cols.length], shape: i % 3 }) }
   const t0 = performance.now();
@@ -316,6 +314,8 @@ const app = $('app');
 function render() {
   document.title = APP;
   const v = S.view;
+  // Kids see the pig-pink side of the paper; everyone else sees the white side.
+  document.body.dataset.side = v === 'kid' ? 'kid' : 'grown';
   if (v === 'loading') app.innerHTML = `<div class="loading"><img src="${PIGGY}" alt="" width="88" height="77"><span>Loading…</span></div>`;
   else if (v === 'auth') app.innerHTML = authHTML();
   else if (v === 'onboard') app.innerHTML = onboardHTML();
@@ -453,11 +453,10 @@ function kidHome(kid) {
   const pct = g ? Math.min(100, Math.round(100 * st.balance / g.amount)) : 0;
   const scrSub = !isScreenDay(kid) ? `Opens ${screenDayNames(kid)}` : sw.leftSec ? `${dur(sw.leftSec)} left` : 'All used this week';
   const recent = ledgerItems(kid, thisWeek()).slice(0, 4);
-  return `<section class="hero bank book" style="--kc:${COLORS[kid.color]}">
-      <div class="page">${RIBBON}
+  return `<section class="hero bank">
       <span class="hero-coin">${coinSVG()}</span><div class="label">In your bank</div><div class="big num" id="bankBig">${money(st.balance)}</div>
       ${g ? `<button class="goalline" type="button" id="goalBtn"><span>Saving for <b>${esc(g.name)}</b></span><span class="meter" id="goalMeter" data-pct="${pct}"><i style="width:${pct}%"></i></span><span class="num">${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}</span></button>` : ''}
-      <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${g ? '' : '<button class="link-w" type="button" id="goalBtn">Set a saving goal</button>'}</div></div>
+      <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${g ? '' : '<button class="link-w" type="button" id="goalBtn">Set a saving goal</button>'}</div>
       <button class="earn" type="button" data-tab="jobs">${I.jobs}<span>Earn more on the job board</span>${I.chev}</button>
     </section>
     ${mine.length ? `<button class="waitline" type="button" data-tab="ledger">${I.clock}<span><b>${mine.length} job${mine.length > 1 ? 's' : ''}</b> waiting for a parent to check</span></button>` : ''}
