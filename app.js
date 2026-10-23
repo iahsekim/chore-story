@@ -423,13 +423,17 @@ const hello = () => { const h = new Date().getHours(); return h < 12 ? 'Good mor
 /* Who's using: each kid is their own paper pig, in their color, with a reason to tap. */
 function whoHTML() {
   const tiles = S.kids.map((k, i) => {
-    const st = stats(k), sw = screenWeek(k), news = unseenMoney(k);
-    const scr = !isScreenDay(k) ? `Opens ${DAYS[(k.screen_days || [6])[0]] || 'soon'}` : sw.leftSec ? mins(sw.left) : 'All used';
+    const st = stats(k), sw = screenWeek(k), news = unseenMoney(k), g = goalOf(k), pend = pendingClaims(k).length;
+    const pct = g ? Math.min(100, Math.round(100 * st.balance / g.amount)) : 0;
+    // One extra line, only when it matters right now: a job waiting, or screens open today.
+    const extra = pend ? `${I.clock}${pend} job${pend > 1 ? 's' : ''} waiting for a grown-up` : isScreenDay(k) && sw.leftSec ? `${I.screen}${mins(sw.left)} of screens left` : '';
     return `<button class="kidtile" type="button" data-who="${k.id}" style="--kc:${COLORS[k.color]};--i:${i}">
       ${news > 0 ? `<span class="news">+${money(news)} new!</span>` : ''}
       <span class="kt-face">${esc((k.name || '?').slice(0, 1).toUpperCase())}</span>
       <b class="kt-name">${esc(k.name)}</b>
-      <span class="kt-stats"><span>${coinSVG('mini')}${money(st.balance)}</span><span>${I.screen}${scr}</span></span></button>`;
+      <span class="kt-info"><span class="kt-bal">${coinSVG('mini')}${money(st.balance)}</span>
+        ${g ? `<span class="kt-goal"><span class="meter"><i style="width:${pct}%"></i></span><span class="kt-sub">${pct >= 100 ? `Enough for ${esc(g.name)}!` : `${pct}% of the way to ${esc(g.name)}`}</span></span>` : '<span class="kt-sub">in the bank</span>'}
+        ${extra ? `<span class="kt-line">${extra}</span>` : ''}</span></button>`;
   }).join('');
   return `<section class="screen-center whoscreen"><h1 class="logo-h"><img class="logo-l" src="logo-900.png" alt="${esc(APP)}" width="900" height="389"><img class="logo-d" src="logo-900-dark.png" alt="${esc(APP)}" width="900" height="370"></h1>
     <h2 class="who-q">${hello()}! Who's here?</h2>
