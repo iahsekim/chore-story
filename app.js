@@ -188,6 +188,7 @@ const I = {
   coin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6.5v11"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
+  dollar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 7.5C15.7 5.9 14.1 5 12 5c-2.8 0-4.5 1.4-4.5 3.4 0 4.6 9.2 2.6 9.2 7.2 0 2-1.9 3.4-4.7 3.4-2.3 0-4-1-4.8-2.7M12 2.5v19"/></svg>',
   jar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8M9 3v3c-2.4 1-4 3.2-4 6v6a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-6c0-2.8-1.6-5-4-6V3"/><path d="M8.5 14h7"/></svg>',
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
@@ -488,7 +489,7 @@ function weekNav(ws, key) {
 const hm = sec => { const m = Math.floor((sec || 0) / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m` };
 function weekSummary(kid, ws) {
   const earned = weekTotal(kid, ws), rw = readWeek(kid, ws), sw = screenWeek(kid, ws);
-  return `<section class="wsum"><div><b class="num" style="color:var(--money)">+${money(earned)}</b><span>Earned</span></div><div><b class="num" style="color:var(--read)">${hm(rw.sec)}</b><span>Read</span><small>+${rw.bonus} screen min</small></div><div><b class="num">${hm(sw.usedSec)}</b><span>Screens</span><small>${hm(sw.leftSec)} left</small></div></section>`;
+  return `<section class="wsum"><div><span class="wi m">${I.dollar}</span><b class="num">+${money(earned)}</b><span>Earned</span></div><div><span class="wi r">${I.read}</span><b class="num">${hm(rw.sec)}</b><span>Read</span><small>+${rw.bonus} screen min</small></div><div><span class="wi s">${I.screen}</span><b class="num">${hm(sw.usedSec)}</b><span>Screens</span><small>${hm(sw.leftSec)} left</small></div></section>`;
 }
 /* Every line item for one kid and one week. kind filters: all | money | reading | screen. */
 function ledgerItems(kid, ws, f = 'all') {
@@ -579,13 +580,22 @@ function readBoardHTML(kid) {
 let pick = null, confirming = false;
 /* "2:10 PM – 2:42 PM" for a finished session, just the start while it's still going. */
 const span = x => { const st = ms(x.started_at), en = x.ended_at ? ms(x.ended_at) : 0; return en && en - st >= 60000 ? `${clockTime(st)} \u2013 ${clockTime(en)}` : clockTime(st) };
+/* Screen time for a kid: one big "left" number, a bar, then where the minutes came from. */
+const mins = m => { m = Math.max(0, Math.round(m)); return m >= 60 ? `${Math.floor(m / 60)} hr${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min` };
 function eqHTML(kid, x, extra = '') {
-  return `<section class="card"><span class="label">This week · ${screenDayNames(kid)}</span>
-    <div class="eq ${[x.extra, x.pen, x.usedSec].filter(Boolean).length >= 3 || (x.pen && x.usedSec) ? 'many' : ''}"><span class="term"><b class="num">${x.base}</b><span>Base</span></span><span class="op">+</span><span class="term"><b class="num" style="color:var(--read)">${x.bonus}</b><span>Reading</span></span>
-    ${x.extra ? `<span class="op">+</span><span class="term"><b class="num" style="color:var(--money)">${x.extra}</b><span>Bonus</span></span>` : ''}
-    ${x.pen ? `<span class="op">\u2212</span><span class="term"><b class="num" style="color:var(--danger)">${x.pen}</b><span>Jar</span></span>` : ''}
-    ${x.usedSec ? `<span class="op">\u2212</span><span class="term"><b class="num" id="eqUsed">${hms(x.usedSec)}</b><span>Used</span></span>` : ''}
-    <span class="op">=</span><span class="term res"><b class="num" id="eqLeft">${hms(x.leftSec)}</b><span>Left</span></span></div>${extra}</section>`;
+  const got = x.base + x.bonus + x.extra, usedPct = x.totalSec ? Math.min(100, 100 * x.usedSec / x.totalSec) : (x.usedSec ? 100 : 0);
+  const line = (ico, cls, what, v) => `<div class="st-row"><span class="ico ${cls}">${ico}</span><span class="st-what">${what}</span><b class="num">${v}</b></div>`;
+  return `<section class="card stime">
+    <div class="st-head"><span class="ico s">${I.screen}</span><div><b class="st-left num" id="eqLeft">${hms(x.leftSec)}</b><span class="st-sub">screen time left this week</span></div></div>
+    <div class="st-bar" aria-hidden="true"><i id="stBar" style="width:${usedPct}%"></i></div>
+    <p class="hint">Screens are open on ${screenDayNames(kid)}.</p>
+    <div class="st-list">
+      ${line(I.clock, 'w', 'Every week you get', mins(x.base))}
+      ${line(I.read, 'r', 'You earned by reading', '+' + mins(x.bonus))}
+      ${x.extra ? line(I.star, 'm', 'Bonus minutes', '+' + mins(x.extra)) : ''}
+      ${x.pen ? line(I.jar, 'x', esc(penName()), '−' + mins(x.pen)) : ''}
+      <div class="st-row st-used"><span class="ico s">${I.screen}</span><span class="st-what">You've watched</span><b class="num" id="eqUsed">${mins(Math.floor(x.usedSec / 60))}</b></div>
+    </div>${extra}</section>`;
 }
 function boardHTML(kid) {
   const x = screenWeek(kid), a = x.active;
@@ -938,7 +948,7 @@ setInterval(() => {
     doneTimer('screen_sessions', a, 'Time\u2019s up for this week', null, Math.max(0, liveSec(a) - (x.usedSec - x.totalSec))).finally(() => { autoStopping = false });
     return;
   }
-  if (a && a.running_since) { const d = $('digits'); if (d) d.textContent = hms(x.leftSec); const su = $('sessUsed'); if (su) su.textContent = hms(liveSec(a)); const f = $('barfill'); if (f) f.style.width = (x.totalSec ? 100 * x.usedSec / x.totalSec : 100) + '%'; const el = $('eqLeft'); if (el) el.textContent = hms(x.leftSec); const eu = $('eqUsed'); if (eu) eu.textContent = hms(x.usedSec) }
+  if (a && a.running_since) { const d = $('digits'); if (d) d.textContent = hms(x.leftSec); const su = $('sessUsed'); if (su) su.textContent = hms(liveSec(a)); const f = $('barfill'); if (f) f.style.width = (x.totalSec ? 100 * x.usedSec / x.totalSec : 100) + '%'; const el = $('eqLeft'); if (el) el.textContent = hms(x.leftSec); const eu = $('eqUsed'); if (eu) eu.textContent = mins(Math.floor(x.usedSec / 60)); const sb2 = $('stBar'); if (sb2) sb2.style.width = (x.totalSec ? Math.min(100, 100 * x.usedSec / x.totalSec) : 100) + '%' }
   const r = activeRead(kid);
   if (r && r.running_since) { if (liveSec(r) >= capSec(kid) && !autoStopping) { autoStopping = true; doneTimer('reading_sessions', r, 'Reading timer stopped after 3 hours. Was it left on?', kid).finally(() => { autoStopping = false }); return } const rd = $('readDigits'); if (rd) rd.textContent = hms(readSec(r, kid)) }
 }, 1000);

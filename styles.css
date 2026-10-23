@@ -64,6 +64,8 @@ svg{display:block}
 .card::after,.kcard::after,.who button::after,.start::after,.board::after{content:"";position:absolute;top:calc(-1 * var(--line-w));right:calc(-1 * var(--line-w));width:30px;height:30px;pointer-events:none;
   background:linear-gradient(to bottom left,var(--under) calc(50% - 1.6px),var(--edge) calc(50% - 1.6px),var(--edge) calc(50% + 1.6px),var(--fold) calc(50% + 1.6px));
   border-left:var(--line-w) solid var(--edge);border-bottom:var(--line-w) solid var(--edge);border-bottom-left-radius:9px}
+/* cards that cast a shadow: hide the shadow beside the fold so it starts where the fold ends */
+.who button::before,.start::before,.board::before{content:"";position:absolute;top:calc(-1 * var(--line-w));right:calc(-1 * var(--line-w) - 4px);width:4px;height:30px;background:var(--under);pointer-events:none}
 .sheet{--under:transparent}
 .sheet .card,.sheet .list{--under:var(--paper)}
 
@@ -100,7 +102,7 @@ body[data-side="kid"] .hello small{color:#fff}
 .pill.no{background:var(--pink-soft);color:var(--pink-deep)}
 .pill.wait{background:var(--pink-soft);color:var(--pink-deep)}
 .pill svg{width:18px;height:18px;flex:none}
-.pill:disabled{color:var(--muted);box-shadow:none;opacity:.6}
+.pill:disabled{color:var(--muted);box-shadow:none;opacity:1;border-color:var(--muted)}
 .save:active,.go:active,.pill:active,.chip:active,.earn:active,.lock:active,.who button:active,.start:active,.bucket:active,.owedline-b:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--edge)!important}
 .ptools{display:flex;flex-wrap:wrap;gap:10px}
 body[data-side="kid"] main>.ptools .pill.soft{background:var(--paper)}
@@ -155,7 +157,7 @@ body[data-side="kid"] main>.ptools .pill.soft{background:var(--paper)}
 .price .coin.mini{width:16px}
 
 /* ---------- the bank: the pig itself. Pink ears fold down from both top corners. ---------- */
-.hero.bank{display:grid;gap:14px;padding:30px 20px 20px;background:var(--paper);color:var(--text);border:3px solid var(--edge);border-radius:0 0 26px 26px;box-shadow:5px 5px 0 var(--edge)}
+.hero.bank{display:grid;gap:14px;padding:30px 20px 20px;background:var(--paper);color:var(--text);border:3px solid var(--edge);border-radius:0 0 26px 26px;box-shadow:0 6px 0 var(--edge)}
 .hero.bank::before,.hero.bank::after{content:"";position:absolute;top:-3px;width:44px;height:44px;pointer-events:none;z-index:1;border-bottom:3px solid var(--edge)}
 .hero.bank::before{left:-3px;border-right:3px solid var(--edge);border-bottom-right-radius:12px;
   background:linear-gradient(to bottom right,var(--under) calc(50% - 2px),var(--edge) calc(50% - 2px),var(--edge) calc(50% + 2px),var(--pink) calc(50% + 2px))}
@@ -216,7 +218,7 @@ body[data-side="kid"] main>.ptools .pill.soft{background:var(--paper)}
 .ghost{width:100%;min-height:54px;border-radius:16px;border:var(--line-w) solid rgba(255,255,255,.6);color:#fff;font-weight:600}
 .row2>.go,.row2>.ghost,.row2>.pill,.row2>.save{height:auto;min-height:48px;white-space:normal;line-height:1.15;padding:8px 10px}
 
-/* the screen-time math: base + reading + bonus − used = left */
+/* old equation layout (kept only for stray markup) */
 .eq{display:flex;align-items:center;justify-content:space-between;gap:4px;flex-wrap:nowrap}
 .eq .term{display:grid;gap:2px;text-align:center;flex:1;min-width:0}
 .eq .term b{font:400 clamp(18px,5.6vw,28px)/1 var(--display);white-space:nowrap}
@@ -397,7 +399,7 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--blue);outline-of
 .confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
 .cheer{position:fixed;inset:0;z-index:55;display:grid;place-items:center;padding:24px;background:rgba(12,24,68,.5);animation:fade-in .2s ease-out}
 .cheer.out{animation:fade-out .3s ease-in forwards}
-.cheer-card{--under:transparent;position:relative;background:var(--paper);color:var(--text);border:3px solid var(--edge);box-shadow:6px 6px 0 var(--edge);border-radius:0 0 28px 28px;padding:30px 24px 22px;max-width:340px;width:100%;display:grid;justify-items:center;gap:8px;text-align:center;animation:cheer-pop .5s cubic-bezier(.2,1.6,.4,1)}
+.cheer-card{--under:transparent;position:relative;background:var(--paper);color:var(--text);border:3px solid var(--edge);box-shadow:0 6px 0 var(--edge);border-radius:0 0 28px 28px;padding:30px 24px 22px;max-width:340px;width:100%;display:grid;justify-items:center;gap:8px;text-align:center;animation:cheer-pop .5s cubic-bezier(.2,1.6,.4,1)}
 .cheer-card::before,.cheer-card::after{content:"";position:absolute;top:-3px;width:40px;height:40px;border-bottom:3px solid var(--edge)}
 .cheer-card::before{left:-3px;border-right:3px solid var(--edge);border-bottom-right-radius:11px;background:linear-gradient(to bottom right,transparent calc(50% - 2px),var(--edge) calc(50% - 2px),var(--edge) calc(50% + 2px),var(--pink) calc(50% + 2px))}
 .cheer-card::after{right:-3px;border-left:3px solid var(--edge);border-bottom-left-radius:11px;background:linear-gradient(to bottom left,transparent calc(50% - 2px),var(--edge) calc(50% - 2px),var(--edge) calc(50% + 2px),var(--pink) calc(50% + 2px))}
@@ -457,3 +459,31 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
   .sheet{max-width:600px;border-radius:28px;border-bottom:3px solid var(--edge);margin-bottom:24px}
   .scrim{align-items:center}
 }
+
+/* ---------- weekly summary icons ---------- */
+.wsum div{justify-items:center;padding-top:14px}
+.wi{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;border:2px solid var(--edge);margin-bottom:6px}
+.wi svg{width:26px;height:26px}
+.wi.m{background:var(--gold);color:#000}
+.wi.r{background:var(--blue);color:#fff}
+.wi.s{background:var(--midnight);color:var(--gold)}
+.wsum b{color:var(--text)}
+
+/* ---------- screen time, explained for kids ---------- */
+.stime{gap:12px}
+.st-head{display:flex;align-items:center;gap:14px}
+.st-head .ico{width:52px;height:52px;border-radius:16px}
+.st-head .ico svg{width:28px;height:28px}
+.st-left{display:block;font:400 clamp(40px,13vw,52px)/1 var(--display);color:var(--text)}
+.st-sub{display:block;font-weight:600;color:var(--muted);margin-top:2px}
+.st-bar{height:16px;border-radius:9px;background:var(--gold);border:var(--line-w) solid var(--edge);overflow:hidden}
+.st-bar i{display:block;height:100%;background:var(--midnight);border-right:var(--line-w) solid var(--edge);transition:width .6s}
+.st-bar i[style*="width:0%"]{border-right:0}
+.st-list{display:grid;border-top:2px solid var(--rule)}
+.st-row{display:flex;align-items:center;gap:12px;padding:10px 0}
+.st-row+.st-row{border-top:2px solid var(--rule)}
+.st-row .ico{width:34px;height:34px;border-radius:11px}
+.st-row .ico svg{width:18px;height:18px}
+.st-what{flex:1;min-width:0;font-weight:500}
+.st-row b{font-weight:600;white-space:nowrap}
+.st-used b{color:var(--pink-deep)}
