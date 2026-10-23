@@ -1,10 +1,10 @@
 /* Layout: a phone app in a "storybook toybox" look — rounded friendly type, chunky buttons that press down, bright page colors on a warm paper ground. Each area owns a color: money green, jobs blue, reading violet, screen sunshine. */
 :root{
   /* Paper Pig: cream paper, black ink outlines, the gold coin, the logo's pink and its partner blue */
-  --bg:#FDF7EC; --surface:#FFFFFF; --sunk:#F8EEDC; --ink:#161311; --muted:#6A5F55; --line:#EADCC3; --edge:#161311;
+  --bg:#FFF5F2; --surface:#FFFFFF; --sunk:#FDEAE5; --ink:#17141A; --muted:#6C5960; --line:#F1D5CF; --edge:#17141A;
   --money:#1E8A4A; --money-deep:#156637; --money-soft:#DEF2E3; --hero:#1E8A4A;
   --jobs:#D91B55; --jobs-soft:#FFE2EB; --pink:#FC3067; --blue:#2F6BFF; --blue-soft:#E3ECFF;
-  --read:#6E4FD8; --read-soft:#ECE5FF;
+  --read:#2F6BFF; --read-soft:#E3ECFF;
   --screen:#FCBE12; --board:#0D2252; --board-raise:#17306B; --board-line:#2A4888; --board-ink:#FDF7EC; --board-muted:#A9B6D8;
   --danger:#D63A2B; --danger-soft:#FFE1DC;
   --press:rgba(22,19,17,.22);
@@ -18,14 +18,14 @@
   --bg:#08112B; --surface:#101C40; --sunk:#16244E; --ink:#FBF4E8; --muted:#AEB9D8; --line:#24356A; --edge:#02060F;
   --money:#4FCB7C; --money-deep:#145A31; --money-soft:#123229; --hero:#1E8A4A;
   --jobs:#FF5C8A; --jobs-soft:#3A1C3F; --pink:#FF4F7E; --blue:#6B95FF; --blue-soft:#1B2B66;
-  --read:#A68BFF; --read-soft:#262457;
+  --read:#7FA3FF; --read-soft:#1B2B66;
   --screen:#FFC93A; --board:#050C22; --board-raise:#101B3D; --board-line:#24356A; --board-ink:#FBF4E8; --board-muted:#A3AFD3;
   --danger:#FF7A6E; --danger-soft:#3E1E2A; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#08112B; --surface:#101C40; --sunk:#16244E; --ink:#FBF4E8; --muted:#AEB9D8; --line:#24356A; --edge:#02060F;
   --money:#4FCB7C; --money-deep:#145A31; --money-soft:#123229; --hero:#1E8A4A;
   --jobs:#FF5C8A; --jobs-soft:#3A1C3F; --pink:#FF4F7E; --blue:#6B95FF; --blue-soft:#1B2B66;
-  --read:#A68BFF; --read-soft:#262457;
+  --read:#7FA3FF; --read-soft:#1B2B66;
   --screen:#FFC93A; --board:#050C22; --board-raise:#101B3D; --board-line:#24356A; --board-ink:#FBF4E8; --board-muted:#A3AFD3;
   --danger:#FF7A6E; --danger-soft:#3E1E2A; --press:rgba(0,0,0,.45); --shadow:none; color-scheme:dark}
 *{box-sizing:border-box}
@@ -610,8 +610,8 @@ input,select,textarea{font-size:16px}
 .cheer-pig{width:120px;height:auto;margin-top:-62px;filter:drop-shadow(3px 4px 0 rgba(22,19,17,.18))}
 @media (prefers-reduced-motion:reduce){.cheer-pig{animation:none}}
 /* reading cards keep the deeper purple in dark mode so white text stays readable */
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.start.rd,.board.rdb){background:#6E4FD8}}
-:root[data-theme="dark"] :is(.start.rd,.board.rdb){background:#6E4FD8}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.start.rd,.board.rdb){background:#2F6BFF}}
+:root[data-theme="dark"] :is(.start.rd,.board.rdb){background:#2F6BFF}
 
 /* ---------- the coin: spins on the bank card, drops in when money arrives,  ---------- */
 .coin{display:block;width:100%;height:auto;overflow:visible}
@@ -717,3 +717,70 @@ input,select,textarea{font-size:16px}
 .link{color:var(--blue)}
 button:focus-visible,input:focus-visible,select:focus-visible{outline-color:var(--blue)}
 .tabbar [aria-selected="true"] .badge,.badge{background:var(--pink);color:#fff}
+
+/* =====================================================================
+   Paper Pig system. The logo is a piggy bank that is also a storybook,
+   so each kid's money is their book: the bank is a pink cover holding a
+   white page, ledgers are ruled notebook pages with a pink margin, kid
+   cards are book spines on a shelf. Pink is the brand and the main
+   action; blue is reading and the ruled lines; gold is only coins and
+   screen time; green is only money coming in.
+   ===================================================================== */
+:root{--pp:#FC3067;--pp-deep:#D91B55;--pp-ink:#fff;--rule:#D9E4FF;--margin:#FC306766}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--pp:#FF3D74;--pp-deep:#FF3D74;--rule:#22336B;--margin:#FF3D7466}}
+:root[data-theme="dark"]{--pp:#FF3D74;--pp-deep:#FF3D74;--rule:#22336B;--margin:#FF3D7466}
+
+/* main actions and the selected tab are pig pink */
+.save{background:var(--pp)!important;color:var(--pp-ink)!important}
+.tabbar button[aria-selected="true"]{background:var(--pp)!important;color:#fff!important}
+.pill:not(.soft):not(.ok):not(.no):not(.wait){background:var(--pp);color:#fff!important}
+.chip[aria-pressed="true"]{background:var(--pp)!important;color:#fff!important}
+.seg button[aria-pressed="true"]{color:var(--pp-deep)}
+.link,.see{color:var(--pp-deep)}
+
+/* the bank is the book: pink cover, white page, stacked page edges, kid-colored ribbon */
+.hero.bank.book{background:var(--pp)!important;color:var(--ink);padding:14px 14px 18px;gap:14px;border-radius:26px!important}
+.hero.bank.book::before{display:none}
+.hero.bank.book .page{position:relative;display:grid;gap:12px;background:var(--surface);color:var(--ink);border:2.5px solid var(--edge);border-radius:18px;padding:20px 18px 16px 18px;
+  box-shadow:0 5px 0 -1px var(--surface),0 5px 0 1.5px var(--edge),0 10px 0 -1px var(--surface),0 10px 0 1.5px var(--edge)}
+.hero.bank.book .page .label{color:var(--muted);padding-left:38px}
+.hero.bank.book .big{color:var(--ink);text-shadow:none}
+.hero.bank.book .ribbon{position:absolute;top:-19px;left:14px;width:30px;height:auto;z-index:2;overflow:visible}
+.hero.bank.book .hero-coin{top:12px;right:12px;width:50px}
+.hero.bank.book .goalline{background:var(--sunk);color:var(--ink)}
+.hero.bank.book .goalline .meter{background:var(--surface);border:2px solid var(--edge);height:12px;border-radius:7px}
+.hero.bank.book .goalline .meter i{background:var(--pp);border-radius:4px}
+.hero.bank.book .hero-foot{border-top:2px dashed var(--line);color:var(--ink)}
+.hero.bank.book .hero-foot b{color:var(--money)}
+.hero.bank.book .link-w{color:var(--pp-deep)}
+.hero.bank.book .earn{margin-top:4px}
+/* the cover's bottom edge points down like the logo's book */
+.hero.bank.book::after{display:block!important;content:"";position:absolute;left:50%;bottom:-12px;width:26px;height:26px;transform:translateX(-50%) rotate(45deg);
+  background:var(--pp);border-right:2.5px solid var(--edge);border-bottom:2.5px solid var(--edge);border-radius:0 0 6px 0;z-index:-1;right:auto;top:auto}
+
+/* ledgers are notebook pages: blue ruled lines, a pink margin, dates written by hand */
+.list{background-color:var(--surface);background-image:linear-gradient(90deg,transparent 9px,var(--margin) 9px,var(--margin) 11px,transparent 11px,transparent 13px,var(--margin) 13px,var(--margin) 14px,transparent 14px)}
+.list>.row,.list>button.row{border-color:var(--rule)!important;background:transparent}
+.list .row+.row,.list .lgroup+.row{border-top:1.5px solid var(--rule)!important}
+.lgroup{background:transparent!important;border-top:2px solid var(--rule)!important;font:700 19px/1.1 var(--hand,var(--display))!important;letter-spacing:0!important;text-transform:none!important;color:var(--pp-deep)!important;padding:12px 18px 2px 24px!important}
+.row{padding-left:22px}
+
+/* kid cards are books on a shelf: a spine in the kid's color */
+.kcard{position:relative;padding-left:14px}
+.kcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:14px;background:var(--kc,var(--pp));border-right:2.5px solid var(--edge);
+  background-image:linear-gradient(transparent 18px,rgba(255,255,255,.55) 18px,rgba(255,255,255,.55) 21px,transparent 21px,transparent calc(100% - 21px),rgba(255,255,255,.55) calc(100% - 21px),rgba(255,255,255,.55) calc(100% - 18px),transparent calc(100% - 18px))}
+
+/* section titles get a pink hand-drawn underline */
+.sect-h h3{background:linear-gradient(var(--pp),var(--pp)) 0 100%/42px 4px no-repeat;padding-bottom:6px}
+
+/* the waiting note and nudges use the brand tint */
+.waitline{background:color-mix(in srgb,var(--pp) 12%,var(--surface));border-color:var(--pp)}
+.waitline svg{color:var(--pp)}
+
+/* backdrop: pig storybooks keep their white pages; tones lean pink and blue */
+.pr.p{color:var(--pp);opacity:.32} .pr.b{color:var(--blue);opacity:.22}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pr.p{opacity:.3}}
+:root[data-theme="dark"] .pr.p{opacity:.3}
+
+/* celebrations: the cheer card is a pink cover too */
+.cheer-card{background:var(--surface);border:2.5px solid var(--edge)!important;box-shadow:6px 6px 0 var(--pp)!important}

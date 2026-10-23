@@ -204,8 +204,10 @@ const supportHTML = (open = false) => `<details class="support" ${open ? 'open' 
   <span class="support-note">It&rsquo;s free! Tips keep it running.</span></div></details>`;
 
 const brandName = () => { const w = APP.split(' '); return w.length > 1 ? `${esc(w.slice(0, -1).join(' '))} <span class="story">${esc(w[w.length - 1])}</span>` : esc(APP) };
-/* ---------- playful backdrop: coins, sparkles, paper planes, books, clocks and TVs drifting and bobbing behind everything ---------- */
+/* ---------- playful backdrop: coins, sparkles, paper planes, little pig storybooks, clocks and TVs drifting and bobbing behind everything ---------- */
 const PIGGY = 'piggy.png';
+/* A bookmark ribbon in the kid's own color hangs over the top of their bank page. */
+const RIBBON = '<svg class="ribbon" viewBox="0 0 28 46" aria-hidden="true"><path d="M2 0h24v44l-12-9-12 9z" fill="var(--kc)" stroke="var(--edge)" stroke-width="2.5" stroke-linejoin="round"/><path d="M7 4v26" stroke="#fff" stroke-opacity=".45" stroke-width="2.5" stroke-linecap="round"/></svg>';
 (function playroom() {
   const W2 = 'fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"';
   const SH = {
@@ -213,6 +215,8 @@ const PIGGY = 'piggy.png';
     coin: '<ellipse cx="17.5" cy="16" rx="9" ry="12" fill="currentColor" opacity=".7"/><ellipse cx="14.5" cy="16" rx="9" ry="12" fill="currentColor"/><path d="M10 20c-1-6 1-10 4-12" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2" stroke-linecap="round"/>',
     plane: `<path d="M3 15 29 4l-7 23-6.5-9z" ${W2}/><path d="M15.5 18 29 4M15.5 18v8l3.5-4.5" ${W2}/>`,
     book: `<path d="M4 8c4-1.5 8-1.5 12 1 4-2.5 8-2.5 12-1v16c-4-1.5-8-1.5-12 1-4-2.5-8-2.5-12-1z" ${W2}/><path d="M16 9v16" ${W2}/>`,
+    pigbook: '<path d="M3 10c4.5-1.2 9-.6 13 2.6 4-3.2 8.5-3.8 13-2.6v15.5c-4.5-1-9-.4-13 2.5-4-2.9-8.5-3.5-13-2.5z" fill="currentColor" stroke="var(--edge)" stroke-width="2" stroke-linejoin="round"/><path d="M6 11.5c3.4-.6 7 .2 10 2.6 3-2.4 6.6-3.2 10-2.6v11c-3.4-.5-7 .3-10 2.6-3-2.3-6.6-3.1-10-2.6z" fill="#fff" stroke="var(--edge)" stroke-width="1.6" stroke-linejoin="round"/><path d="M16 14v11" stroke="var(--edge)" stroke-width="1.6"/>',
+    page: `<path d="M8 4h11l6 6v18H8z" ${W2}/><path d="M19 4v6h6M12 16h9M12 21h9" ${W2}/>`,
     clock: `<circle cx="16" cy="17" r="10" ${W2}/><path d="M16 11v6l4 3M13 4h6" ${W2}/>`,
     tv: `<rect x="4" y="8" width="24" height="16" rx="3" ${W2}/><path d="M11 28h10M12 4l4 4 4-4" ${W2}/>`,
     star: `<path d="m16 4 3.5 7.3 8 1-5.9 5.5 1.5 7.9L16 21.9l-7.1 3.8 1.5-7.9-5.9-5.5 8-1z" ${W2}/>`,
@@ -220,10 +224,10 @@ const PIGGY = 'piggy.png';
   };
   // [shape, tone, x%, y%, size px, motion]; tones: g gold, p pink, b blue, m muted ink
   const items = [
-    ['sparkle', 'g', 6, 8, 26, 'twinkle'], ['coin', 'g', 82, 6, 24, 'flip'], ['plane', 'p', 74, 30, 36, 'float'], ['book', 'b', 10, 30, 30, 'bob'],
-    ['sparkle', 'g', 46, 18, 14, 'twinkle'], ['clock', 'm', 88, 46, 26, 'bob'], ['coin', 'g', 18, 58, 20, 'flip'], ['star', 'g', 60, 52, 20, 'spin'],
-    ['plane', 'b', 4, 78, 30, 'float'], ['tv', 'b', 64, 74, 30, 'bob'], ['heart', 'p', 36, 88, 16, 'twinkle'], ['sparkle', 'g', 92, 86, 20, 'twinkle'],
-    ['coin', 'g', 40, 40, 16, 'flip'], ['book', 'b', 84, 64, 24, 'float'], ['star', 'g', 26, 14, 16, 'spin'], ['sparkle', 'g', 54, 94, 14, 'twinkle'],
+    ['sparkle', 'g', 6, 8, 26, 'twinkle'], ['coin', 'g', 82, 6, 24, 'flip'], ['pigbook', 'p', 72, 28, 40, 'float'], ['plane', 'b', 10, 30, 30, 'float'],
+    ['sparkle', 'g', 46, 18, 14, 'twinkle'], ['page', 'b', 88, 46, 26, 'bob'], ['coin', 'g', 18, 58, 20, 'flip'], ['star', 'g', 60, 52, 20, 'spin'],
+    ['pigbook', 'p', 4, 78, 34, 'bob'], ['plane', 'p', 64, 74, 30, 'float'], ['heart', 'p', 36, 88, 16, 'twinkle'], ['sparkle', 'g', 92, 86, 20, 'twinkle'],
+    ['coin', 'g', 40, 40, 16, 'flip'], ['pigbook', 'p', 84, 64, 26, 'float'], ['star', 'g', 26, 14, 16, 'spin'], ['sparkle', 'g', 54, 94, 14, 'twinkle'],
   ];
   const el = document.createElement('div'); el.className = 'playroom'; el.setAttribute('aria-hidden', 'true');
   el.innerHTML = items.map(([k, tone, x, y, size, mo], i) => `<span class="pr ${tone} m-${mo}" style="left:${x}%;top:${y}%;width:${size}px;--d:${(7 + (i * 37) % 9)}s;animation-delay:-${(i * 1.7).toFixed(1)}s"><svg viewBox="0 0 32 32">${SH[k]}</svg></span>`).join('');
@@ -449,10 +453,11 @@ function kidHome(kid) {
   const pct = g ? Math.min(100, Math.round(100 * st.balance / g.amount)) : 0;
   const scrSub = !isScreenDay(kid) ? `Opens ${screenDayNames(kid)}` : sw.leftSec ? `${dur(sw.leftSec)} left` : 'All used this week';
   const recent = ledgerItems(kid, thisWeek()).slice(0, 4);
-  return `<section class="hero bank" style="--hero:${COLORS[kid.color]}">
+  return `<section class="hero bank book" style="--kc:${COLORS[kid.color]}">
+      <div class="page">${RIBBON}
       <span class="hero-coin">${coinSVG()}</span><div class="label">In your bank</div><div class="big num" id="bankBig">${money(st.balance)}</div>
       ${g ? `<button class="goalline" type="button" id="goalBtn"><span>Saving for <b>${esc(g.name)}</b></span><span class="meter" id="goalMeter" data-pct="${pct}"><i style="width:${pct}%"></i></span><span class="num">${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}</span></button>` : ''}
-      <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${g ? '' : '<button class="link-w" type="button" id="goalBtn">Set a saving goal</button>'}</div>
+      <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${g ? '' : '<button class="link-w" type="button" id="goalBtn">Set a saving goal</button>'}</div></div>
       <button class="earn" type="button" data-tab="jobs">${I.jobs}<span>Earn more on the job board</span>${I.chev}</button>
     </section>
     ${mine.length ? `<button class="waitline" type="button" data-tab="ledger">${I.clock}<span><b>${mine.length} job${mine.length > 1 ? 's' : ''}</b> waiting for a parent to check</span></button>` : ''}
@@ -614,7 +619,7 @@ function pKids() {
   for (const k of S.kids) { const o = owedInfo(k); if (o.nudge) h += `<div class="nudge"><span><b>${esc(k.name)} has ${money(o.balance)} banked</b> · ${o.last ? `last withdrawal ${ago(o.days)}` : `no withdrawals yet, ${o.weeks.length} week${o.weeks.length === 1 ? '' : 's'} of savings`}</span><button class="pill" type="button" data-payall="${k.id}">Withdraw ${money(o.balance)}</button></div>` }
   return h + S.kids.map(k => {
     const st = stats(k), sw = screenWeek(k), rw = readWeek(k), o = owedInfo(k), g = goalOf(k);
-    return `<article class="kcard"><div class="kh">${avatar(k)}<h3>${esc(k.name)}</h3><span class="wk num" style="color:color-mix(in srgb, ${COLORS[k.color]} 78%, var(--ink))">${money(st.balance)}<small>Banked</small></span></div>
+    return `<article class="kcard" style="--kc:${COLORS[k.color]}"><div class="kh">${avatar(k)}<h3>${esc(k.name)}</h3><span class="wk num" style="color:color-mix(in srgb, ${COLORS[k.color]} 78%, var(--ink))">${money(st.balance)}<small>Banked</small></span></div>
       <div class="owedline">${o.saving ? `Saving for ${esc(g.name)} · ${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}` : o.last ? `Last withdrawal ${short(o.last)} (${ago(o.days)})` : 'No withdrawals yet'}</div>
       <div class="kstats"><div><b class="num">${money(st.week)}</b><span>This week</span></div><div><b class="num">${money(st.month)}</b><span>Month</span></div><div><b class="num">${money(st.lifetime)}</b><span>Lifetime</span></div></div>
       <div class="kstats"><div><b class="num">${hms(sw.leftSec)}</b><span>Screen left</span></div><div><b class="num" style="color:var(--read)">+${rw.bonus}</b><span>Reading bonus</span></div><div><b class="num">${hms(rw.sec)}</b><span>Read</span></div></div>
