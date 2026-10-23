@@ -340,7 +340,7 @@ document.addEventListener('click', e => {
 function logoAnim() {
   const still = logoPlayed; logoPlayed = true;
   return `<h1 class="logo-h ori-logo ${still ? 'still' : ''}"><span class="sr">${esc(APP)}</span>
-    <span class="ori" aria-hidden="true"><img class="ori-r" src="pp-book-r.png" alt=""><span class="ori-l"><img class="face" src="pp-book-l.png" alt=""><img class="back" src="pp-cover.png" alt=""></span>${[0, 1].map(n => `<span class="ori-pg" style="--n:${n}"><img src="pp-page.png" alt=""></span>`).join('')}
+    <span class="ori" aria-hidden="true"><img class="ori-r" src="pp-book-r.png" alt=""><span class="ori-l"><img class="face" src="pp-lcover.png" alt=""><img class="back" src="pp-cover.png" alt=""></span><span class="ori-pg" style="--n:0"><img class="face" src="pp-lp1.png" alt=""><img class="back" src="pp-lp1b.png" alt=""></span><span class="ori-pg" style="--n:1"><img class="face" src="pp-lp2.png" alt=""><img class="back" src="pp-lp2b.png" alt=""></span>
       <img class="ori-hr" src="pp-head-r.png" alt=""><span class="ori-hl"><img class="face" src="pp-head-l.png" alt=""><img class="back" src="pp-head-back.png" alt=""></span><img class="ori-ear l" src="pp-ear-l.png" alt=""><img class="ori-ear r" src="pp-ear-r.png" alt=""></span>
     <span class="ori-word" aria-hidden="true"><img class="logo-l" src="wordmark-l.png" alt=""><img class="logo-d" src="wordmark-d.png" alt=""></span></h1>`;
 }
