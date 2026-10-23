@@ -340,7 +340,7 @@ function render() {
    page lifts, the right half of the pig). Every turning sheet is drawn in thin vertical strips
    with real perspective and a little curl, so it reads like paper. When every sheet has
    landed, the picture is the logo itself. Plays once per visit; tap it to play again. */
-const ORI_SRC = { cover: 'pp-cover.png', lcover: 'pp-lcover.png', lp1: 'pp-lp1.png', lp2: 'pp-lp2.png', rpage: 'pp-rpage.png', rbook: 'pp-rbook.png', headl: 'pp-headl.png', headr: 'pp-headr.png', earl: 'pp-earl.png', earr: 'pp-earr.png' };
+const ORI_SRC = { cover: 'pp-cover.png', lcover: 'pp-lcover.png', lp1: 'pp-lp1.png', lp1t: 'pp-lp1t.png', lp2: 'pp-lp2.png', rpage: 'pp-rpage.png', rbook: 'pp-rbook.png', headl: 'pp-headl.png', headr: 'pp-headr.png', earl: 'pp-earl.png', earr: 'pp-earr.png' };
 let ORI = null, oriLoading = null, logoPlayed = false, oriRaf = 0;
 function oriLoad() {
   if (ORI) return Promise.resolve(ORI);
@@ -367,9 +367,10 @@ function oriFrame(cv, t) {
   const appear = oriClamp(t / .3);
   g.save(); g.globalAlpha = appear; g.translate(shift, 0);
   const flat = (img, x) => img && g.drawImage(img, x, 0, img.width * (H / img.height), H);
-  const sheets = [[I.cover, I.lcover, pc], [I.rpage, I.lp1, p1], [I.rpage, I.lp2, p2], [I.rpage, I.headl, p3]];
+  // [front, back while turning, back once landed, progress]
+  const sheets = [[I.cover, I.lcover, I.lcover, pc], [I.rpage, I.lp1t, I.lp1, p1], [I.rpage, I.lp2, I.lp2, p2], [I.rpage, I.headl, I.headl, p3]];
   // left side: sheets that have landed, oldest first
-  for (const [, back, p] of sheets) if (p >= 1) flat(back, 0);
+  for (const [, , landed, p] of sheets) if (p >= 1) flat(landed, 0);
   // right side: the page stack, and the right half of the pig once the last page starts to lift
   if (pc > 0) { flat(I.rbook, X0); if (p3 > 0) {
       // the pig is bigger than the pages: a pop-up. Its right half springs up out of the page as the last sheet lifts.
@@ -377,7 +378,7 @@ function oriFrame(cv, t) {
       g.save(); g.translate(0, hy); g.scale(1, Math.max(.001, e)); g.translate(0, -hy); flat(I.headr, X0); g.restore();
     } }
   // the sheet that is turning (or the closed cover before anything moves)
-  for (const [front, back, p] of sheets) {
+  for (const [front, back, , p] of sheets) {
     if (p <= 0 && front === I.cover) { flat(front, X0); break }
     if (p > 0 && p < 1) { oriTurn(g, front, back, oriEase(p), { X0, pw, H, cy, f }); break }
   }
