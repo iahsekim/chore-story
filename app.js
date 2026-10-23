@@ -188,6 +188,7 @@ const I = {
   coin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6.5v11"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h-1A.5.5 0 0 1 4 15.5z"/><path d="M8.5 8.5h7M8.5 12h4.5"/></svg>',
   dollar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 7.5C15.7 5.9 14.1 5 12 5c-2.8 0-4.5 1.4-4.5 3.4 0 4.6 9.2 2.6 9.2 7.2 0 2-1.9 3.4-4.7 3.4-2.3 0-4-1-4.8-2.7M12 2.5v19"/></svg>',
   jar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8M9 3v3c-2.4 1-4 3.2-4 6v6a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-6c0-2.8-1.6-5-4-6V3"/><path d="M8.5 14h7"/></svg>',
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
@@ -338,12 +339,12 @@ function authHTML() {
         <input id="codeIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" maxlength="12" placeholder="Code"></div>
         <button class="save" id="codeGo" type="button">Sign in</button>
         <p class="hint">Or tap the link in the email on this device. <button class="link" id="authBack" type="button">Use a different email</button></p>`
-      : `<div class="field"><label class="label" for="emailIn">Parent email</label>
+      : `<div class="field"><label class="label" for="emailIn">Parent or guardian email</label>
         <input id="emailIn" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="${esc(S.authEmail)}"></div>
         <button class="save" id="emailGo" type="button">Email me a sign-in code</button>
         <p class="hint">No password. We email you a code each time you sign in on a new device. Kids sign in with your email too, then pick their name.</p>`}
     </div>
-    <div class="foot">${supportHTML()}<span><button class="link" type="button" data-fb="hi">Contact</button> · <button class="link" type="button" data-privacy>Privacy</button></span></div></section>`;
+    <div class="foot">${supportHTML()}<span><button class="link" type="button" data-fb="hi">Feedback</button> · <button class="link" type="button" data-privacy>Privacy</button></span></div></section>`;
 }
 async function sendCode() {
   const email = $('emailIn').value.trim().toLowerCase();
@@ -371,8 +372,8 @@ function onboardHTML() {
     <div class="card form"><div class="field"><label class="label" for="famName">Family name</label><input id="famName" maxlength="60" placeholder="Family name" autocapitalize="words" value="${esc(O.name)}"></div>
     <p class="hint">Weeks start Monday in your time zone: <b>${esc(O.tz)}</b>.</p>
     <button class="save" id="ob0" type="button">Next</button></div></section>`;
-  if (O.step === 1) return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Parent PIN</h2>
-    <p class="lede">Kids use your email to sign in, so a 4-digit PIN keeps parent tools to you.</p>
+  if (O.step === 1) return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Parent/guardian PIN</h2>
+    <p class="lede">Kids use your email to sign in, so a 4-digit PIN keeps the grown-up tools to you.</p>
     <div class="card form"><div class="field"><label class="label" for="pin1">Choose a PIN</label><input id="pin1" class="pin" inputmode="numeric" type="password" maxlength="4" autocomplete="off"></div>
     <div class="field"><label class="label" for="pin2">Type it again</label><input id="pin2" class="pin" inputmode="numeric" type="password" maxlength="4" autocomplete="off"></div>
     <button class="save" id="ob1" type="button">Next</button></div></section>`;
@@ -437,9 +438,9 @@ function whoHTML() {
   }).join('');
   return `<section class="screen-center whoscreen"><h1 class="logo-h"><img class="logo-l" src="logo-900.png" alt="${esc(APP)}" width="900" height="389"><img class="logo-d" src="logo-900-dark.png" alt="${esc(APP)}" width="900" height="370"></h1>
     <h2 class="who-q">${hello()}! Who's here?</h2>
-    ${S.kids.length ? `<div class="kidtiles ${S.kids.length === 1 ? 'one' : ''}">${tiles}</div>` : '<p class="hint" style="text-align:center">No kids yet. Choose Parent to add one.</p>'}
-    <button class="partile" type="button" data-who="parent"><span class="pt-lock">${I.lock}</span><span class="t"><b>Parent</b><span>Settings, approvals and the ledger. PIN needed.</span></span>${I.chev}</button>
-    <div class="foot"><button class="link" id="signOutWho" type="button">Switch account</button></div></section>`;
+    ${S.kids.length ? `<div class="kidtiles ${S.kids.length === 1 ? 'one' : ''}">${tiles}</div>` : '<p class="hint" style="text-align:center">No kids yet. Choose Parent/guardian to add one.</p>'}
+    <button class="partile" type="button" data-who="parent"><span class="pt-lock">${I.lock}</span><span class="t"><b>Parent/guardian</b><span>Settings, approvals and the ledger. PIN needed.</span></span>${I.chev}</button>
+    <div class="foot"><span><button class="link" type="button" data-fb="hi">Feedback</button> · <button class="link" id="signOutWho" type="button">Switch account</button></span></div></section>`;
 }
 function setProfile(p) { S.profile = p; store.set('profile', p); S.view = p === 'parent' ? 'parent' : 'kid'; S.tab = 'home'; if (p !== 'parent') { const k = kidById(p); if (k) setTimeout(() => cheerNews(k), 50) } }
 function chooseProfile(p) {
@@ -456,7 +457,7 @@ function kidAppHTML() {
   if (!['home', 'jobs', 'ledger'].includes(S.tab)) S.tab = 'home';
   const greet = { home: 'Hi there!', jobs: 'Pick a job, earn money', ledger: 'Everything logged' }[S.tab];
   return `<header><div class="hello"><span class="mypig" style="--kc:${COLORS[kid.color]}" aria-hidden="true">${esc((kid.name || '?').slice(0, 1).toUpperCase())}</span><div><small>${greet}</small><h1>${esc(kid.name)}</h1></div></div>
-    <button class="lock" id="swapBtn" type="button">${I.swap} Switch</button></header>
+    <div class="hbtns"><button class="lock icon" type="button" data-fb="hi" aria-label="Send feedback">${I.chat}</button><button class="lock" id="swapBtn" type="button">${I.swap} Switch</button></div></header>
     <main>${({ home: kidHome, jobs: kidJobs, ledger: kidLedger })[S.tab](kid)}</main>
     ${tabbar(KTABS, S.tab)}`;
 }
@@ -482,7 +483,7 @@ function kidHome(kid) {
       <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${g ? '' : '<button class="link-w" type="button" id="goalBtn">Set a saving goal</button>'}</div>
       <button class="earn" type="button" data-tab="jobs">${I.jobs}<span>Earn more on the job board</span>${I.chev}</button>
     </section>
-    ${mine.length ? `<button class="waitline" type="button" data-tab="ledger">${I.clock}<span><b>${mine.length} job${mine.length > 1 ? 's' : ''}</b> waiting for a parent to check</span></button>` : ''}
+    ${mine.length ? `<button class="waitline" type="button" data-tab="ledger">${I.clock}<span><b>${mine.length} job${mine.length > 1 ? 's' : ''}</b> waiting for a grown-up to check</span></button>` : ''}
     ${ra ? `<section class="board rdb" id="readBoard">${readBoardHTML(kid)}</section>` : ''}
     ${sa ? `<section class="board" id="board">${boardHTML(kid)}</section>` : ''}
     ${ra && sa ? '' : `<section class="starts">
@@ -522,7 +523,7 @@ function ledgerItems(kid, ws, f = 'all') {
     for (const c of S.credits.filter(c => c.kid_id === kid.id && c.week_start === ws)) {
       const wait = !isApproved(c), m = Number(c.minutes) || 0;
       R.push({ date: localDate(ms(c.created_at)), ts: ms(c.created_at), ico: `<span class="ico ${wait ? 'w' : c.kind === 'job' ? 'j' : 'm'}">${wait ? I.clock : c.kind === 'job' ? I.check : I.star}</span>`, title: c.title,
-        sub: (wait ? 'Waiting for a parent' : c.kind === 'job' ? 'Job' : 'Bonus') + (m ? ` · +${m} screen min` : ''), amt: '+' + money(Number(c.amount)), cls: wait ? 'wait' : 'up', edit: `${c.kind === 'job' ? 'job' : 'bonus'}|${c.id}|${kid.id}` });
+        sub: (wait ? 'Waiting for a grown-up' : c.kind === 'job' ? 'Job' : 'Bonus') + (m ? ` · +${m} screen min` : ''), amt: '+' + money(Number(c.amount)), cls: wait ? 'wait' : 'up', edit: `${c.kind === 'job' ? 'job' : 'bonus'}|${c.id}|${kid.id}` });
     }
     for (const t of S.tx.filter(t => t.kid_id === kid.id && monday(t.local_date) === ws))
       R.push({ date: t.local_date, ts: ms(t.created_at), ico: `<span class="ico ${t.kind === 'payout' ? 's' : 'r'}">${t.kind === 'payout' ? I.cash : I.bag}</span>`, title: t.note, sub: t.kind === 'payout' ? 'Withdrawal' : 'Spent', amt: '−' + money(Number(t.amount)), cls: 'out', edit: `${t.kind}|${t.id}|${kid.id}` });
@@ -530,10 +531,10 @@ function ledgerItems(kid, ws, f = 'all') {
       R.push({ date: p.local_date, ts: ms(p.created_at), ico: `<span class="ico x">${I.jar}</span>`, title: p.note, sub: penName(), amt: '−' + money(Number(p.amount)), cls: 'out', edit: `penalty|${p.id}` });
   }
   if (rd) for (const r of S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws))
-    R.push({ date: r.local_date, ts: ms(r.started_at), when: span(r), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: 'Reading' + (r.source === 'manual' ? ' · added by a parent' : !r.ended_at ? (r.running_since ? ' · reading now' : ' · paused') : ''), amt: dur(readSec(r, kid)), cls: 'rd', edit: `read|${r.id}` });
+    R.push({ date: r.local_date, ts: ms(r.started_at), when: span(r), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: 'Reading' + (r.source === 'manual' ? ' · added by a grown-up' : !r.ended_at ? (r.running_since ? ' · reading now' : ' · paused') : ''), amt: dur(readSec(r, kid)), cls: 'rd', edit: `read|${r.id}` });
   if (sc) {
     for (const x of S.screen.filter(x => x.kid_id === kid.id && x.week_start === ws))
-      R.push({ date: x.local_date, ts: ms(x.started_at), when: span(x), ico: `<span class="ico s">${I.screen}</span>`, title: x.note || 'Screen time', sub: 'Screens' + (x.source === 'manual' ? ' · added by a parent' : !x.ended_at ? (x.running_since ? ' · on now' : ' · paused') : ''), amt: '−' + dur(liveSec(x)), cls: 'out', edit: `screen|${x.id}` });
+      R.push({ date: x.local_date, ts: ms(x.started_at), when: span(x), ico: `<span class="ico s">${I.screen}</span>`, title: x.note || 'Screen time', sub: 'Screens' + (x.source === 'manual' ? ' · added by a grown-up' : !x.ended_at ? (x.running_since ? ' · on now' : ' · paused') : ''), amt: '−' + dur(liveSec(x)), cls: 'out', edit: `screen|${x.id}` });
     for (const b of S.sbonus.filter(b => b.kid_id === kid.id && b.week_start === ws))
       R.push({ date: localDate(ms(b.created_at)), ts: ms(b.created_at), ico: `<span class="ico m">${I.star}</span>`, title: b.note, sub: 'Bonus screen minutes', amt: `+${b.minutes} min`, cls: 'up', edit: `sbonus|${b.id}` });
     for (const p of kidPen(kid).filter(p => p.week_start === ws && Number(p.minutes) > 0))
@@ -555,8 +556,7 @@ function ledgerListHTML(kid, ws, f, parent) {
 function kidJobs(kid) {
   const on = S.jobs.filter(j => j.kid_id === kid.id && j.enabled), mine = pendingClaims(kid);
   const cats = ['All', ...new Set(on.map(j => j.category))]; if (!cats.includes(S.jobFilter)) S.jobFilter = 'All';
-  return `<section class="steps4" aria-label="How jobs work">${[['jobs', 'Pick a job'], ['check', 'Do it'], ['play', 'Tap I did it'], ['coin', 'Grown-up OKs it']].map(([ic, t], i) => `<div><span class="n">${i + 1}</span><span class="si">${I[ic]}</span><b>${t}</b></div>`).join('')}</section>
-    ${mine.length ? `<section class="sect"><div class="sect-h"><h3>Waiting for a parent</h3></div><div class="list">${mine.map(c => `<div class="row wait-row"><span class="ico j">${I.clock}</span><span class="t"><b>${esc(c.title)}</b><span>${short(localDate(ms(c.created_at)))}</span></span><span class="amt">+${money(Number(c.amount))}</span></div>`).join('')}</div></section>` : ''}
+  return `${mine.length ? `<section class="sect"><div class="sect-h"><h3>Waiting for a grown-up</h3></div><div class="list">${mine.map(c => `<div class="row wait-row"><span class="ico j">${I.clock}</span><span class="t"><b>${esc(c.title)}</b><span>${short(localDate(ms(c.created_at)))}</span></span><span class="amt">+${money(Number(c.amount))}</span></div>`).join('')}</div></section>` : ''}
     ${on.length ? `<section class="sect"><div class="filters">${cats.map(c => `<button class="chip" type="button" data-cat="${esc(c)}" aria-pressed="${c === S.jobFilter}">${esc(c)}</button>`).join('')}</div>
     <div class="list">${on.filter(j => S.jobFilter === 'All' || j.category === S.jobFilter).sort((a, b) => a.price - b.price).map(j => `<button class="row jobrow" type="button" data-claim="${j.id}">${catIco(j.category)}<span class="t"><b>${esc(j.title)}</b><span>${esc(j.done_means)}</span></span><span class="stack"><span class="price num">${coinSVG('mini')}${money(Number(j.price))}</span>${Number(j.bonus_minutes) ? `<span class="bal">+${j.bonus_minutes} screen min</span>` : ''}</span></button>`).join('')}</div></section>`
       : `<div class="list"><div class="empty">No jobs on your board yet.</div></div>`}`;
@@ -564,10 +564,10 @@ function kidJobs(kid) {
 function claimSheet(kid, job) {
   openSheet(`<span class="label">${esc(job.category)}</span><h2>${esc(job.title)}</h2>
     <div class="done-box"><span class="label">Done means</span><b>${esc(job.done_means || 'Finished all the way')}</b></div>
-    <p class="hint">A parent will check it. Then <b>${money(Number(job.price))}</b>${Number(job.bonus_minutes) ? ` and <b>${job.bonus_minutes} screen minutes</b>` : ''} go to you.</p>
+    <p class="hint">A grown-up will check it. Then <b>${money(Number(job.price))}</b>${Number(job.bonus_minutes) ? ` and <b>${job.bonus_minutes} screen minutes</b>` : ''} go to you.</p>
     <button class="save" id="clGo" type="button">I did it</button><button class="cancel" data-close type="button">Not yet</button>`, () => {
     $('clGo').onclick = async () => { closeSheet(); unlockAudio(); await act(() => q(sb.from('credits').insert({ family_id: S.family.id, kid_id: kid.id, week_start: thisWeek(), kind: 'job', title: job.title, amount: Number(job.price), minutes: Number(job.bonus_minutes) || 0, job_id: job.id, status: 'pending' })));
-      celebrate(praise(), `${job.title} is waiting for a parent to check. ${money(Number(job.price))} is on the way!`, { icon: 'check' }) };
+      celebrate(praise(), `${job.title} is waiting for a grown-up to check. ${money(Number(job.price))} is on the way!`, { icon: 'check' }) };
   });
 }
 function goalSheet(kid) {
@@ -636,9 +636,9 @@ function boardHTML(kid) {
 const PTABS = [['kids', 'Kids', 'kids'], ['jobs', 'Job boards', 'jobs'], ['pay', 'Ledger', 'pay'], ['settings', 'Settings', 'gear']];
 function parentAppHTML() {
   
-  const greet = { kids: 'Parent', jobs: 'Edit each kid’s board', pay: 'Every entry, editable', settings: 'Family settings' }[S.ptab];
+  const greet = { kids: 'Parent/guardian', jobs: 'Edit each kid’s board', pay: 'Every entry, editable', settings: 'Family settings' }[S.ptab];
   return `<header><div class="hello"><small>${greet}</small><h1>${esc(S.family.name || APP)}</h1></div>
-    <button class="lock on" id="swapBtn" type="button">${I.swap} Switch</button></header>
+    <div class="hbtns"><button class="lock icon" type="button" data-fb="hi" aria-label="Send feedback">${I.chat}</button><button class="lock on" id="swapBtn" type="button">${I.swap} Switch</button></div></header>
     <main>${({ kids: pKids, jobs: pJobs, pay: pPay, settings: pSettings })[S.ptab]()}</main>
     ${tabbar(PTABS, S.ptab, { kids: pendingClaims().length })}`;
 }
@@ -673,13 +673,13 @@ function pJobs() {
 function timeRows(kid, view, ws) {
   const R = [];
   if (view === 'screen') {
-    for (const x of S.screen.filter(x => x.kid_id === kid.id && x.week_start === ws)) R.push({ date: x.local_date, ts: ms(x.started_at), when: span(x), ico: `<span class="ico s">${I.screen}</span>`, title: x.source === 'manual' ? (x.note || 'Screen time') : 'Screen session', sub: x.source === 'manual' ? 'Added by a parent' : !x.ended_at ? (x.running_since ? 'Running now' : 'Paused') : 'Clock', v: -liveSec(x), edit: `screen|${x.id}` });
+    for (const x of S.screen.filter(x => x.kid_id === kid.id && x.week_start === ws)) R.push({ date: x.local_date, ts: ms(x.started_at), when: span(x), ico: `<span class="ico s">${I.screen}</span>`, title: x.source === 'manual' ? (x.note || 'Screen time') : 'Screen session', sub: x.source === 'manual' ? 'Added by a parent/guardian' : !x.ended_at ? (x.running_since ? 'Running now' : 'Paused') : 'Clock', v: -liveSec(x), edit: `screen|${x.id}` });
     for (const b of S.sbonus.filter(b => b.kid_id === kid.id && b.week_start === ws)) R.push({ date: localDate(ms(b.created_at)), ts: ms(b.created_at), ico: `<span class="ico m">${I.star}</span>`, title: b.note, sub: 'Bonus minutes', v: b.minutes * 60, edit: `sbonus|${b.id}` });
     for (const c of weekCredits(kid, ws).filter(c => Number(c.minutes) > 0)) R.push({ date: localDate(ms(c.created_at)), ts: ms(c.created_at), ico: `<span class="ico j">${I.check}</span>`, title: c.title, sub: 'Job bonus minutes', v: c.minutes * 60, edit: `credit|${c.id}` });
     for (const p of kidPen(kid).filter(p => p.week_start === ws && Number(p.minutes) > 0)) R.push({ date: p.local_date, ts: ms(p.created_at), ico: `<span class="ico x">${I.jar}</span>`, title: p.note, sub: penName(), v: -p.minutes * 60, edit: `penalty|${p.id}` });
     const rw = readWeek(kid, ws); if (rw.bonus) R.push({ date: addDays(ws, 6) > today() ? today() : addDays(ws, 6), ts: 0, ico: `<span class="ico r">${I.read}</span>`, title: 'Earned from reading', sub: `${dur(rw.sec)} read this week`, v: rw.bonus * 60, edit: '' });
   } else {
-    for (const r of S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws)) R.push({ date: r.local_date, ts: ms(r.started_at), when: span(r), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: r.source === 'manual' ? 'Added by a parent' : !r.ended_at ? (r.running_since ? 'Reading now' : 'Paused') : 'Timer', v: readSec(r, kid), edit: `read|${r.id}` });
+    for (const r of S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws)) R.push({ date: r.local_date, ts: ms(r.started_at), when: span(r), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: r.source === 'manual' ? 'Added by a parent/guardian' : !r.ended_at ? (r.running_since ? 'Reading now' : 'Paused') : 'Timer', v: readSec(r, kid), edit: `read|${r.id}` });
   }
   return R.sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
 }
@@ -800,13 +800,13 @@ function pSettings() {
       <div class="field"><label class="label" for="sFam">Family name</label><input id="sFam" maxlength="60" autocapitalize="words" value="${esc(F.name)}"></div>
       <div class="field"><label class="label" for="sTz">Time zone (weeks reset Monday here)</label><select id="sTz">${tzOptions(F.timezone)}</select></div>
       <button class="save" id="saveFam" type="button">Save</button>
-      <button class="pill soft" id="changePin" type="button" style="justify-self:start">Change parent PIN</button></section>
-    <section class="card"><span class="label">Parents on this family</span>
-      ${S.members.map(m => `<div class="hint" style="color:var(--ink)">${esc(m.email || 'Parent')}${m.user_id === S.user.id ? ' (you)' : ''}</div>`).join('')}
-      ${S.invites.map(i => `<div class="hint">${esc(i.email)} · invited</div>`).join('')}
-      <div class="field"><label class="label" for="invEmail">Invite another parent</label><input id="invEmail" type="email" placeholder="Email address"></div>
-      <button class="pill" id="invGo" type="button" style="justify-self:start">Add parent</button>
-      <p class="hint">They sign in at this site with that email and join your family automatically.</p></section>
+      <button class="pill soft" id="changePin" type="button" style="justify-self:start">Change parent/guardian PIN</button></section>
+    <section class="card"><span class="label">Parents and guardians</span>
+      <div class="people">${S.members.map(m => `<div class="person"><span class="t"><b>${esc(m.email || 'Parent/guardian')}</b><span>${m.user_id === S.user.id ? 'You' : 'Can sign in'}</span></span>${m.user_id === S.user.id ? '' : `<button class="pill no" type="button" data-rmmember="${m.user_id}" data-email="${esc(m.email || '')}">Remove</button>`}</div>`).join('')}
+      ${S.invites.map(i => `<div class="person"><span class="t"><b>${esc(i.email)}</b><span>Invited, hasn't signed in yet</span></span><button class="pill soft" type="button" data-rminvite="${esc(i.email)}">Cancel invite</button></div>`).join('')}</div>
+      <div class="field"><label class="label" for="invEmail">Add a parent or guardian</label><input id="invEmail" type="email" placeholder="Email address"></div>
+      <button class="pill" id="invGo" type="button" style="justify-self:start">Add</button>
+      <p class="hint">They sign in here with that email and join your family. Anyone you add can add or remove others too.</p></section>
     <section class="card"><span class="label">Contact & feedback</span><p class="hint">Found a bug, have an idea, or just want to say hi? It goes straight to the person who makes ${esc(APP)}.</p>
       <div class="ptools"><button class="pill soft" type="button" data-fb="bug">Report a bug</button><button class="pill soft" type="button" data-fb="idea">Request a feature</button><button class="pill soft" type="button" data-fb="hi">Say hi</button></div></section>
     <section class="card"><span class="label">Support ${esc(APP)}</span><p class="hint">${esc(APP)} is free. If it helps your family, a coffee keeps it running.</p>${supportHTML(true)}</section>
@@ -888,7 +888,9 @@ function bindAll() {
   each('[data-addtime]', el => { const [kind, kid, ws] = el.dataset.addtime.split('|'); entrySheet(kind, kidById(kid), null, ws) });
   on('saveFam', () => act(() => q(sb.from('families').update({ name: titleCase($('sFam').value) || 'Our Family', timezone: $('sTz').value }).eq('id', S.family.id)), 'Saved'));
   on('changePin', () => newPinSheet());
-  on('invGo', () => { const e = $('invEmail').value.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return toast('Enter a valid email.'); act(() => q(sb.from('family_invites').upsert({ family_id: S.family.id, email: e })), 'Invite saved') });
+  each('[data-rmmember]', el => confirmSheet(`Remove ${el.dataset.email || 'this person'}?`, 'They lose access to your family right away. You can invite them again later.', 'Remove', () => q(sb.from('family_members').delete().eq('family_id', S.family.id).eq('user_id', el.dataset.rmmember)), 'Removed'));
+  each('[data-rminvite]', el => act(() => q(sb.from('family_invites').delete().eq('family_id', S.family.id).eq('email', el.dataset.rminvite)), 'Invite canceled'));
+  on('invGo', () => { const e = $('invEmail').value.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return toast('Enter a valid email.'); act(() => q(sb.from('family_invites').upsert({ family_id: S.family.id, email: e })), 'Added. They can sign in with that email now.') });
   on('signOutWho', async () => { await sb.auth.signOut(); store.set('profile', null); store.set('signed-in', null); location.reload() });
   on('signOut', async () => { await sb.auth.signOut(); store.set('profile', null); location.reload() });
   on('delAcct', deleteSheet);
@@ -983,7 +985,11 @@ function releaseWake() { try { wakeLock?.release(); wakeLock = null } catch (e) 
 
 /* ---------- sheets ---------- */
 const layer = $('layer');
-function openSheet(html, after) { layer.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`; $('scrim').onclick = e => { if (e.target.id === 'scrim') closeSheet() }; layer.querySelectorAll('[data-close]').forEach(b => b.onclick = closeSheet); after && after() }
+/* An open sheet updates in place (no replayed slide-up, scroll kept), so tapping an option never feels like a reload. */
+function openSheet(html, after) {
+  const cur = layer.querySelector('.sheet');
+  if (cur) { const top = cur.scrollTop; cur.innerHTML = html; cur.scrollTop = top; layer.querySelectorAll('[data-close]').forEach(b => b.onclick = closeSheet); after && after(); return }
+  layer.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`; $('scrim').onclick = e => { if (e.target.id === 'scrim') closeSheet() }; layer.querySelectorAll('[data-close]').forEach(b => b.onclick = closeSheet); after && after() }
 function closeSheet() { layer.innerHTML = '' }
 let tt; function toast(m) { clearTimeout(tt); let el = $('toast'); if (!el) { el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el) } el.textContent = m; tt = setTimeout(() => el.remove(), 2800) }
 function confirmSheet(title, body, yes, fn, ok, style = 'red') {
@@ -991,7 +997,7 @@ function confirmSheet(title, body, yes, fn, ok, style = 'red') {
     () => { $('cfYes').onclick = async () => { $('cfYes').disabled = true; closeSheet(); await act(fn, ok) } });
 }
 function pinSheet(onOk) {
-  openSheet(`<h2>Parent PIN</h2><div class="field"><label class="label" for="pinIn">Enter your 4-digit PIN</label><input id="pinIn" class="pin" inputmode="numeric" type="password" maxlength="4" autocomplete="off"></div>
+  openSheet(`<h2>Parent/guardian PIN</h2><div class="field"><label class="label" for="pinIn">Enter your 4-digit PIN</label><input id="pinIn" class="pin" inputmode="numeric" type="password" maxlength="4" autocomplete="off"></div>
     <button class="save" id="pinGo" type="button">Unlock</button><button class="cancel" data-close type="button">Cancel</button>
     ${S.canResetPin ? '<button class="cancel" id="pinReset" type="button">Forgot it? Set a new PIN</button>' : '<p class="hint">Forgot it? On the Who\'s using screen, choose Switch account, sign in again with your email, and you can set a new PIN.</p>'}`, () => {
     const r = $('pinReset'); if (r) r.onclick = () => { closeSheet(); newPinSheet(true, onOk) };
@@ -1203,19 +1209,19 @@ function feedbackSheet(kind) {
 }
 const PRIVACY = [
   ['The short version', `${APP} is a free tool for families. It keeps as little as possible, never sells or shares it, and has no ads, trackers or analytics.`],
-  ['What we store', 'The parent\u2019s email address, used only to send sign-in codes. A family name, time zone and a scrambled (hashed) parent PIN. For each kid: a first name and color, allowance amount, job board, jobs and bonuses with their explanations, withdrawals and purchases with their explanations, a saving goal if one is set, reading sessions (book titles and time) and screen-time sessions.'],
-  ['What we don\u2019t collect', 'No last names, birthdays, photos, locations, school names, contact details or anything else about kids. Kids never make an account or enter an email. Everything sits under the parent\u2019s account.'],
-  ['Who can see it', 'Only the parents signed in to your family. Data is stored with Supabase and protected by database rules that keep each family\u2019s records separate from every other family\u2019s.'],
+  ['What we store', 'The parent or guardian\u2019s email address, used only to send sign-in codes. A family name, time zone and a scrambled (hashed) parent/guardian PIN. For each kid: a first name and color, allowance amount, job board, jobs and bonuses with their explanations, withdrawals and purchases with their explanations, a saving goal if one is set, reading sessions (book titles and time) and screen-time sessions.'],
+  ['What we don\u2019t collect', 'No last names, birthdays, photos, locations, school names, contact details or anything else about kids. Kids never make an account or enter an email. Everything sits under the parent or guardian\u2019s account.'],
+  ['Who can see it', 'Only the parents and guardians signed in to your family. Data is stored with Supabase and protected by database rules that keep each family\u2019s records separate from every other family\u2019s.'],
   ['Feedback messages', 'If you send a bug report, idea or message, it\u2019s delivered to the person who runs this site, along with the email you typed (optional) and which screen you were on.'],
   ['Donations', 'The Venmo, Cash App and PayPal links open those services. This site never sees your payment details.'],
-  ['Deleting your data', 'Parent \u2192 Settings \u2192 Delete account and all data permanently removes your family, every kid profile and all history right away.'],
+  ['Deleting your data', 'Parent/guardian \u2192 Settings \u2192 Delete account and all data permanently removes your family, every kid profile and all history right away.'],
   ['Questions', 'Use Contact on the sign-in screen, or Settings \u2192 Contact & feedback.']
 ];
 function privacySheet() {
   openSheet(`<span class="label">${esc(APP)}</span><h2>Privacy</h2>${PRIVACY.map(([h, t]) => `<div class="field"><b style="font:700 18px var(--display)">${h}</b><p class="hint" style="color:var(--ink);font-size:15px;line-height:1.55">${t}</p></div>`).join('')}<p class="hint">Last updated October 2026.</p><button class="save" data-close type="button">Done</button>`);
 }
 function deleteSheet() {
-  openSheet(`<h2>Delete everything?</h2><p class="hint">This permanently deletes your family, every kid profile, all earnings history, reading and screen time, and your sign-in. Other parents on this family lose access too.</p>
+  openSheet(`<h2>Delete everything?</h2><p class="hint">This permanently deletes your family, every kid profile, all earnings history, reading and screen time, and your sign-in. Other parents and guardians on this family lose access too.</p>
     <div class="field"><label class="label" for="delType">Type DELETE to confirm</label><input id="delType" autocomplete="off"></div>
     <button class="save red" id="delGo" type="button">Delete my account</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
     $('delGo').onclick = async () => { if ($('delType').value.trim() !== 'DELETE') return toast('Type DELETE to confirm.');

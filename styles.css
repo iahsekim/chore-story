@@ -320,11 +320,13 @@ input,select,textarea{font:500 16px var(--body);color:var(--text);background:var
 textarea{min-height:120px;resize:vertical}
 input:focus,select:focus,textarea:focus{outline:3px solid var(--blue);outline-offset:1px}
 .pin,.code-in{font:400 30px var(--display)!important;letter-spacing:.35em;text-align:center}
-.tog{position:relative;flex:none;width:52px;height:32px;border-radius:16px;background:var(--rule);border:var(--line-w) solid var(--edge)}
+.tog{position:relative;flex:none;width:60px;height:36px;border-radius:18px;background:var(--paper);border:var(--line-w) solid var(--edge);transition:background .18s}
 .tog::before{content:"";position:absolute;inset:-9px -4px}
-.tog::after{content:"";position:absolute;top:2px;left:2px;width:23px;height:23px;border-radius:50%;background:#fff;border:var(--line-w) solid var(--edge);transition:left .15s}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--ink);transition:transform .18s cubic-bezier(.3,.9,.4,1)}
+:root[data-theme="dark"] .tog::after{background:#fff}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tog::after{background:#fff}}
 .tog[aria-pressed="true"]{background:var(--pink)}
-.tog[aria-pressed="true"]::after{left:21px}
+.tog[aria-pressed="true"]::after{transform:translateX(24px);background:#fff}
 .togline{display:flex;align-items:center;justify-content:space-between;gap:14px}
 .togline>span{display:grid;gap:2px}
 .togline b{font-weight:600}
@@ -529,3 +531,15 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
 
 /* ---------- the kid's initial in the header, in their color ---------- */
 .mypig{flex:none;width:56px;height:56px;display:grid;place-items:center;background:var(--kc);border:var(--line-w) solid var(--edge);border-radius:18px;font:400 30px/1 var(--display);color:#fff;-webkit-text-stroke:7px var(--edge);paint-order:stroke fill;box-shadow:0 4px 0 var(--edge)}
+
+/* header buttons: feedback is always one tap away */
+.hbtns{display:flex;gap:8px;flex:none}
+.lock.icon{width:44px;padding:0;justify-content:center}
+.lock.icon svg{width:20px;height:20px}
+/* parents and guardians list */
+.people{display:grid}
+.person{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:2px solid var(--rule)}
+.person:first-child{border-top:0;padding-top:0}
+.person .t{flex:1;min-width:0;display:grid;gap:1px}
+.person b{font-weight:600;overflow-wrap:anywhere}
+.person .t span{font-size:13px;color:var(--muted)}

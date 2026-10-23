@@ -277,6 +277,10 @@ create policy fam_update on public.families for update to authenticated using (i
 
 drop policy if exists mem_select on public.family_members;
 create policy mem_select on public.family_members for select to authenticated using (family_id in (select public.my_family_ids()));
+-- Any parent/guardian can remove another one from the family (never themselves, so a family is never left empty).
+drop policy if exists mem_delete on public.family_members;
+create policy mem_delete on public.family_members for delete to authenticated
+  using (family_id in (select public.my_family_ids()) and user_id <> auth.uid());
 
 drop policy if exists inv_all on public.family_invites;
 create policy inv_all on public.family_invites for all to authenticated
