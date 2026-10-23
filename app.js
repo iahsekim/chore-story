@@ -292,7 +292,7 @@ function celebrate(title, sub, { power = 1, icon = 'star', sound = true } = {}) 
   const close = () => { document.removeEventListener('keydown', onKey); el.classList.add('out'); setTimeout(() => el.remove(), 300) };
   const onKey = e => { if (e.key === 'Escape') close() };
   el.onclick = e => { if (e.target === el || e.target.closest('.cheer-ok')) close() };
-  document.addEventListener('keydown', onKey); document.body.appendChild(el); el.querySelector('.cheer-ok').focus({ preventScroll: true });
+  document.addEventListener('keydown', onKey); document.body.appendChild(el); el.querySelector('.cheer-ok').focus({ preventScroll: true, focusVisible: false });
 }
 const CHEER_OK = ['Yay!', 'Awesome!', 'Got it!', 'Woo-hoo!'];
 const PRAISE = ['Way to go!', 'Awesome!', 'You did it!', 'Nice work!', 'Look at you go!', 'High five!', 'Super job!'];

@@ -5,7 +5,7 @@
    - Kids stand on the pink side. Grown-ups stand on the white side.
    - Every card is a white sheet with the logo's heavy ink outline.
    - Folded ears mean "a pig": they appear only on pigs (the bank, each
-     kid's name tile, the celebration). Nothing else is folded.
+     kid's name tile). Nothing else is folded.
    - Pink is the brand and the main action. Blue is reading and good news.
      Gold is the coin, and screen time. Ink does the rest.
    ===================================================================== */
@@ -391,10 +391,7 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--blue);outline-of
 .confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
 .cheer{position:fixed;inset:0;z-index:55;display:grid;place-items:center;padding:24px;background:rgba(12,24,68,.5);animation:fade-in .2s ease-out}
 .cheer.out{animation:fade-out .3s ease-in forwards}
-.cheer-card{--under:transparent;position:relative;background:var(--paper);color:var(--text);border:var(--line-w) solid var(--edge);box-shadow:0 6px 0 var(--edge);border-radius:0 0 28px 28px;padding:30px 24px 22px;max-width:340px;width:100%;display:grid;justify-items:center;gap:8px;text-align:center;animation:cheer-pop .5s cubic-bezier(.2,1.6,.4,1)}
-.cheer-card::before,.cheer-card::after{content:"";position:absolute;top:calc(-1 * var(--line-w));width:40px;height:40px;border-bottom:var(--line-w) solid var(--edge)}
-.cheer-card::before{left:calc(-1 * var(--line-w));border-right:var(--line-w) solid var(--edge);border-bottom-right-radius:11px;background:linear-gradient(to bottom right,transparent calc(50% - 2.8px),var(--edge) calc(50% - 2.8px),var(--edge) calc(50% + 2.8px),var(--pink) calc(50% + 2.8px))}
-.cheer-card::after{right:calc(-1 * var(--line-w));border-left:var(--line-w) solid var(--edge);border-bottom-left-radius:11px;background:linear-gradient(to bottom left,transparent calc(50% - 2.8px),var(--edge) calc(50% - 2.8px),var(--edge) calc(50% + 2.8px),var(--pink) calc(50% + 2.8px))}
+.cheer-card{--under:transparent;position:relative;background:var(--paper);color:var(--text);border:var(--line-w) solid var(--edge);box-shadow:var(--pop-lg);border-radius:28px;padding:30px 24px 22px;max-width:340px;width:100%;display:grid;justify-items:center;gap:8px;text-align:center;animation:cheer-pop .5s cubic-bezier(.2,1.6,.4,1)}
 .cheer-pig{width:120px;height:auto;margin-top:-76px}
 .cheer-card b{font:400 32px/1.05 var(--display);margin-top:4px}
 .cheer-card span{font-size:18px;color:var(--muted)}
