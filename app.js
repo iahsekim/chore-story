@@ -332,6 +332,11 @@ function render() {
    The book starts closed, the cover swings open right to left, the white pages show,
    then the pig pops up out of the spine and its ears fold down. Plays once per visit. */
 let logoPlayed = false;
+// Tap the logo to watch it fold out again.
+document.addEventListener('click', e => {
+  const el = e.target.closest('.ori-logo'); if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  el.classList.add('still'); void el.offsetWidth; el.classList.remove('still');
+});
 function logoAnim() {
   const still = logoPlayed; logoPlayed = true;
   return `<h1 class="logo-h ori-logo ${still ? 'still' : ''}"><span class="sr">${esc(APP)}</span>

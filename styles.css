@@ -542,7 +542,7 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
 
 /* ---------- the logo, folded out of paper ---------- */
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.ori-logo{display:flex;align-items:center;justify-content:center;gap:clamp(6px,2vw,12px)}
+.ori-logo{cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;display:flex;align-items:center;justify-content:center;gap:clamp(6px,2vw,12px)}
 .ori{position:relative;flex:none;width:min(168px,40vw);aspect-ratio:360/315;perspective:1600px;perspective-origin:50% 50%}
 .whoscreen .ori{width:min(132px,33vw)}
 .ori>img,.ori-l{position:absolute;top:0;height:100%}
