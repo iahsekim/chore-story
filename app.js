@@ -340,7 +340,7 @@ function render() {
    page lifts, the right half of the pig). Every turning sheet is drawn in thin vertical strips
    with real perspective and a little curl, so it reads like paper. When every sheet has
    landed, the picture is the logo itself. Plays once per visit; tap it to play again. */
-const ORI_SRC = { cover: 'pp-cover.png', lcover: 'pp-lcover.png', lp1: 'pp-lp1.png', lp1t: 'pp-lp1t.png', lp2: 'pp-lp2.png', lp2w: 'pp-lp2w.png', rpage: 'pp-rpage.png', rbook: 'pp-rbook.png', headl: 'pp-headl.png', headr: 'pp-headr.png', earl: 'pp-earl.png', earr: 'pp-earr.png' };
+const ORI_SRC = { cover: 'pp-cover.png', lcover: 'pp-lcover.png', lp1: 'pp-lp1.png', lp1t: 'pp-lp1t.png', lp1s: 'pp-lp1s.png', lp2: 'pp-lp2.png', lp2w: 'pp-lp2w.png', rpage: 'pp-rpage.png', rbook: 'pp-rbook.png', headl: 'pp-headl.png', headr: 'pp-headr.png', earl: 'pp-earl.png', earr: 'pp-earr.png' };
 let ORI = null, oriLoading = null, logoPlayed = false, oriRaf = 0;
 function oriLoad() {
   if (ORI) return Promise.resolve(ORI);
@@ -368,7 +368,8 @@ function oriFrame(cv, t) {
   g.save(); g.globalAlpha = appear; g.translate(shift, 0);
   const flat = (img, x) => img && g.drawImage(img, x, 0, img.width * (H / img.height), H);
   // [front, back while turning, back once landed, progress]
-  const sheets = [[I.cover, I.lcover, I.lcover, pc], [I.rpage, I.lp1t, I.lp1, p1], [I.rpage, I.lp2, I.lp2w, p2], [I.rpage, I.headl, I.headl, p3]];
+  // page 1 lies alone with a straight edge; once page 2 lands on it, it takes the logo's exact shape underneath
+  const sheets = [[I.cover, I.lcover, I.lcover, pc], [I.rpage, I.lp1t, p2 >= 1 ? I.lp1 : I.lp1s, p1], [I.rpage, I.lp2, I.lp2w, p2], [I.rpage, I.headl, I.headl, p3]];
   // left side: sheets that have landed, oldest first
   for (const [, , landed, p] of sheets) if (p >= 1) flat(landed, 0);
   // right side: the page stack, and the right half of the pig once the last page starts to lift
@@ -417,15 +418,7 @@ function oriTurn(g, front, back, p, o) {
     if (useFront) t.drawImage(img, sx, 0, Math.min(sw * ext, iw - sx), ih, 0, 0, Math.min(sw * ext, iw - sx), ih);
     else { const s0 = Math.max(0, sx - sw * (ext - 1)), ww = sx + sw - s0; t.save(); t.translate(sw, 0); t.scale(1, 1); t.drawImage(img, s0, 0, ww, ih, -ww, 0, ww, ih); t.restore() }
   }
-  // shade the paper as it tilts away from flat: one smooth gradient across the page, not per-strip rectangles
   t.setTransform(1, 0, 0, 1, 0, 0);
-  const xs = S.map(p => p.x), lo = Math.min(...xs) - 2, hi = Math.max(...xs) + 2;
-  if (hi - lo > 1) {
-    const gr = t.createLinearGradient(lo, 0, hi, 0), seen = [];
-    for (let j = 0; j <= N; j += 6) { const pos = (S[j].x - lo) / (hi - lo), a = .22 * (1 - Math.abs(Math.cos(P[j][2]))); seen.push([pos, a]) }
-    seen.sort((m, n) => m[0] - n[0]); for (const [pos, a] of seen) gr.addColorStop(oriClamp(pos), `rgba(0,0,0,${a.toFixed(3)})`);
-    t.globalCompositeOperation = 'source-atop'; t.fillStyle = gr; t.fillRect(lo, 0, hi - lo, H); t.globalCompositeOperation = 'source-over';
-  }
   g.drawImage(oriTmp, 0, 0);
 }
 function oriMount() {
