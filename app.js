@@ -344,7 +344,7 @@ const ORI_SRC = { cover: 'pp-cover.png', lcover: 'pp-lcover.png', lp1: 'pp-lp1.p
 let ORI = null, oriLoading = null, logoPlayed = false, oriRaf = 0;
 function oriLoad() {
   if (ORI) return Promise.resolve(ORI);
-  return oriLoading || (oriLoading = Promise.all(Object.entries(ORI_SRC).map(([k, src]) => new Promise(res => { const im = new Image(); im.onload = () => res([k, im]); im.onerror = () => res([k, null]); im.src = src }))).then(list => (ORI = Object.fromEntries(list))));
+  return oriLoading || (oriLoading = Promise.all(Object.entries(ORI_SRC).map(([k, src]) => new Promise(res => { const im = new Image(); im.onload = () => (im.decode ? im.decode().catch(() => { }) : Promise.resolve()).then(() => res([k, im])); im.onerror = () => res([k, null]); im.src = src }))).then(list => (ORI = Object.fromEntries(list))));
 }
 function logoAnim() {
   const still = logoPlayed; logoPlayed = true;
@@ -352,74 +352,115 @@ function logoAnim() {
     <canvas class="ori-cv" width="600" height="524" aria-hidden="true"></canvas>
     <span class="ori-word" aria-hidden="true"><img class="logo-l" src="wordmark-l.png" alt=""><img class="logo-d" src="wordmark-d.png" alt=""></span></h1>`;
 }
-const oriEase = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const oriEase = t => t * t * (3 - 2 * t);            // gentle in and out, so overlapping turns flow into each other
 const oriBack = t => { const c = 1.9; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2) };
 const oriClamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
-/* the schedule, in seconds */
-const ORI_T = { cover: [.2, .56], s1: [.62, .96], s2: [1.01, 1.34], s3: [1.39, 1.76], earl: [1.73, 1.92], earr: [1.77, 1.96], end: 1.98 };
-function oriFrame(cv, t) {
-  const g = cv.getContext('2d'), W = cv.width, H = cv.height, X0 = W / 2, pw = W / 2, cy = H * .6, f = W * 2.6;
-  const I = ORI; g.clearRect(0, 0, W, H);
+/* the schedule, in seconds. Each page starts lifting before the one before it lands, so the motion never stops. */
+const ORI_T = { cover: [.12, .6], s1: [.46, .96], s2: [.8, 1.3], s3: [1.14, 1.68], earl: [1.6, 1.84], earr: [1.65, 1.89], end: 1.92 };
+const ORI_W = 600, ORI_H = 524;
+/* Everything the frame needs, as a list of draws: flat layers, transformed quads, and the turning sheets.
+   The same list is drawn by WebGL when it is available, or by the 2D canvas otherwise. */
+function oriScene(t) {
+  const I = ORI, W = ORI_W, H = ORI_H, X0 = W / 2, pw = W / 2, cy = H * .6, f = W * 2.6, out = [];
   const prog = ([a, b]) => oriClamp((t - a) / (b - a));
   const pc = prog(ORI_T.cover), p1 = prog(ORI_T.s1), p2 = prog(ORI_T.s2), p3 = prog(ORI_T.s3);
-  // the closed book sits centered, then slides over as it opens
-  const shift = -pw * .5 * (1 - oriEase(pc));
-  const appear = oriClamp(t / .16);
-  g.save(); g.globalAlpha = appear; g.translate(shift, 0);
-  const flat = (img, x) => img && g.drawImage(img, x, 0, img.width * (H / img.height), H);
-  // [front, back while turning, back once landed, progress]
-  // page 1 lies alone with a straight edge; once page 2 lands on it, it takes the logo's exact shape underneath
+  const shift = -pw * .5 * (1 - oriEase(pc)), alpha = oriClamp(t / .14);
+  const rect = (img, x, y0 = 0, y1 = H) => img && out.push({ img, alpha, q: [[x + shift, y0], [x + shift + img.width * (H / img.height), y0], [x + shift + img.width * (H / img.height), y1], [x + shift, y1]] });
+  // [front, back while turning, back once landed, progress]; page 1 takes the logo's exact shape once page 2 covers it
   const sheets = [[I.cover, I.lcover, I.lcover, pc], [I.rpage, I.lp1t, p2 >= 1 ? I.lp1 : I.lp1s, p1], [I.rpage, I.lp2, I.lp2w, p2], [I.rpage, I.headl, I.headl, p3]];
-  // left side: sheets that have landed, oldest first
-  for (const [, , landed, p] of sheets) if (p >= 1) flat(landed, 0);
-  // right side: the page stack, and the right half of the pig once the last page starts to lift
-  if (pc > 0) { flat(I.rbook, X0); if (p3 > 0) {
-      // the pig is bigger than the pages: a pop-up. Its right half springs up out of the page as the last sheet lifts.
-      const q = oriClamp((p3 - .08) / .55), e = oriBack(q), hy = H * .78;
-      g.save(); g.translate(0, hy); g.scale(1, Math.max(.001, e)); g.translate(0, -hy); flat(I.headr, X0); g.restore();
-    } }
-  // the sheet that is turning (or the closed cover before anything moves)
-  for (const [front, back, , p] of sheets) {
-    if (p <= 0 && front === I.cover) { flat(front, X0); break }
-    if (p > 0 && p < 1) { oriTurn(g, front, back, oriEase(p), { X0, pw, H, cy, f }); break }
-  }
-  // the ears fold down last
+  for (const [, , landed, p] of sheets) if (p >= 1) rect(landed, 0);
+  if (pc > 0) {
+    rect(I.rbook, X0);
+    if (p3 > 0) { const e = Math.max(.001, oriBack(oriClamp((p3 - .06) / .55))), hy = H * .78; rect(I.headr, X0, hy - hy * e, hy + (H - hy) * e) }
+  } else rect(I.cover, X0);
+  for (const [front, back, , p] of sheets) if (p > 0 && p < 1) out.push({ turn: true, front, back, p: oriEase(p), alpha, shift, X0, pw, H, cy, f });
   for (const [img, span, hx, sgn] of [[I.earl, ORI_T.earl, .27, -1], [I.earr, ORI_T.earr, .73, 1]]) {
     const q = prog(span); if (!img || q <= 0) continue;
-    const e = oriBack(q), hy = H * .21, x = W * hx;
-    g.save(); g.globalAlpha = appear * oriClamp(q / .3); g.translate(x, hy); g.rotate(sgn * (1 - e) * 2.2); g.scale(.3 + .7 * e, .3 + .7 * e); g.translate(-x, -hy);
-    g.drawImage(img, 0, 0, W, H); g.restore();
+    const e = oriBack(q), hy = H * .21, x = W * hx + shift, a = sgn * (1 - e) * 2.2, k = .3 + .7 * e, c = Math.cos(a) * k, s_ = Math.sin(a) * k;
+    const T = ([px, py]) => { const dx = px + shift - x, dy = py - hy; return [x + c * dx - s_ * dy, hy + s_ * dx + c * dy] };
+    out.push({ img, alpha: alpha * oriClamp(q / .3), q: [T([0, 0]), T([W, 0]), T([W, H]), T([0, H])] });
   }
-  g.restore();
+  return out;
 }
-/* One sheet turning from the right (θ=0) to the left (θ=π). It is drawn as thin vertical strips;
-   each strip is sheared to meet its neighbours exactly, so the page's edges stay smooth lines. */
-let oriTmp = null;
-function oriTurn(g, front, back, p, o) {
-  const { X0, pw, H, cy, f } = o, th = p * Math.PI, N = 240, curl = .55 * Math.sin(th);
-  if (!oriTmp) oriTmp = document.createElement('canvas');
-  if (oriTmp.width !== g.canvas.width || oriTmp.height !== H) { oriTmp.width = g.canvas.width; oriTmp.height = H }
-  const t = oriTmp.getContext('2d'); t.setTransform(1, 0, 0, 1, 0, 0); t.clearRect(0, 0, oriTmp.width, H);
-  t.imageSmoothingEnabled = true; t.imageSmoothingQuality = 'high';
-  // walk out along the page from the spine; the outer part lags a little so the page curls
-  const P = [[0, 0, th]]; let x = 0, z = 0;
-  for (let j = 1; j <= N; j++) { const u = j / N, phi = oriClamp(th - curl * u * u, 0, Math.PI); x += Math.cos(phi) * pw / N; z += Math.sin(phi) * pw / N; P.push([x, z, phi]) }
-  // screen position of each point: perspective, seen from a little above so a lifted page rises toward you
-  const S = P.map(([x, z]) => { const s = f / (f - z); return { x: X0 + x * s, top: cy - cy * s - z * s * .2, s } });
-  for (let j = 0; j < N; j++) {
-    const A = S[j], B = S[j + 1], dx = B.x - A.x, useFront = dx >= 0, img = useFront ? front : back; if (!img) continue;
-    const iw = img.width, ih = img.height, sw = iw / N, u0 = j / N;
-    const h = H * (A.s + B.s) / 2, d = h / ih, pad = .35;
-    // front: spine at the picture's left edge; back: spine at its right edge
-    if (useFront) t.setTransform((dx + pad) / sw, (B.top - A.top) / sw, 0, d, A.x, A.top);
-    else t.setTransform((-dx + pad) / sw, (A.top - B.top) / sw, 0, d, B.x, B.top);
-    // each strip carries a little of its neighbour's picture past its edge, so strips overlap and no seam shows
-    const ext = 3, sx = useFront ? u0 * iw : iw - (u0 + 1 / N) * iw;
-    if (useFront) t.drawImage(img, sx, 0, Math.min(sw * ext, iw - sx), ih, 0, 0, Math.min(sw * ext, iw - sx), ih);
-    else { const s0 = Math.max(0, sx - sw * (ext - 1)), ww = sx + sw - s0; t.save(); t.translate(sw, 0); t.scale(1, 1); t.drawImage(img, s0, 0, ww, ih, -ww, 0, ww, ih); t.restore() }
+/* The turning sheet as a strip of columns from the spine out: screen x, top, bottom, and which face shows. */
+function oriSheet(o, N) {
+  const { p, X0, pw, H, cy, f, shift } = o, th = p * Math.PI, curl = .55 * Math.sin(th), cols = [];
+  let x = 0, z = 0;
+  for (let j = 0; j <= N; j++) {
+    if (j) { const u = j / N, phi = oriClamp(th - curl * u * u, 0, Math.PI); x += Math.cos(phi) * pw / N; z += Math.sin(phi) * pw / N }
+    const s = f / (f - z), top = cy - cy * s - z * s * .2;
+    cols.push({ x: X0 + x * s + shift, top, bot: top + H * s, u: j / N });
   }
-  t.setTransform(1, 0, 0, 1, 0, 0);
-  g.drawImage(oriTmp, 0, 0);
+  return cols;
+}
+function oriFrame(cv, t) {
+  const R = oriGL(cv), scene = oriScene(t);
+  if (R) return R.draw(scene);
+  const g = cv.getContext('2d'); g.setTransform(cv.width / ORI_W, 0, 0, cv.height / ORI_H, 0, 0); g.clearRect(0, 0, ORI_W, ORI_H);
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  for (const d of scene) {
+    g.globalAlpha = d.alpha;
+    if (d.turn) { oriTurn2D(g, d); continue }
+    const [a, b, , e] = d.q, w = Math.hypot(b[0] - a[0], b[1] - a[1]), h = Math.hypot(e[0] - a[0], e[1] - a[1]);
+    g.save(); g.transform((b[0] - a[0]) / d.img.width, (b[1] - a[1]) / d.img.width, (e[0] - a[0]) / d.img.height, (e[1] - a[1]) / d.img.height, a[0], a[1]); g.drawImage(d.img, 0, 0); g.restore();
+  }
+  g.globalAlpha = 1;
+}
+/* 2D fallback for a turning sheet: thin sheared strips (only used when WebGL is not available). */
+function oriTurn2D(g, d) {
+  const cols = oriSheet(d, 96), N = cols.length - 1;
+  for (let j = 0; j < N; j++) {
+    const A = cols[j], B = cols[j + 1], front = B.x - A.x >= 0, img = front ? d.front : d.back; if (!img) continue;
+    const iw = img.width, ih = img.height, sw = iw / N, sx = front ? A.u * iw : iw - B.u * iw, dx = Math.abs(B.x - A.x) + .5;
+    const L = front ? A : B, Rr = front ? B : A;
+    g.save(); g.transform(dx / sw, (Rr.top - L.top) / sw, 0, (L.bot - L.top) / ih, L.x, L.top);
+    g.drawImage(img, Math.max(0, sx - sw), 0, Math.min(sw * 3, iw - Math.max(0, sx - sw)), ih, -(sx - Math.max(0, sx - sw)), 0, Math.min(sw * 3, iw - Math.max(0, sx - sw)), ih); g.restore();
+  }
+}
+/* WebGL renderer: every layer is a textured quad, and a turning sheet is one textured mesh, so a frame costs almost nothing. */
+function oriGL(cv) {
+  if (cv._ori !== undefined) return cv._ori;
+  let gl = null;
+  try { gl = cv.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: true, preserveDrawingBuffer: true }) } catch (e) { }
+  if (!gl) return (cv._ori = null);
+  const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return o };
+  const pr = gl.createProgram();
+  gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec2 p;attribute vec2 uv;uniform vec2 r;varying vec2 v;void main(){v=uv;gl_Position=vec4(p.x/r.x*2.-1.,1.-p.y/r.y*2.,0.,1.);}'));
+  gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, 'precision mediump float;varying vec2 v;uniform sampler2D t;uniform float a;void main(){gl_FragColor=texture2D(t,v)*a;}'));
+  gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) return (cv._ori = null);
+  gl.useProgram(pr);
+  const buf = gl.createBuffer(), lp = gl.getAttribLocation(pr, 'p'), luv = gl.getAttribLocation(pr, 'uv'), lr = gl.getUniformLocation(pr, 'r'), la = gl.getUniformLocation(pr, 'a');
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(lp); gl.enableVertexAttribArray(luv);
+  gl.vertexAttribPointer(lp, 2, gl.FLOAT, false, 16, 0); gl.vertexAttribPointer(luv, 2, gl.FLOAT, false, 16, 8);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+  const tex = new Map();
+  const texOf = img => {
+    let t = tex.get(img); if (t) return t;
+    t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+    tex.set(img, t); return t;
+  };
+  const strip = (img, verts, alpha) => { if (!img || verts.length < 16) return; gl.bindTexture(gl.TEXTURE_2D, texOf(img)); gl.uniform1f(la, alpha); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STREAM_DRAW); gl.drawArrays(gl.TRIANGLE_STRIP, 0, verts.length / 4) };
+  const draw = scene => {
+    gl.viewport(0, 0, cv.width, cv.height); gl.uniform2f(lr, ORI_W, ORI_H); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    for (const d of scene) {
+      if (!d.turn) { const [a, b, c, e] = d.q; strip(d.img, [a[0], a[1], 0, 0, b[0], b[1], 1, 0, e[0], e[1], 0, 1, c[0], c[1], 1, 1], d.alpha); continue }
+      // one mesh per face: columns where the page faces you show its front, the rest its back
+      const cols = oriSheet(d, 72); let run = [], face = null;
+      const flush = () => { if (run.length) strip(face ? d.front : d.back, run, d.alpha) };
+      for (let j = 0; j < cols.length; j++) {
+        const c = cols[j], nx = cols[Math.min(j + 1, cols.length - 1)], f = j < cols.length - 1 ? nx.x - c.x >= 0 : face;
+        const u = f ? c.u : 1 - c.u;
+        if (face !== null && f !== face) { const uu = face ? c.u : 1 - c.u; run.push(c.x, c.top, uu, 0, c.x, c.bot, uu, 1); flush(); run = [] }
+        face = f; run.push(c.x, c.top, u, 0, c.x, c.bot, u, 1);
+      }
+      flush();
+    }
+  };
+  return (cv._ori = { draw });
 }
 function oriMount() {
   const cv = document.querySelector('.ori-cv'); if (!cv) return;
@@ -427,17 +468,22 @@ function oriMount() {
   cancelAnimationFrame(oriRaf);
   oriLoad().then(() => {
     if (!cv.isConnected) return;
-    if (box.classList.contains('still') || reduce) { oriFrame(cv, ORI_T.end); return }
-    const t0 = performance.now();
-    const step = now => { if (!cv.isConnected) return; const t = (now - t0) / 1000; oriFrame(cv, Math.min(t, ORI_T.end)); if (t < ORI_T.end) oriRaf = requestAnimationFrame(step) };
-    oriRaf = requestAnimationFrame(step);
+    if (box.classList.contains('still') || reduce) { box.classList.add('done'); oriFrame(cv, ORI_T.end); return }
+    oriFrame(cv, 0);
+    // start the canvas and the wordmark's CSS on the same frame, so they stay in step
+    requestAnimationFrame(t0 => {
+      box.classList.add('play');
+      const step = now => { if (!cv.isConnected) return; const t = (now - t0) / 1000; oriFrame(cv, Math.min(t, ORI_T.end)); if (t < ORI_T.end) oriRaf = requestAnimationFrame(step); else box.classList.add('done') };
+      oriRaf = requestAnimationFrame(step);
+    });
   });
 }
 // Tap the logo to watch the book open again.
 document.addEventListener('click', e => {
   const el = e.target.closest('.ori-logo'); if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  el.classList.add('still'); void el.offsetWidth; el.classList.remove('still'); oriMount();
+  el.classList.remove('still', 'play', 'done'); void el.offsetWidth; oriMount();
 });
+oriLoad();
 /* ---------- sign in ---------- */
 function authHTML() {
   const code = S.authStep === 'code';
