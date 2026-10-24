@@ -146,6 +146,10 @@ create table if not exists public.screen_bonus (
   created_at  timestamptz not null default now()
 );
 
+-- Optional countdown timers: when set, the session stops by itself (and the app rings) at this length.
+alter table public.reading_sessions add column if not exists target_seconds int check (target_seconds is null or target_seconds between 60 and 36000);
+alter table public.screen_sessions  add column if not exists target_seconds int check (target_seconds is null or target_seconds between 60 and 36000);
+
 -- Optional "oops jar": small deductions of money or screen minutes, always with a reason.
 -- Off for every family unless a parent turns it on in Settings, and the family picks its name.
 alter table public.families add column if not exists penalty_enabled boolean not null default false;

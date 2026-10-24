@@ -189,6 +189,7 @@ const I = {
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
   chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h-1A.5.5 0 0 1 4 15.5z"/><path d="M8.5 8.5h7M8.5 12h4.5"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path d="M10 21h4M12 3v2"/></svg>',
   dollar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 7.5C15.7 5.9 14.1 5 12 5c-2.8 0-4.5 1.4-4.5 3.4 0 4.6 9.2 2.6 9.2 7.2 0 2-1.9 3.4-4.7 3.4-2.3 0-4-1-4.8-2.7M12 2.5v19"/></svg>',
   jar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8M9 3v3c-2.4 1-4 3.2-4 6v6a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-6c0-2.8-1.6-5-4-6V3"/><path d="M8.5 14h7"/></svg>',
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
@@ -687,10 +688,10 @@ function ledgerItems(kid, ws, f = 'all') {
       R.push({ date: p.local_date, ts: ms(p.created_at), ico: `<span class="ico x">${I.jar}</span>`, title: p.note, sub: penName(), amt: '−' + money(Number(p.amount)), cls: 'out', edit: `penalty|${p.id}` });
   }
   if (rd) for (const r of S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws))
-    R.push({ date: r.local_date, ts: ms(r.started_at), when: span(r), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: 'Reading' + (r.source === 'manual' ? ' · added by a grown-up' : !r.ended_at ? (r.running_since ? ' · reading now' : ' · paused') : ''), amt: dur(readSec(r, kid)), cls: 'rd', edit: `read|${r.id}` });
+    R.push({ date: r.local_date, ts: ms(r.started_at), when: span(r), ico: `<span class="ico r">${I.read}</span>`, title: r.book, sub: 'Reading' + (sessTarget(r) ? ` · ${minLabel(Math.round(sessTarget(r) / 60))} timer` : '') + (r.source === 'manual' ? ' · added by a grown-up' : !r.ended_at ? (r.running_since ? ' · reading now' : ' · paused') : ''), amt: dur(readSec(r, kid)), cls: 'rd', edit: `read|${r.id}` });
   if (sc) {
     for (const x of S.screen.filter(x => x.kid_id === kid.id && x.week_start === ws))
-      R.push({ date: x.local_date, ts: ms(x.started_at), when: span(x), ico: `<span class="ico s">${I.screen}</span>`, title: x.note || 'Screen time', sub: 'Screens' + (x.source === 'manual' ? ' · added by a grown-up' : !x.ended_at ? (x.running_since ? ' · on now' : ' · paused') : ''), amt: '−' + dur(liveSec(x)), cls: 'out', edit: `screen|${x.id}` });
+      R.push({ date: x.local_date, ts: ms(x.started_at), when: span(x), ico: `<span class="ico s">${I.screen}</span>`, title: x.note || 'Screen time', sub: 'Screens' + (sessTarget(x) ? ` · ${minLabel(Math.round(sessTarget(x) / 60))} timer` : '') + (x.source === 'manual' ? ' · added by a grown-up' : !x.ended_at ? (x.running_since ? ' · on now' : ' · paused') : ''), amt: '−' + dur(liveSec(x)), cls: 'out', edit: `screen|${x.id}` });
     for (const b of S.sbonus.filter(b => b.kid_id === kid.id && b.week_start === ws))
       R.push({ date: localDate(ms(b.created_at)), ts: ms(b.created_at), ico: `<span class="ico m">${I.star}</span>`, title: b.note, sub: 'Bonus screen minutes', amt: `+${b.minutes} min`, cls: 'up', edit: `sbonus|${b.id}` });
     for (const p of kidPen(kid).filter(p => p.week_start === ws && Number(p.minutes) > 0))
@@ -747,10 +748,11 @@ function txListSheet(kid, kind) {
 }
 function readBoardHTML(kid) {
   const a = activeRead(kid);
-  if (a) { const run = !!a.running_since, sec = readSec(a, kid);
-    return `<div class="bline"><span class="label">${run ? 'Reading now' : 'Paused'}</span><b>${esc(a.book)}</b></div>
-    <div class="digits num ${run ? '' : 'idle'}" id="readDigits">${hms(sec)}</div>
-    <p class="note">${run ? 'Every second counts. Pause any time.' : 'Your time is saved. Tap Resume when you pick the book back up.'}</p>
+  if (a) { const run = !!a.running_since, sec = readSec(a, kid), tg = sessTarget(a);
+    return `<div class="bline"><span class="label">${run ? (tg ? `${I.bell}Timer · ${minLabel(Math.round(tg / 60))}` : 'Reading now') : 'Paused'}</span><b>${esc(a.book)}</b></div>
+    <div class="digits num ${run ? '' : 'idle'}" id="readDigits">${hms(tg ? tg - sec : sec)}</div>
+    ${tg ? `<div class="bar"><i id="readBar" style="width:${Math.min(100, 100 * sec / tg)}%"></i></div>` : ''}
+    <p class="note">${run ? (tg ? 'It rings when the timer is done. Every second counts.' : 'Every second counts. Pause any time.') : 'Your time is saved. Tap Resume when you pick the book back up.'}</p>
     <div class="row2">${run ? '<button class="ghost" id="pauseRead" type="button">Pause</button>' : '<button class="ghost" id="resumeRead" type="button">Resume</button>'}<button class="go white" id="stopRead" type="button">I'm done</button></div>`; }
   return `<div class="bline"><span class="label">Reading timer</span><span>1 min = <b>1 screen min</b></span></div>
     <div class="digits idle num">00:00</div><button class="go white" id="startRead" type="button">Start reading</button>`;
@@ -777,7 +779,11 @@ function eqHTML(kid, x, extra = '') {
 }
 function boardHTML(kid) {
   const x = screenWeek(kid), a = x.active;
-  if (a) { const run = !!a.running_since;
+  if (a) { const run = !!a.running_since, tg = sessTarget(a);
+    if (tg) return `<div class="bline"><span class="label">${run ? `${I.bell}Timer · ${minLabel(Math.round(tg / 60))}` : 'Paused'}</span><b>${esc(a.note || 'Screens')}</b></div>
+      <div class="digits num ${run ? '' : 'idle'}" id="digits">${hms(tg - liveSec(a))}</div><div class="bar"><i id="barfill" style="width:${Math.min(100, 100 * liveSec(a) / tg)}%"></i></div>
+      <p class="note">${run ? 'It rings when the timer is done.' : 'Timer is paused, so screens are off. Tap Resume to keep going.'} <b id="wkLeft">${hms(x.leftSec)}</b> left this week.</p>
+      <div class="row2">${run ? '<button class="ghost" id="pauseScr" type="button">Pause</button>' : '<button class="go" id="resumeScr" type="button">Resume</button>'}<button class="ghost" id="doneScr" type="button">I'm done</button></div>`;
     return `<div class="bline"><span class="label">${run ? 'Watching now' : 'Paused'}</span><b>${esc(a.note || 'Screens')}</b></div>
       <div class="digits num ${run ? '' : 'idle'}" id="digits">${hms(x.leftSec)}</div><div class="bar"><i id="barfill" style="width:${x.totalSec ? 100 * x.usedSec / x.totalSec : 100}%"></i></div>
       <p class="note">This session <b id="sessUsed">${hms(liveSec(a))}</b>. ${run ? 'That big number is what’s left this week. Pause whenever you stop. At zero, screens go off.' : 'Clock is paused, so screens are off. Tap Resume to keep going.'}</p>
@@ -1066,21 +1072,81 @@ function bindBoards() {
   on('resumeRead', () => resumeTimer('reading_sessions', activeRead(kid))); on('stopRead', () => stopRead(kid));
 }
 function rerenderBoards() { const kid = kidById(S.profile); if (!kid) return; const b = $('board'); if (b) b.innerHTML = boardHTML(kid); const r = $('readBoard'); if (r) r.innerHTML = readBoardHTML(kid); bindBoards() }
-async function startScreen(kid, note) {
+/* ---------- stopwatch or timer ----------
+   A session can run open-ended (stopwatch) or count down from a set length (timer). A timer stops
+   the session at exactly that length, so exactly that much is used, and rings until it's turned off. */
+const sessTarget = r => r ? (Number(r.target_seconds) || Number(store.get('tgt-' + r.id)) || 0) : 0;
+const TPREF = (kind, kid) => `tpref-${kind}-${kid.id}`;
+function timerPref(kind, kid) {
+  let p = null; try { p = JSON.parse(store.get(TPREF(kind, kid)) || 'null') } catch (e) { }
+  return p || (kind === 'screen' ? { mode: 'timer', min: 15 } : { mode: 'watch', min: 20 });
+}
+/* Minute choices: 5-minute steps, and for screens never more than what's left (plus that exact amount). */
+function timerChoices(kind, maxMin) {
+  if (kind === 'read') return [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
+  const top = Math.min(maxMin, 120), out = [];
+  for (let m = 5; m <= top; m += 5) out.push(m);
+  if (maxMin % 5 && maxMin <= 120) out.push(maxMin);
+  if (maxMin > 120) out.push(maxMin);
+  return out.length ? out : [Math.max(1, maxMin)];
+}
+const minLabel = m => mins(m);
+function timerPickHTML(kind, st, maxMin) {
+  const ch = timerChoices(kind, maxMin);
+  return `<div class="field"><span class="label">How long?</span>
+    <div class="seg tmode"><button type="button" data-tm="watch" aria-pressed="${st.mode === 'watch'}">${I.clock}Stopwatch</button><button type="button" data-tm="timer" aria-pressed="${st.mode === 'timer'}">${I.bell}Timer</button></div>
+    ${st.mode === 'timer' ? `<div class="chips tmins ${ch.length > 12 ? 'scroll' : ''}" role="radiogroup" aria-label="Minutes">${ch.map(m => `<button class="chip" type="button" role="radio" data-tmin="${m}" aria-checked="${m === st.min}" aria-pressed="${m === st.min}">${minLabel(m)}</button>`).join('')}</div>
+      <p class="hint">${kind === 'screen' ? `The timer rings after ${minLabel(st.min)}. Turn it off, and that time comes out of your screen time.` : `The timer rings after ${minLabel(st.min)} of reading.`}</p>`
+      : `<p class="hint">${kind === 'screen' ? 'Runs until you stop it. At zero for the week, screens go off.' : 'Counts up until you tap I’m done.'}</p>`}</div>`;
+}
+/* Pick a valid starting choice: the last one used, or the closest that still fits. */
+function timerState(kind, kid, maxMin) {
+  const p = timerPref(kind, kid), ch = timerChoices(kind, maxMin);
+  const min = ch.includes(p.min) ? p.min : ch.filter(m => m <= p.min).pop() || ch[0];
+  return { mode: p.mode, min };
+}
+function bindTimerPick(st, redraw) {
+  const sel = layer.querySelector('.tmins [aria-checked="true"]'); if (sel) sel.scrollIntoView({ block: 'nearest', inline: 'center' });
+  layer.querySelectorAll('[data-tm]').forEach(b => b.onclick = () => { st.mode = b.dataset.tm; redraw() });
+  layer.querySelectorAll('[data-tmin]').forEach(b => b.onclick = () => { st.min = Number(b.dataset.tmin); redraw() });
+}
+/* Insert a session; if the database hasn't got the timer column yet, keep the timer on this device instead. */
+async function insertSession(table, row, target) {
+  const body = target ? { ...row, target_seconds: target } : row;
+  let { data, error } = await sb.from(table).insert(body).select().single();
+  if (error && target && /target_seconds/i.test(error.message || '')) {
+    ({ data, error } = await sb.from(table).insert(row).select().single());
+    if (!error && data) store.set('tgt-' + data.id, String(target));
+  }
+  if (error) throw error;
+  return data;
+}
+async function startScreen(kid, note, target) {
   if (screenWeek(kid).active) return; unlockAudio(); const d = today(), now = new Date().toISOString();
-  await act(() => q(sb.from('screen_sessions').insert({ family_id: S.family.id, kid_id: kid.id, local_date: d, week_start: monday(d), started_at: now, running_since: now, seconds: 0, source: 'clock', note: note || null })));
+  await act(() => insertSession('screen_sessions', { family_id: S.family.id, kid_id: kid.id, local_date: d, week_start: monday(d), started_at: now, running_since: now, seconds: 0, source: 'clock', note: note || null }, target));
 }
 function screenStartSheet(kid) {
   const sw = screenWeek(kid);
   if (!isScreenDay(kid)) return toast(`Screens open ${screenDayNames(kid)}. You have ${dur(sw.leftSec) || '0 min'} so far.`);
   if (!sw.leftSec) return toast('All of this week’s screen time is used. New time starts Monday.');
   const recent = [...new Set(S.screen.filter(x => x.kid_id === kid.id && x.note && x.source !== 'manual').sort((a, b) => ms(b.started_at) - ms(a.started_at)).map(x => x.note))].slice(0, 6);
-  openSheet(`<span class="label">${dur(sw.leftSec)} left this week</span><h2>Start screens</h2><div class="field"><label class="label" for="watchIn">What are you watching or playing?</label><input id="watchIn" maxlength="80" placeholder="Show, game or app" value="${esc(recent[0] || '')}">
+  const maxMin = Math.max(1, Math.floor(sw.leftSec / 60)), st = timerState('screen', kid, maxMin);
+  let note = recent[0] || '';
+  const draw = () => openSheet(`<span class="label">${dur(sw.leftSec)} left this week</span><h2>Start screens</h2><div class="field"><label class="label" for="watchIn">What are you watching or playing?</label><input id="watchIn" maxlength="80" placeholder="Show, game or app" value="${esc(note)}">
     ${recent.length ? `<div class="chips">${recent.map(b => `<button class="chip" type="button" data-watch="${esc(b)}">${esc(b)}</button>`).join('')}</div>` : ''}</div>
-    <p class="hint">The clock counts down while screens are on. Pause it whenever you stop.</p><button class="save" id="scrGo" type="button">Start the clock</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
-    layer.querySelectorAll('[data-watch]').forEach(b => b.onclick = () => { $('watchIn').value = b.dataset.watch });
-    $('scrGo').onclick = async () => { const note = capFirst($('watchIn').value.trim()); if (!note) return toast('What are you watching?'); closeSheet(); await startScreen(kid, note); toast(`Enjoy ${note}!`) };
+    ${timerPickHTML('screen', st, maxMin)}
+    <button class="save" id="scrGo" type="button">${st.mode === 'timer' ? `Start ${minLabel(st.min)} timer` : 'Start the clock'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+    $('watchIn').oninput = e => { note = e.target.value };
+    layer.querySelectorAll('[data-watch]').forEach(b => b.onclick = () => { note = b.dataset.watch; $('watchIn').value = note });
+    bindTimerPick(st, draw);
+    $('scrGo').onclick = async () => {
+      const n = capFirst($('watchIn').value.trim()); if (!n) return toast('What are you watching?');
+      store.set(TPREF('screen', kid), JSON.stringify(st)); closeSheet();
+      await startScreen(kid, n, st.mode === 'timer' ? Math.min(st.min * 60, screenWeek(kid).leftSec) : 0);
+      toast(st.mode === 'timer' ? `Enjoy ${n}! The timer rings in ${minLabel(st.min)}.` : `Enjoy ${n}!`);
+    };
   });
+  draw();
 }
 const timerSec = (row, kid) => kid ? Math.min(liveSec(row), capSec(kid)) : liveSec(row);
 async function pauseTimer(table, row, kid) { if (!row || !row.running_since) return; await act(() => q(sb.from(table).update({ seconds: timerSec(row, kid), running_since: null }).eq('id', row.id)), 'Paused. Your time is saved.') }
@@ -1121,21 +1187,60 @@ function bindUndo(root) { root.querySelectorAll('[data-edit]').forEach(b => b.on
 let wasActive = null, wakeLock = null, audio = null, autoStopping = false;
 setInterval(() => {
   if (S.view !== 'kid') return; const kid = kidById(S.profile); if (!kid) return;
-  const x = screenWeek(kid), a = x.active, id = a && a.running_since ? a.id : null;
+  const x = screenWeek(kid), a = x.active, r0 = activeRead(kid), id = (a && a.running_since ? a.id : '') + (r0 && r0.running_since ? r0.id : '') || null;
   if (id !== wasActive) { if (id) holdWake(); else releaseWake(); wasActive = id }
-  if (a && a.running_since && x.leftSec <= 0 && !autoStopping) {
-    autoStopping = true; beep();
-    doneTimer('screen_sessions', a, 'Time\u2019s up for this week', null, Math.max(0, liveSec(a) - (x.usedSec - x.totalSec))).finally(() => { autoStopping = false });
+  const tg = sessTarget(a);
+  if (a && a.running_since && tg && liveSec(a) >= tg && x.leftSec > 0 && !autoStopping) {
+    autoStopping = true;
+    doneTimer('screen_sessions', a, null, null, tg).then(() => ringAlarm('Time\u2019s up!', `Your ${minLabel(Math.round(tg / 60))} of screens are done. ${screenWeek(kid).leftSec ? `${dur(screenWeek(kid).leftSec)} left this week.` : 'That was the last of this week\u2019s screen time.'}`,
+      () => celebrate('Screens off. Nice job!', screenWeek(kid).leftSec ? `You still have ${dur(screenWeek(kid).leftSec)} saved for later.` : 'New screen time starts Monday.', { power: .6, icon: 'check' }))).finally(() => { autoStopping = false });
     return;
   }
-  if (a && a.running_since) { const d = $('digits'); if (d) d.textContent = hms(x.leftSec); const su = $('sessUsed'); if (su) su.textContent = hms(liveSec(a)); const f = $('barfill'); if (f) f.style.width = (x.totalSec ? 100 * x.usedSec / x.totalSec : 100) + '%'; const el = $('eqLeft'); if (el) el.textContent = hms(x.leftSec); const eu = $('eqUsed'); if (eu) eu.textContent = mins(Math.floor(x.usedSec / 60)); const sb2 = $('stBar'); if (sb2) sb2.style.width = (x.totalSec ? Math.min(100, 100 * x.usedSec / x.totalSec) : 100) + '%' }
+  if (a && a.running_since && x.leftSec <= 0 && !autoStopping) {
+    autoStopping = true;
+    doneTimer('screen_sessions', a, null, null, Math.max(0, liveSec(a) - (x.usedSec - x.totalSec))).then(() => ringAlarm('Time\u2019s up!', 'That was the last of this week\u2019s screen time. New time starts Monday.')).finally(() => { autoStopping = false });
+    return;
+  }
+  if (a && a.running_since) { const d = $('digits'); if (d) d.textContent = hms(tg ? tg - liveSec(a) : x.leftSec); const wl = $('wkLeft'); if (wl) wl.textContent = hms(x.leftSec); const su = $('sessUsed'); if (su) su.textContent = hms(liveSec(a)); const f = $('barfill'); if (f) f.style.width = (tg ? Math.min(100, 100 * liveSec(a) / tg) : x.totalSec ? 100 * x.usedSec / x.totalSec : 100) + '%'; const el = $('eqLeft'); if (el) el.textContent = hms(x.leftSec); const eu = $('eqUsed'); if (eu) eu.textContent = mins(Math.floor(x.usedSec / 60)); const sb2 = $('stBar'); if (sb2) sb2.style.width = (x.totalSec ? Math.min(100, 100 * x.usedSec / x.totalSec) : 100) + '%' }
   const r = activeRead(kid);
-  if (r && r.running_since) { if (liveSec(r) >= capSec(kid) && !autoStopping) { autoStopping = true; doneTimer('reading_sessions', r, 'Reading timer stopped after 3 hours. Was it left on?', kid).finally(() => { autoStopping = false }); return } const rd = $('readDigits'); if (rd) rd.textContent = hms(readSec(r, kid)) }
+  if (r && r.running_since) {
+    const rt = sessTarget(r);
+    if (rt && liveSec(r) >= rt && !autoStopping) {
+      autoStopping = true; const before = Math.min(Number(kid.reading_cap) || 0, Math.floor((readWeek(kid).sec - readSec(r, kid)) / 60));
+      doneTimer('reading_sessions', r, null, kid, rt).then(() => ringAlarm('Time\u2019s up!', `You read ${minLabel(Math.round(rt / 60))}!`, () => {
+        const after = readWeek(kid).bonus, earned = after - before;
+        celebrate(`You read ${dur(rt)}!`, earned > 0 ? `+${earned} screen minute${earned > 1 ? 's' : ''} earned${after >= kid.reading_cap ? '. You maxed out this week!' : ''}` : 'Every second counts toward your next minute.', { power: earned > 0 ? 1.3 : .6, icon: 'read' });
+      })).finally(() => { autoStopping = false });
+      return;
+    }
+    if (liveSec(r) >= capSec(kid) && !autoStopping) { autoStopping = true; doneTimer('reading_sessions', r, 'Reading timer stopped after 3 hours. Was it left on?', kid).finally(() => { autoStopping = false }); return }
+    const rd = $('readDigits'); if (rd) rd.textContent = hms(rt ? rt - readSec(r, kid) : readSec(r, kid)); const rb = $('readBar'); if (rb) rb.style.width = Math.min(100, 100 * readSec(r, kid) / rt) + '%';
+  }
 }, 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.family && (S.view === 'kid' || S.view === 'parent')) refresh() });
 setInterval(() => { if (!document.hidden && S.family && (S.view === 'kid' || S.view === 'parent') && !$('scrim')) refresh() }, 60000);
 function unlockAudio() { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume() } catch (e) { } }
 function beep() { try { if (!audio) return;[0, .35, .7].forEach(t => { const o = audio.createOscillator(), g = audio.createGain(); o.frequency.value = 880; o.connect(g); g.connect(audio.destination); g.gain.setValueAtTime(.25, audio.currentTime + t); g.gain.exponentialRampToValueAtTime(.001, audio.currentTime + t + .3); o.start(audio.currentTime + t); o.stop(audio.currentTime + t + .3) }) } catch (e) { } }
+/* The alarm: rings (and buzzes, where phones allow) until it's turned off. Gives up after two minutes. */
+let alarmEl = null, alarmTimer = 0;
+function alarmSound() {
+  try { unlockAudio(); if (!audio) return; const t0 = audio.currentTime;
+    [0, .16, .32, .62, .78, .94].forEach(dt => { const o = audio.createOscillator(), g = audio.createGain(), t = t0 + dt; o.type = 'square'; o.frequency.setValueAtTime(1046, t); o.frequency.setValueAtTime(1318, t + .06); o.connect(g); g.connect(audio.destination); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.16, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + .13); o.start(t); o.stop(t + .14) });
+  } catch (e) { }
+  try { navigator.vibrate?.([180, 80, 180, 80, 180]) } catch (e) { }
+}
+function ringAlarm(title, sub, after) {
+  stopAlarm(); const started = Date.now();
+  const el = alarmEl = document.createElement('div'); el.className = 'alarm'; el.setAttribute('role', 'alertdialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', title);
+  el.innerHTML = `<div class="alarm-card"><span class="alarm-bell">${I.bell}</span><b>${esc(title)}</b><span>${esc(sub)}</span><button class="save alarm-off" type="button">Turn off</button></div>`;
+  document.body.appendChild(el);
+  alarmSound(); alarmTimer = setInterval(() => { if (Date.now() - started > 120000) { clearInterval(alarmTimer); return } alarmSound() }, 1500);
+  el.querySelector('.alarm-off').onclick = () => { stopAlarm(); after && after() };
+  el.querySelector('.alarm-off').focus({ preventScroll: true, focusVisible: false });
+}
+function stopAlarm() { clearInterval(alarmTimer); try { navigator.vibrate?.(0) } catch (e) { } if (alarmEl) { alarmEl.remove(); alarmEl = null } }
+// sound needs one tap to unlock on phones; any tap in the app does it
+document.addEventListener('pointerdown', () => unlockAudio(), { passive: true });
 async function holdWake() { try { wakeLock = await navigator.wakeLock?.request('screen') } catch (e) { } }
 function releaseWake() { try { wakeLock?.release(); wakeLock = null } catch (e) { } }
 
@@ -1186,13 +1291,24 @@ function rulesSheet(kid) {
 }
 function readStartSheet(kid) {
   const books = [...new Set(S.reading.filter(r => r.kid_id === kid.id).map(r => r.book))].slice(0, 6);
-  openSheet(`<h2>Start reading</h2><div class="field"><label class="label" for="bookIn">What are you reading?</label><input id="bookIn" maxlength="100" placeholder="Book title" value="${esc(books[0] || '')}">
+  const st = timerState('read', kid, 60);
+  let book = books[0] || '';
+  const draw = () => openSheet(`<h2>Start reading</h2><div class="field"><label class="label" for="bookIn">What are you reading?</label><input id="bookIn" maxlength="100" placeholder="Book title" value="${esc(book)}">
     ${books.length ? `<div class="chips">${books.map(b => `<button class="chip" type="button" data-book="${esc(b)}">${esc(b)}</button>`).join('')}</div>` : ''}</div>
-    <p class="hint">Chapter books and graphic novels count. Audiobooks don't.</p><button class="save" id="rdGo" type="button" style="background:var(--read)">Start the timer</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
-    layer.querySelectorAll('[data-book]').forEach(b => b.onclick = () => { $('bookIn').value = b.dataset.book });
-    $('rdGo').onclick = async () => { const book = $('bookIn').value.trim(); if (!book) return toast('Type the book’s title.'); if (activeRead(kid)) return closeSheet(); closeSheet(); const d = today();
-      unlockAudio(); const now = new Date().toISOString(); await act(() => q(sb.from('reading_sessions').insert({ family_id: S.family.id, kid_id: kid.id, book, local_date: d, week_start: monday(d), started_at: now, running_since: now, seconds: 0, source: 'timer' }))); toast(`Happy reading! Enjoy ${book}.`) };
+    ${timerPickHTML('read', st, 60)}
+    <p class="hint">Chapter books and graphic novels count. Audiobooks don't.</p><button class="save" id="rdGo" type="button" style="background:var(--read)">${st.mode === 'timer' ? `Start ${minLabel(st.min)} timer` : 'Start the stopwatch'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+    $('bookIn').oninput = e => { book = e.target.value };
+    layer.querySelectorAll('[data-book]').forEach(b => b.onclick = () => { book = b.dataset.book; $('bookIn').value = book });
+    bindTimerPick(st, draw);
+    $('rdGo').onclick = async () => {
+      const bk = $('bookIn').value.trim(); if (!bk) return toast('Type the book’s title.'); if (activeRead(kid)) return closeSheet();
+      store.set(TPREF('read', kid), JSON.stringify(st)); closeSheet(); const d = today();
+      unlockAudio(); const now = new Date().toISOString();
+      await act(() => insertSession('reading_sessions', { family_id: S.family.id, kid_id: kid.id, book: bk, local_date: d, week_start: monday(d), started_at: now, running_since: now, seconds: 0, source: 'timer' }, st.mode === 'timer' ? st.min * 60 : 0));
+      toast(st.mode === 'timer' ? `Happy reading! The timer rings in ${minLabel(st.min)}.` : `Happy reading! Enjoy ${bk}.`);
+    };
   });
+  draw();
 }
 function manualSheet(kid, kind) { entrySheet(kind === 'read' ? 'read' : 'screen', kid, null, thisWeek()) }
 /* In a kid's view, manual entry needs the parent PIN each time, and doesn't leave parent mode unlocked. */
