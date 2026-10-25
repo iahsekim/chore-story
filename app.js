@@ -597,7 +597,7 @@ function whoHTML() {
     <h2 class="who-q">${hello()}! Who's here?</h2>
     ${S.kids.length ? `<div class="kidtiles ${S.kids.length === 1 ? 'one' : ''}">${tiles}</div>` : '<p class="hint" style="text-align:center">No kids yet. Choose Parent/guardian to add one.</p>'}
     <button class="partile" type="button" data-who="parent"><span class="pt-lock">${I.lock}</span><span class="t"><b>Parent/guardian</b><span>Settings, approvals and the ledger. PIN needed.</span></span>${I.chev}</button>
-    <div class="foot"><span><button class="link" type="button" data-fb="hi">Feedback</button> · <button class="link" id="signOutWho" type="button">Switch account</button></span></div></section>`;
+    <div class="foot">${supportHTML()}<span><button class="link" type="button" data-fb="hi">Feedback</button> · <button class="link" id="signOutWho" type="button">Switch account</button></span></div></section>`;
 }
 function setProfile(p) { S.profile = p; store.set('profile', p); S.view = p === 'parent' ? 'parent' : 'kid'; S.tab = 'home'; if (p !== 'parent') { const k = kidById(p); if (k) setTimeout(() => cheerNews(k), 50) } }
 function chooseProfile(p) {
