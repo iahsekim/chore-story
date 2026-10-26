@@ -70,7 +70,7 @@ That's it. Visit the site, sign in with your email, and set up your family.
 | Week | Monday to Sunday in the family's time zone (set in Settings). |
 | Allowance | Each Monday a kid's week starts at their weekly allowance. A change counts from the current week. |
 | Setup | One question per screen: family name, parent PIN, then for each kid their name and color, weekly allowance, screen minutes a week and screen days. Last comes a starter job list to keep, edit, delete or add to. With two or more kids, each job has a checkbox per kid. |
-| Job list | One list for the family. With two or more kids, each job shows a checkbox per kid: everyone checked sees it on their board and can do it and get paid. A kid added later gets the jobs the other kids all share. **More job ideas** adds suggestions with one tap. |
+| Job list | One list for the family. With two or more kids, each job shows a checkbox per kid: everyone checked sees it on their board and can do it and get paid. Tap a job to edit it right in the list (name, what done means, pay, screen bonus, group); changes save as you type. Delete takes a second tap to confirm. A kid added later gets the jobs the other kids all share. **More job ideas** adds suggestions with one tap. |
 | Jobs | The kid taps a job and **I did it**. It waits under **Needs your OK** (with a badge) until a parent taps **OK** or **Not yet**. Parents can also log a job directly. A job can also carry bonus screen minutes. |
 | Bonuses | **Add bonus**: money or screen minutes, always with an explanation the kid can see. |
 | Saving goal | The kid picks something to save for and sees a progress bar against their balance. When there's enough, **Bought something** fills in the goal. |

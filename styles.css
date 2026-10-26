@@ -391,7 +391,21 @@ input.inbig{font-size:21px;min-height:58px}
 /* Shared job list: who can do each job. */
 .jobs-lede{padding:0 2px}
 .jrow{flex-wrap:wrap;row-gap:10px}
-.jrow>.t{flex:1 1 0;text-align:left}
+.jhead{flex:1 1 100%;display:flex;align-items:center;gap:12px;min-width:0;text-align:left}
+.jrow.open{background:var(--wash)}
+.jedit{flex-basis:100%;display:grid;gap:10px}
+.jedit label{display:grid;gap:4px;min-width:0}
+.jedit label>span{font:600 12px/1.2 var(--body);color:var(--muted)}
+.jedit input,.jedit select{min-height:44px;padding:8px 12px;border-radius:12px;font-size:16px}
+.jedit [data-jf="title"]{font-weight:600}
+.jnums{display:grid;grid-template-columns:84px 84px minmax(0,1fr);gap:8px}
+.moneyin.sm>span{left:12px;font-size:16px}
+.moneyin.sm>input{padding-left:24px}
+.jfoot{flex-basis:100%;display:flex;align-items:center;gap:10px}
+.jsaved{flex:1;text-align:right;font-size:13px;font-weight:600;color:var(--muted)}
+.jdel{min-height:40px;padding:0 2px;font-weight:600;font-size:15px;color:var(--pink-deep)}
+.jdel.armed{padding:0 12px;border-radius:12px;background:var(--pink);color:#fff}
+.pill.jdone{min-height:40px;padding:4px 18px}
 .jrow.off>.t,.jrow.off>.stack{opacity:.45}
 .jkids{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px}
 .kchk{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:0 14px 0 6px;border-radius:999px;border:var(--line-w) solid var(--edge);background:var(--paper);color:var(--text);font:600 14px var(--body)}

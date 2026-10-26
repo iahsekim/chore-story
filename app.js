@@ -929,44 +929,86 @@ function pKids() {
 }
 function pJobs() {
   if (!S.kids.length) return `<div class="card"><p class="hint">Add a kid first.</p></div>`;
-  return `<p class="hint jobs-lede">${S.kids.length > 1 ? 'Check who can do each job, or tap one to change it.' : `These jobs are on ${esc(S.kids[0].name)}’s board. Tap one to change it.`}</p>${jobsEditorHTML(jobsModel())}`;
+  return `<p class="hint jobs-lede">${S.kids.length > 1 ? 'Check who can do each job. Tap a job to edit it.' : `These jobs are on ${esc(S.kids[0].name)}’s board. Tap a job to edit it.`}</p>${jobsEditorHTML(jobsModel())}`;
 }
-/* The job list editor, shared by onboarding (a draft kept in S.onboard, saved when setup finishes) and the Jobs tab (saved jobs). */
+/* The job list, shared by onboarding (a draft kept in S.onboard, saved when setup finishes) and the Jobs tab (saved jobs).
+   Jobs are edited right in the list: tap one to open it, changes save as you go. */
 function jobsModel() {
   if (S.view === 'onboard') {
     const O = S.onboard;
     return { kids: O.kids.map(k => ({ id: k.key, name: k.name, color: k.color })), jobs: O.jobs,
-      add: (b, ok) => { O.jobs.push({ id: 'd' + Math.random().toString(36).slice(2, 10), ...b }); render(); if (ok) toast(ok) },
-      save: (j, b) => { Object.assign(j, b); render() },
-      remove: j => { O.jobs.splice(O.jobs.indexOf(j), 1); render(); toast('Deleted') } };
+      add: (b, ok) => { O.jobs.push({ id: 'd' + Math.random().toString(36).slice(2, 10), ...b }); render(); if (ok) toast(ok) } };
   }
   return { kids: S.kids, jobs: S.jobs.map(j => ({ ...j, kid_ids: jobKids(j) })),
-    add: (b, ok = 'Added') => act(() => q(sb.from('jobs').insert({ ...b, family_id: S.family.id, enabled: true, sort: S.jobs.length })), ok),
-    save: (j, b) => act(() => q(sb.from('jobs').update({ ...b, kid_id: null, enabled: true }).eq('id', j.id)), 'Saved'),
-    remove: j => confirmSheet('Delete this job?', 'Money already earned for it stays.', 'Delete', () => q(sb.from('jobs').delete().eq('id', j.id)), 'Deleted') };
+    add: (b, ok = 'Added') => act(() => q(sb.from('jobs').insert({ ...b, family_id: S.family.id, enabled: true, sort: S.jobs.length })), ok) };
 }
 const kidChk = (k, on, attr, label) => `<button class="kchk" type="button" ${attr} aria-pressed="${on}" aria-label="${esc(label)}" style="--kc:${COLORS[k.color] || COLORS.green}"><i>${I.check}</i>${esc(k.name)}</button>`;
 function jobsEditorHTML(M) {
   const multi = M.kids.length > 1, have = new Set(M.jobs.map(j => j.title.trim().toLowerCase()));
-  const cats = [...new Set([...CATALOG.map(c => c.cat), ...M.jobs.map(j => j.category)])].filter(c => M.jobs.some(j => j.category === c));
+  const allCats = [...new Set([...CATALOG.map(c => c.cat), ...M.jobs.map(j => j.category)])], cats = allCats.filter(c => M.jobs.some(j => j.category === c));
   const ideas = CATALOG.filter(c => !have.has(c.title.toLowerCase()));
-  // With one kid there's nothing to choose, so no checkboxes, except on a job that isn't on their board (left over from a removed kid).
-  const row = j => { const chk = multi || !j.kid_ids.length;
-    return `<div class="row jrow${j.kid_ids.length ? '' : ' off'}"><button class="t" type="button" data-ej="${j.id}"><b>${esc(j.title)}</b><span>${esc(j.done_means || 'Tap to describe what done looks like')}</span></button>
-      <span class="stack"><span class="price num">${money(Number(j.price))}</span>${Number(j.bonus_minutes) ? `<span class="bal">+${j.bonus_minutes} screen min</span>` : ''}</span>
-      ${chk ? `<div class="jkids">${M.kids.map(k => kidChk(k, j.kid_ids.includes(k.id), `data-jkc="${j.id}|${k.id}"`, `${k.name} can do ${j.title}`)).join('')}</div>` : ''}</div>` };
+  if (S.openJob && !M.jobs.some(j => j.id === S.openJob)) S.openJob = null;
+  const row = j => {
+    // With one kid there's nothing to choose, so no checkboxes, except on a job that isn't on their board (left over from a removed kid).
+    const chk = multi || !j.kid_ids.length, kids = chk ? `<div class="jkids">${M.kids.map(k => kidChk(k, j.kid_ids.includes(k.id), `data-jkc="${j.id}|${k.id}"`, `${k.name} can do ${j.title}`)).join('')}</div>` : '';
+    if (j.id !== S.openJob) return `<div class="row jrow${j.kid_ids.length ? '' : ' off'}" data-jrow="${j.id}"><button class="jhead" type="button" data-ej="${j.id}" aria-expanded="false"><span class="t"><b>${esc(j.title)}</b><span>${esc(j.done_means || 'Tap to say what done looks like')}</span></span>
+      <span class="stack"><span class="price num">${money(Number(j.price))}</span>${Number(j.bonus_minutes) ? `<span class="bal">+${j.bonus_minutes} screen min</span>` : ''}</span></button>${kids}</div>`;
+    return `<div class="row jrow open${j.kid_ids.length ? '' : ' off'}" data-jrow="${j.id}"><div class="jedit">
+      <label><span>Job</span><input data-jf="title" maxlength="80" value="${esc(j.title)}" autocapitalize="sentences"></label>
+      <label><span>Done means</span><input data-jf="done_means" maxlength="160" value="${esc(j.done_means)}" placeholder="What finished looks like"></label>
+      <div class="jnums"><label><span>Pays</span><div class="moneyin sm"><span>$</span><input data-jf="price" type="number" inputmode="decimal" min="0" max="1000" step="0.25" value="${Number(j.price)}"></div></label>
+      <label><span>Screen bonus</span><input data-jf="bonus_minutes" type="number" inputmode="numeric" min="0" max="240" step="5" value="${Number(j.bonus_minutes) || 0}"></label>
+      <label><span>Group</span><select data-jf="category">${allCats.map(c => `<option ${c === j.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label></div></div>
+      ${kids}<div class="jfoot"><button class="jdel" type="button" data-jdel="${j.id}">Delete</button><span class="jsaved" aria-live="polite"></span><button class="pill soft jdone" type="button" data-jdone="${j.id}">Done</button></div></div>`;
+  };
   return `${cats.map(c => `<section class="sect"><div class="sect-h"><h3>${esc(c)}</h3></div><div class="list">${M.jobs.filter(j => j.category === c).map(row).join('')}</div></section>`).join('') || '<div class="list"><div class="empty">No jobs yet. Add your own, or pick some from the ideas below.</div></div>'}
     <button class="pill" id="newJob" type="button" style="justify-self:start">${I.plus}New job</button>
     ${ideas.length ? `<details class="ideas" ${S.ideasOpen ? 'open' : ''}><summary>More job ideas<span class="n">${ideas.length}</span></summary><div class="list">${ideas.map(c => `<button class="row" type="button" data-idea="${c.id}"><span class="ico add">${I.plus}</span><span class="t"><b>${esc(c.title)}</b><span>${esc(c.cat)}</span></span><span class="price num">${money(c.price)}</span></button>`).join('')}</div></details>` : ''}`;
 }
-/* Check or uncheck a kid on a job. Saved quietly in place, so a parent can tick through a list without the page jumping. */
+/* Re-render while keeping a job row where it was on screen (rows above may grow or shrink). */
+function keepRow(id, fn) { const a = app.querySelector(`[data-jrow="${id}"]`), top = a ? a.getBoundingClientRect().top : null; fn(); const b = app.querySelector(`[data-jrow="${id}"]`); if (b && top != null) window.scrollBy(0, b.getBoundingClientRect().top - top) }
+function openJob(id) { keepRow(id, () => { S.openJob = S.openJob === id ? null : id; render() }); const r = app.querySelector(`[data-jrow="${id}"]`); if (r && S.openJob === id) { const b = r.getBoundingClientRect(); if (b.bottom > innerHeight - 90) scrollBy(0, b.bottom - innerHeight + 110) } }
+/* Change a job in place: the draft during setup, or the saved job (quietly, without reloading the page). */
+function patchJob(id, patch, after) {
+  if (S.view === 'onboard') { Object.assign(S.onboard.jobs.find(x => x.id === id) || {}, patch); after && after(); return }
+  const live = S.jobs.find(x => x.id === id); if (!live) return;
+  const body = { ...patch, kid_ids: patch.kid_ids || jobKids(live), kid_id: null, enabled: true }; Object.assign(live, body);
+  q(sb.from('jobs').update(body).eq('id', id)).then(() => after && after()).catch(e => { console.error(e); toast(errMsg(e)); refresh() });
+}
+function flashSaved(id) { const el = app.querySelector(`[data-jrow="${id}"] .jsaved`); if (!el) return; el.textContent = 'Saved'; clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = '' }, 1400) }
+/* quiet = saving while still typing: don't rewrite the field or complain about a half-typed value. */
+function saveJobField(el, quiet) {
+  const id = el.closest('[data-jrow]').dataset.jrow, j = jobsModel().jobs.find(x => x.id === id), f = el.dataset.jf; if (!j) return;
+  let v = el.value;
+  if (f === 'title') { v = capFirst(v); if (!v) { if (!quiet) { el.value = j.title; toast('A job needs a name.') } return } }
+  else if (f === 'done_means') v = v.trim();
+  else if (f === 'price') v = Math.min(1000, Math.max(0, r2(parseFloat(v) || 0)));
+  else if (f === 'bonus_minutes') v = Math.min(240, Math.max(0, parseInt(v) || 0));
+  if (!quiet && f !== 'category') el.value = v;
+  if (String(j[f] ?? '') === String(v)) return;
+  patchJob(id, { [f]: v }, () => f === 'category' ? keepRow(id, render) : flashSaved(id));
+}
+/* Check or uncheck a kid on a job, saved in place so a parent can tick through a list without the page jumping. */
 function toggleJobKid(el) {
-  const [jid, kid] = el.dataset.jkc.split('|'), M = jobsModel(), j = M.jobs.find(x => x.id === jid); if (!j) return;
+  const [jid, kid] = el.dataset.jkc.split('|'), j = jobsModel().jobs.find(x => x.id === jid); if (!j) return;
   const on = !j.kid_ids.includes(kid), ids = on ? [...j.kid_ids, kid] : j.kid_ids.filter(x => x !== kid);
   el.setAttribute('aria-pressed', on); el.closest('.jrow')?.classList.toggle('off', !ids.length);
-  if (S.view === 'onboard') { j.kid_ids = ids; return }
-  const live = S.jobs.find(x => x.id === jid); if (live) Object.assign(live, { kid_ids: ids, kid_id: null, enabled: true });
-  q(sb.from('jobs').update({ kid_ids: ids, kid_id: null, enabled: true }).eq('id', jid)).catch(e => { console.error(e); toast(errMsg(e)); refresh() });
+  patchJob(jid, { kid_ids: ids }, () => flashSaved(jid));
+}
+async function newJob() {
+  const M = jobsModel(), body = { title: 'New job', done_means: '', category: 'Around the house', price: 1, bonus_minutes: 0, kid_ids: M.kids.map(k => k.id) };
+  if (S.view === 'onboard') { const id = 'd' + Math.random().toString(36).slice(2, 10); S.onboard.jobs.push({ id, ...body }); S.openJob = id; render() }
+  else { try { const row = await q(sb.from('jobs').insert({ ...body, family_id: S.family.id, enabled: true, sort: S.jobs.length }).select().single()); S.jobs.push(row); S.openJob = row.id; render() } catch (e) { console.error(e); return toast(errMsg(e)) } }
+  const r = app.querySelector(`[data-jrow="${S.openJob}"]`); if (!r) return; r.scrollIntoView({ block: 'center' }); const t = r.querySelector('[data-jf="title"]'); t.focus(); t.select();
+}
+/* Delete asks for a second tap instead of a pop-up. */
+function deleteJob(el) {
+  const id = el.dataset.jdel;
+  if (!el.classList.contains('armed')) { el.classList.add('armed'); el.textContent = 'Tap again to delete'; clearTimeout(el._t); el._t = setTimeout(() => { el.classList.remove('armed'); el.textContent = 'Delete' }, 3000); return }
+  S.openJob = null;
+  if (S.view === 'onboard') { const O = S.onboard; O.jobs = O.jobs.filter(j => j.id !== id); render(); return toast('Deleted') }
+  S.jobs = S.jobs.filter(j => j.id !== id); render();
+  q(sb.from('jobs').delete().eq('id', id)).then(() => toast('Deleted. Money already earned for it stays.')).catch(e => { console.error(e); toast(errMsg(e)); refresh() });
 }
 /* Keep what the parent is looking at in place when a list above it grows. */
 async function keepPlace(sel, fn) { const a = app.querySelector(sel), top = a ? a.getBoundingClientRect().top : null; await fn(); const b = app.querySelector(sel); if (b && top != null) window.scrollBy(0, b.getBoundingClientRect().top - top) }
@@ -1136,16 +1178,21 @@ function bindAll() {
   // onboarding
   if (S.view === 'onboard') bindOnboard();
   // job lists (onboarding and the Jobs tab)
-  each('[data-ej]', el => jobSheet(jobsModel().jobs.find(j => j.id === el.dataset.ej)));
+  each('[data-ej]', el => openJob(el.dataset.ej));
+  each('[data-jdone]', el => openJob(el.dataset.jdone));
+  each('[data-jdel]', deleteJob);
   each('[data-jkc]', toggleJobKid);
   each('[data-idea]', el => addIdea(el.dataset.idea));
-  on('newJob', () => jobSheet(null));
+  on('newJob', newJob);
+  app.querySelectorAll('[data-jf]').forEach(el => { let t;
+    el.onchange = () => { clearTimeout(t); saveJobField(el) };
+    if (el.tagName === 'INPUT') { el.oninput = () => { clearTimeout(t); t = setTimeout(() => saveJobField(el, true), 700) }; el.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); el.blur() } } } });
   const ideas = app.querySelector('details.ideas'); if (ideas) ideas.ontoggle = () => { S.ideasOpen = ideas.open };
   // who
   each('[data-who]', el => chooseProfile(el.dataset.who));
   on('swapBtn', switchProfile);
   // tabs
-  each('[data-tab]', el => { if (S.view === 'parent') S.ptab = el.dataset.tab; else S.tab = el.dataset.tab; confirming = false; render(); window.scrollTo(0, 0) });
+  each('[data-tab]', el => { if (S.view === 'parent') S.ptab = el.dataset.tab; else S.tab = el.dataset.tab; confirming = false; S.openJob = null; render(); window.scrollTo(0, 0) });
   each('[data-cat]', el => { S.jobFilter = el.dataset.cat; render() });
   each('[data-manual]', el => manualGate(kidById(el.dataset.kid || S.profile), el.dataset.manual));
   on('rulesBtn', () => rulesSheet(kidById(S.profile)));
@@ -1348,7 +1395,7 @@ setInterval(() => {
   }
 }, 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.family && (S.view === 'kid' || S.view === 'parent')) refresh() });
-setInterval(() => { if (!document.hidden && S.family && (S.view === 'kid' || S.view === 'parent') && !$('scrim')) refresh() }, 60000);
+setInterval(() => { if (!document.hidden && S.family && (S.view === 'kid' || S.view === 'parent') && !$('scrim') && !S.openJob) refresh() }, 60000);
 function unlockAudio() { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume() } catch (e) { } }
 function beep() { try { if (!audio) return;[0, .35, .7].forEach(t => { const o = audio.createOscillator(), g = audio.createGain(); o.frequency.value = 880; o.connect(g); g.connect(audio.destination); g.gain.setValueAtTime(.25, audio.currentTime + t); g.gain.exponentialRampToValueAtTime(.001, audio.currentTime + t + .3); o.start(audio.currentTime + t); o.stop(audio.currentTime + t + .3) }) } catch (e) { } }
 /* The alarm: rings (and buzzes, where phones allow) until it's turned off. Gives up after two minutes. */
@@ -1548,27 +1595,6 @@ function kidSheet(kid) {
       if (kid) await act(async () => { await q(sb.from('kids').update(body).eq('id', kid.id)); if (Number(kid.weekly_allowance) !== body.weekly_allowance) await q(sb.from('weeks').update({ allowance: body.weekly_allowance }).eq('kid_id', kid.id).eq('week_start', thisWeek())) }, 'Saved');
       else await act(() => addKid(body), `${body.name} added`) };
     if (kid) $('kDel').onclick = () => confirmSheet(`Remove ${kid.name}?`, 'This deletes their earnings history, reading and screen time, and takes them off every job. It can’t be undone.', 'Remove for good', () => q(sb.from('kids').delete().eq('id', kid.id)), 'Removed');
-  });
-}
-/* Add or edit a job. With two or more kids, it also says who can do it. Works on the onboarding draft and on saved jobs. */
-function jobSheet(job) {
-  const M = jobsModel(), multi = M.kids.length > 1, cats = [...new Set(M.jobs.map(j => j.category).concat(CATALOG.map(c => c.cat)))];
-  const J = job ? { ...job, kid_ids: [...job.kid_ids] } : { title: '', done_means: '', price: 1, category: cats[0], bonus_minutes: 0, kid_ids: M.kids.map(k => k.id) };
-  const showKids = multi || (job && !J.kid_ids.length);
-  openSheet(`<h2>${job ? 'Edit job' : 'New job'}</h2>
-    <div class="field"><label class="label" for="jT">Job</label><input id="jT" maxlength="80" value="${esc(J.title)}" placeholder="Feed the fish"></div>
-    <div class="field"><label class="label" for="jD">Done means</label><input id="jD" maxlength="160" value="${esc(J.done_means)}" placeholder="What finished looks like"></div>
-    <div class="row2"><div class="field"><label class="label" for="jP">Pays ($)</label><input id="jP" type="number" inputmode="decimal" min="0" step="0.25" value="${J.price}"></div>
-    <div class="field"><label class="label" for="jC">Group</label><select id="jC">${cats.map(c => `<option ${c === J.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div></div>
-    <div class="field"><label class="label" for="jM">Bonus screen minutes (optional)</label><input id="jM" type="number" inputmode="numeric" min="0" max="240" step="5" value="${Number(J.bonus_minutes) || 0}"></div>
-    ${showKids ? `<div class="field"><span class="label">Who can do it</span><div class="jkids">${M.kids.map(k => kidChk(k, J.kid_ids.includes(k.id), `data-sk="${k.id}"`, `${k.name} can do this job`)).join('')}</div><p class="hint">Everyone checked can do it and get paid.</p></div>` : ''}
-    <button class="save" id="jGo" type="button">${job ? 'Save' : 'Add job'}</button>${job ? '<button class="cancel danger-link" id="jDel" type="button">Delete job</button>' : ''}<button class="cancel" data-close type="button">Cancel</button>`, () => {
-    layer.querySelectorAll('[data-sk]').forEach(b => b.onclick = () => { const id = b.dataset.sk; J.kid_ids = J.kid_ids.includes(id) ? J.kid_ids.filter(x => x !== id) : [...J.kid_ids, id]; b.setAttribute('aria-pressed', J.kid_ids.includes(id)) });
-    $('jGo').onclick = () => { const title = capFirst($('jT').value); if (!title) { toast('Name the job.'); return $('jT').focus() }
-      const body = { title, done_means: $('jD').value.trim(), price: Math.min(1000, Math.max(0, r2(parseFloat($('jP').value) || 0))), category: $('jC').value,
-        bonus_minutes: Math.min(240, Math.max(0, parseInt($('jM').value) || 0)), kid_ids: showKids ? J.kid_ids : M.kids.map(k => k.id) };
-      closeSheet(); job ? M.save(job, body) : M.add(body, `Added ${title}`) };
-    if (job) $('jDel').onclick = () => { if (S.view === 'onboard') closeSheet(); M.remove(job) };
   });
 }
 const FB = { bug: ['Report a bug', 'What happened, and what did you expect? Which screen were you on?'], idea: ['Request a feature', 'What would make this more useful for your family?'], hi: ['Say hi', 'Questions, thanks, anything.'] };
