@@ -90,7 +90,9 @@ async function ensureWeeks() {
   }
 }
 async function refresh() { try { await loadAll() } catch (e) { toast(errMsg(e)) } render(); if (S.view === 'kid' && kidById(S.profile) && !$('scrim')) cheerNews(kidById(S.profile)) }
-const errMsg = e => (e && e.message && /fetch|network/i.test(e.message)) ? 'You’re offline. Try again when you’re connected.' : 'That didn’t save. Try again.';
+// Shows the database's own reason too, so a problem can be reported and fixed instead of guessed at.
+const errMsg = e => { const m = String(e?.message || e?.error_description || e || '').trim();
+  return /failed to fetch|network|load failed/i.test(m) ? 'You’re offline. Try again when you’re connected.' : `That didn’t save${m ? ` (${m.slice(0, 160)})` : ''}. Try again.` };
 async function act(fn, ok) { try { await fn(); if (ok) toast(ok); await refresh() } catch (e) { console.error(e); toast(errMsg(e)) } }
 
 /* ---------- money math ---------- */
@@ -1435,7 +1437,7 @@ function openSheet(html, after) {
   if (cur) { const top = cur.scrollTop; cur.innerHTML = html; cur.scrollTop = top; layer.querySelectorAll('[data-close]').forEach(b => b.onclick = closeSheet); after && after(); return }
   layer.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`; $('scrim').onclick = e => { if (e.target.id === 'scrim') closeSheet() }; layer.querySelectorAll('[data-close]').forEach(b => b.onclick = closeSheet); after && after() }
 function closeSheet() { layer.innerHTML = '' }
-let tt; function toast(m) { clearTimeout(tt); let el = $('toast'); if (!el) { el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el) } el.textContent = m; tt = setTimeout(() => el.remove(), 2800) }
+let tt; function toast(m) { clearTimeout(tt); let el = $('toast'); if (!el) { el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el) } el.textContent = m; tt = setTimeout(() => el.remove(), Math.max(2800, String(m).length * 70)) }
 function confirmSheet(title, body, yes, fn, ok, style = 'red') {
   openSheet(`<h2>${esc(title)}</h2><p class="hint">${esc(body)}</p><button class="save ${style === 'red' ? 'red' : ''}" id="cfYes" type="button" >${esc(yes)}</button><button class="cancel" data-close type="button">Cancel</button>`,
     () => { $('cfYes').onclick = async () => { $('cfYes').disabled = true; closeSheet(); await act(fn, ok) } });
