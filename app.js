@@ -322,6 +322,9 @@ function render() {
   const v = S.view;
   // Kids see the pig-pink side of the paper; everyone else sees the white side.
   document.body.dataset.side = v === 'kid' ? 'kid' : 'grown';
+  // Each kid's screens are tinted with their own color, so it's obvious whose profile is open.
+  const kc = v === 'kid' && COLORS[kidById(S.profile)?.color];
+  if (kc) document.body.style.setProperty('--kidc', kc); else document.body.style.removeProperty('--kidc');
   if (v === 'loading') app.innerHTML = `<div class="loading"><img src="${PIGGY}" alt="" width="88" height="77"><span>Loading…</span></div>`;
   else if (v === 'auth') app.innerHTML = authHTML();
   else if (v === 'onboard') app.innerHTML = onboardHTML();
@@ -498,7 +501,7 @@ function authHTML() {
     <p class="lede">${S.invited && !code ? 'You’re invited! Sign in with your email to join your family.' : 'Allowance, chores, reading and screen time, all in one place kids can see and trust.'}</p>
     <div class="card form">
       ${code ? `<div class="field"><label class="label" for="codeIn">Enter the code we sent to ${esc(S.authEmail)}</label>
-        <input id="codeIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" maxlength="12" placeholder="Code"></div>
+        <input id="codeIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" maxlength="12" placeholder="CODE"></div>
         <button class="save" id="codeGo" type="button">Sign in</button>
         <p class="hint">Or tap the link in the email on this device. <button class="link" id="authBack" type="button">Use a different email</button></p>`
       : `<div class="field"><label class="label" for="emailIn">Parent or guardian email</label>
@@ -1276,24 +1279,36 @@ function timerChoices(kind, maxMin) {
   return out.length ? out : [Math.max(1, maxMin)];
 }
 const minLabel = m => mins(m);
+const timerHint = (kind, m) => kind === 'screen' ? `The timer rings after ${minLabel(m)}. Turn it off, and that time comes out of your screen time.` : `The timer rings after ${minLabel(m)} of reading.`;
 function timerPickHTML(kind, st, maxMin) {
   const ch = timerChoices(kind, maxMin);
   return `<div class="field"><span class="label">How long?</span>
     <div class="seg tmode"><button type="button" data-tm="watch" aria-pressed="${st.mode === 'watch'}">${I.clock}Stopwatch</button><button type="button" data-tm="timer" aria-pressed="${st.mode === 'timer'}">${I.bell}Timer</button></div>
     ${st.mode === 'timer' ? `<div class="chips tmins ${ch.length > 12 ? 'scroll' : ''}" role="radiogroup" aria-label="Minutes">${ch.map(m => `<button class="chip" type="button" role="radio" data-tmin="${m}" aria-checked="${m === st.min}" aria-pressed="${m === st.min}">${minLabel(m)}</button>`).join('')}</div>
-      <p class="hint">${kind === 'screen' ? `The timer rings after ${minLabel(st.min)}. Turn it off, and that time comes out of your screen time.` : `The timer rings after ${minLabel(st.min)} of reading.`}</p>`
+      <div class="tcustom"><label for="tminIn">Or type the minutes</label><span class="minin"><input id="tminIn" type="number" inputmode="numeric" min="1" max="${maxMin}" step="1" value="${st.min}" data-kind="${kind}"><span>min</span></span></div>
+      <p class="hint" id="tHint">${timerHint(kind, st.min)}</p>`
       : `<p class="hint">${kind === 'screen' ? 'Runs until you stop it. At zero for the week, screens go off.' : 'Counts up until you tap I’m done.'}</p>`}</div>`;
 }
 /* Pick a valid starting choice: the last one used, or the closest that still fits. */
 function timerState(kind, kid, maxMin) {
   const p = timerPref(kind, kid), ch = timerChoices(kind, maxMin);
-  const min = ch.includes(p.min) ? p.min : ch.filter(m => m <= p.min).pop() || ch[0];
+  // A typed amount is kept too, as long as it still fits (screens can't go past what's left this week).
+  const min = p.min >= 1 && p.min <= maxMin ? Math.round(p.min) : ch.filter(m => m <= p.min).pop() || ch[0];
   return { mode: p.mode, min };
 }
 function bindTimerPick(st, redraw) {
   const sel = layer.querySelector('.tmins [aria-checked="true"]'); if (sel) sel.scrollIntoView({ block: 'nearest', inline: 'center' });
   layer.querySelectorAll('[data-tm]').forEach(b => b.onclick = () => { st.mode = b.dataset.tm; redraw() });
   layer.querySelectorAll('[data-tmin]').forEach(b => b.onclick = () => { st.min = Number(b.dataset.tmin); redraw() });
+  // Typing updates the chips, the hint and the start button in place, so the keyboard stays up.
+  const inp = layer.querySelector('#tminIn'); if (!inp) return;
+  const max = Number(inp.max), kind = inp.dataset.kind;
+  const sync = note => { layer.querySelectorAll('[data-tmin]').forEach(b => { const on = Number(b.dataset.tmin) === st.min; b.setAttribute('aria-checked', on); b.setAttribute('aria-pressed', on) });
+    const h = $('tHint'); if (h) h.textContent = note || timerHint(kind, st.min); const go = layer.querySelector('#scrGo,#rdGo'); if (go) go.textContent = `Start ${minLabel(st.min)} timer` };
+  const over = () => kind === 'screen' ? `You have ${minLabel(max)} left this week, so the timer is set to ${minLabel(max)}.` : `Reading timers go up to ${minLabel(max)}.`;
+  inp.oninput = () => { const v = parseInt(inp.value); if (v >= 1) { st.min = Math.min(max, v); sync(v > max ? over() : '') } };
+  inp.onchange = () => { const v = parseInt(inp.value); st.min = Math.min(max, Math.max(1, v || st.min)); inp.value = st.min; sync(v > max ? over() : '') };
+  inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur() } };
 }
 /* Insert a session; if the database hasn't got the timer column yet, keep the timer on this device instead. */
 async function insertSession(table, row, target) {

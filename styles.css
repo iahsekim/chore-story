@@ -37,7 +37,9 @@
   --paper:#16245E; --wash:#0C1844; --text:#FFF4F7; --muted:#AEB8DC; --rule:rgba(255,255,255,.12);
   color-scheme:dark}
 body{--under:var(--ground)}
-body[data-side="kid"]{--ground:var(--pink-ground)}
+body[data-side="kid"]{--ground:color-mix(in srgb,var(--kidc,var(--pink)) 30%,#fff)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) body[data-side="kid"]{--ground:color-mix(in srgb,var(--kidc,var(--pink)) 26%,#0C1844)}}
+:root[data-theme="dark"] body[data-side="kid"]{--ground:color-mix(in srgb,var(--kidc,var(--pink)) 26%,#0C1844)}
 
 /* ---------- base ---------- */
 *{box-sizing:border-box}
@@ -70,7 +72,7 @@ body[data-side="kid"] header h1,body[data-side="kid"] .sect-h h3,body[data-side=
 .hint{font-size:14px;color:var(--muted)}
 .lede{font:500 18px/1.4 var(--body);color:var(--muted);max-width:34ch;text-wrap:balance}
 .link{display:inline-flex;align-items:center;min-height:40px;font-weight:600;font-size:15px;color:var(--blue-deep);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
-body[data-side="kid"] .sect-h .link{color:#fff}
+body[data-side="kid"] .sect-h .link{color:var(--text)}
 .danger-link{color:var(--pink-deep)!important;font-weight:600}
 .empty{padding:24px 18px 22px;color:var(--muted);text-align:center;font-weight:500}
 .empty::before{content:"";display:block;width:56px;height:49px;margin:0 auto 8px;background:url(piggy.png) center/contain no-repeat}
@@ -80,7 +82,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;pa
 .hello{display:flex;align-items:center;gap:10px;min-width:0}
 .hello>div{display:grid;gap:4px;min-width:0}
 .hello small{font:600 15px/1 var(--body);color:var(--muted)}
-body[data-side="kid"] .hello small{color:#fff}
+body[data-side="kid"] .hello small{color:var(--text)}
 .hi-pig{width:56px;height:auto;flex:none;transform-origin:50% 90%}
 .lock{flex:none;display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 14px;border-radius:999px;background:var(--paper);border:var(--line-w) solid var(--edge);box-shadow:var(--pop);font-weight:600;font-size:14px}
 .lock svg{width:16px;height:16px}
@@ -228,7 +230,7 @@ body[data-side="kid"] main>.ptools .pill.soft{background:var(--paper)}
 .weeknav{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .weeknav b{font:400 20px/1.1 var(--display);text-align:center;flex:1}
 .weeknav b small{display:block;font:500 13px var(--body);color:var(--muted);margin-top:2px}
-body[data-side="kid"] .weeknav b small{color:#fff;-webkit-text-stroke:0;letter-spacing:0}
+body[data-side="kid"] .weeknav b small{color:var(--text);-webkit-text-stroke:0;letter-spacing:0}
 .weeknav .pill{width:46px;padding:0;font-size:22px}
 .weeknav.small{margin-top:4px}
 .wsum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -456,9 +458,9 @@ input.inbig{font-size:21px;min-height:58px}
 .playroom .pr svg{width:100%;height:auto;overflow:visible}
 .pr.g{color:var(--gold)} .pr.p{color:var(--pink)} .pr.b{color:var(--blue)} .pr.m{color:var(--muted)}
 body[data-side="kid"] .pr{opacity:.4}
-body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .playroom .pr{opacity:.28}:root:not([data-theme="light"]) body[data-side="kid"] .pr.p{color:var(--pink)}}
-:root[data-theme="dark"] .playroom .pr{opacity:.28} :root[data-theme="dark"] body[data-side="kid"] .pr.p{color:var(--pink)}
+body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:color-mix(in srgb,var(--kidc,var(--pink)) 75%,#000)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .playroom .pr{opacity:.28}:root:not([data-theme="light"]) body[data-side="kid"] :is(.pr.p,.pr.b){color:color-mix(in srgb,var(--kidc,var(--pink)) 70%,#fff)}}
+:root[data-theme="dark"] .playroom .pr{opacity:.28} :root[data-theme="dark"] body[data-side="kid"] :is(.pr.p,.pr.b){color:color-mix(in srgb,var(--kidc,var(--pink)) 70%,#fff)}
 
 /* ---------- motion ---------- */
 @media (prefers-reduced-motion:no-preference){
@@ -637,3 +639,10 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
 @keyframes ring{0%,40%,100%{transform:rotate(0)}5%{transform:rotate(18deg)}10%{transform:rotate(-16deg)}15%{transform:rotate(14deg)}20%{transform:rotate(-12deg)}25%{transform:rotate(8deg)}30%{transform:rotate(-6deg)}35%{transform:rotate(3deg)}}
 
 .foot.ptail{padding-top:18px}
+
+/* Timer: type any number of minutes */
+.tcustom{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.tcustom>label{font:600 14px var(--body);color:var(--muted)}
+.minin{position:relative;display:inline-flex;align-items:center}
+.minin>input{width:118px;min-height:46px;padding-right:46px;font-weight:600;font-variant-numeric:tabular-nums}
+.minin>span{position:absolute;right:14px;font-weight:600;color:var(--muted);pointer-events:none}
