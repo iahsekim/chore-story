@@ -1234,8 +1234,8 @@ function bindAll() {
   on('invGo', () => { const e = $('invEmail').value.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return toast('Enter a valid email.');
     if (S.members.some(m => (m.email || '').toLowerCase() === e)) return toast('They’re already in your family.');
     const b = $('invGo'); b.disabled = true; b.textContent = 'Sending…';
-    act(async () => { await q(sb.from('family_invites').upsert({ family_id: S.family.id, email: e })); toast(await sendInvite(e) ? `Invite sent to ${e}` : `Added. The email didn’t send, so ask them to sign in at ${location.host || 'paperpig.app'} with ${e}.`) }) });
-  each('[data-reinvite]', async el => { el.disabled = true; el.textContent = 'Sending…'; const ok = await sendInvite(el.dataset.reinvite); el.disabled = false; el.textContent = 'Send again'; toast(ok ? `Sent again to ${el.dataset.reinvite}` : 'Couldn’t send the email. Try again in a minute.') });
+    act(async () => { await q(sb.from('family_invites').upsert({ family_id: S.family.id, email: e })); const err = await sendInvite(e); toast(err ? `Added, but ${err.charAt(0).toLowerCase() + err.slice(1)} Or ask them to sign in at ${location.host || 'paperpig.app'} with ${e}.` : `Invite sent to ${e}`) }) });
+  each('[data-reinvite]', async el => { el.disabled = true; el.textContent = 'Sending…'; const err = await sendInvite(el.dataset.reinvite); el.disabled = false; el.textContent = 'Send again'; toast(err || `Sent again to ${el.dataset.reinvite}`) });
   on('signOutWho', async () => { await sb.auth.signOut(); store.set('profile', null); store.set('signed-in', null); location.reload() });
   on('signOut', async () => { await sb.auth.signOut(); store.set('profile', null); location.reload() });
   on('delAcct', deleteSheet);
@@ -1645,14 +1645,18 @@ function deleteSheet() {
   });
 }
 
-/* Emails the invite through the site's invite function (Netlify + Resend). Returns false if it couldn't send. */
+/* Emails the invite through the site's invite function (Netlify + Resend). Returns '' when sent, or a reason a parent can act on. */
 async function sendInvite(email) {
+  let r;
   try {
-    const tok = (await sb.auth.getSession()).data?.session?.access_token; if (!tok) return false;
-    const r = await fetch('/.netlify/functions/invite', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ email }) });
-    if (!r.ok) console.warn('invite email', r.status, await r.text().catch(() => ''));
-    return r.ok;
-  } catch (e) { console.warn('invite email', e); return false }
+    const tok = (await sb.auth.getSession()).data?.session?.access_token; if (!tok) return 'Your sign-in expired. Sign out and back in, then try again.';
+    r = await fetch('/.netlify/functions/invite', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ email }) });
+  } catch (e) { console.warn('invite email', e); return 'Couldn’t reach the server. Check your connection and try again.' }
+  if (r.ok) return '';
+  const j = await r.json().catch(() => ({})); console.warn('invite email', r.status, j);
+  return ({ not_configured: 'Invite emails aren’t turned on yet. The site needs its RESEND_API_KEY.', signin: 'Your sign-in expired. Sign out and back in, then try again.',
+    no_invite: 'That invite was canceled. Add them again.', too_many: 'Too many open invites. Cancel some first.',
+    send_failed: `The email didn’t send: ${j.detail || 'the email service refused it'}.` })[j.error] || `The email didn’t send (error ${r.status}). Try again in a minute.`;
 }
 /* ---------- boot ---------- */
 async function enter(session) {

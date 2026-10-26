@@ -14,6 +14,12 @@ const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'ap
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 exports.handler = async (event) => {
+  try { return await send(event) } catch (e) { console.error('invite crashed', e); return json(500, { error: 'crash', detail: String(e && e.message || e) }) }
+};
+
+async function send(event) {
+  // A plain visit (GET) only reports whether sending is set up, so it's easy to check from a browser.
+  if (event.httpMethod === 'GET') return json(200, { configured: !!process.env.RESEND_API_KEY, runtime: process.version });
   if (event.httpMethod !== 'POST') return json(405, { error: 'method' });
   const key = process.env.RESEND_API_KEY;
   if (!key) return json(503, { error: 'not_configured' });
@@ -58,7 +64,7 @@ exports.handler = async (event) => {
     method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from: FROM, to: [email], subject, html, text, ...(me.email ? { reply_to: me.email } : {}) })
   });
-  if (!r.ok) { console.error('resend', r.status, await r.text()); return json(502, { error: 'send_failed' }) }
+  if (!r.ok) { const t = await r.text(); console.error('resend', r.status, t); let detail = t; try { detail = JSON.parse(t).message || t } catch (e) { } return json(502, { error: 'send_failed', detail: String(detail).slice(0, 300) }) }
   return json(200, { ok: true });
-};
+}
 
