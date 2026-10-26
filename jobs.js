@@ -1,4 +1,4 @@
-/* Default job board. Every new kid profile starts with this list; parents can edit it per kid. */
+/* Job ideas. The ones marked on (last argument 1) make the starter list in setup; the rest show under More job ideas. */
 const J=(id,cat,title,price,done,on)=>({id,cat,title,price,done,on:!!on});
 const CATALOG=[
  J('k1','Kitchen','Unload the dishwasher',1,'Every dish put away where it goes',1),

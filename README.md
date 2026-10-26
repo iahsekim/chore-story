@@ -2,7 +2,7 @@
 
 A free web app for families: a weekly allowance, a job board with prices, a reading log that earns screen minutes, and a weekend screen clock that can't be paused.
 
-- **Parents** sign in with just an email (a 6-digit code or magic link, no password), add their kids, and set up each kid's job board, allowance and screen-time rules.
+- **Parents** sign in with just an email (a 6-digit code or magic link, no password), and answer a few quick questions: each kid's name, allowance, screen time and screen days, then which jobs each kid can do.
 - **Kids** sign in on the same email, pick their profile, and see their week: the allowance, every job and bonus with the reason, what's in their bank, and what's been withdrawn or spent.
 - **A bank for each kid.** Every Monday the kid earns their allowance, plus any jobs and bonuses. It all builds up as a balance in their bank. Money only comes out when you record a withdrawal (cash or a transfer) or a purchase you made for them with their money. Every entry needs an explanation. Nothing is taken away as a punishment unless you turn on the optional jar (below).
 
@@ -68,7 +68,9 @@ That's it. Visit the site, sign in with your email, and set up your family.
 | Thing | Rule |
 |---|---|
 | Week | Monday to Sunday in the family's time zone (set in Settings). |
-| Allowance | Each Monday a kid's week starts at their weekly allowance. A change applies from the next Monday. |
+| Allowance | Each Monday a kid's week starts at their weekly allowance. A change counts from the current week. |
+| Setup | One question per screen: family name, parent PIN, then for each kid their name and color, weekly allowance, screen minutes a week and screen days. Last comes a starter job list to keep, edit, delete or add to. With two or more kids, each job has a checkbox per kid. |
+| Job list | One list for the family. With two or more kids, each job shows a checkbox per kid: everyone checked sees it on their board and can do it and get paid. A kid added later gets the jobs the other kids all share. **More job ideas** adds suggestions with one tap. |
 | Jobs | The kid taps a job and **I did it**. It waits under **Needs your OK** (with a badge) until a parent taps **OK** or **Not yet**. Parents can also log a job directly. A job can also carry bonus screen minutes. |
 | Bonuses | **Add bonus**: money or screen minutes, always with an explanation the kid can see. |
 | Saving goal | The kid picks something to save for and sees a progress bar against their balance. When there's enough, **Bought something** fills in the goal. |
@@ -92,7 +94,7 @@ That's it. Visit the site, sign in with your email, and set up your family.
 index.html            page shell
 styles.css            all styles (light + dark)
 app.js                the app
-jobs.js               default job board (58 jobs, 15 on by default)
+jobs.js               job ideas (58 jobs; the 15 marked on make the starter list)
 config.js             your Supabase URL/key, app name, Venmo + Cash App handles
 privacy.html          privacy page
 supabase/schema.sql   database tables, security rules and functions

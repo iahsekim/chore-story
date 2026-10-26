@@ -49,7 +49,8 @@ create table if not exists public.kids (
 create table if not exists public.jobs (
   id          uuid primary key default gen_random_uuid(),
   family_id   uuid not null references public.families on delete cascade,
-  kid_id      uuid not null references public.kids on delete cascade,
+  kid_id      uuid references public.kids on delete cascade,
+  kid_ids     uuid[] not null default '{}',
   title       text not null check (char_length(title) between 1 and 80),
   done_means  text not null default '' check (char_length(done_means) <= 160),
   category    text not null default 'Around the house' check (char_length(category) <= 40),
@@ -197,7 +198,42 @@ alter table public.jobs add column if not exists bonus_minutes int not null defa
 alter table public.kids add column if not exists goal_name text;
 alter table public.kids add column if not exists goal_amount numeric(8,2);
 
-create index if not exists jobs_kid on public.jobs (kid_id);
+-- Shared jobs: one job list per family. kid_ids says which kids see each job on their board,
+-- and every kid listed can do it and get paid. (Earlier versions kept a separate copy per kid in kid_id.)
+alter table public.jobs add column if not exists kid_ids uuid[] not null default '{}';
+alter table public.jobs alter column kid_id drop not null;
+
+-- Merge the per-kid copies from earlier versions into one shared job (safe to re-run: only old rows are touched).
+do $$
+begin
+  if exists (select 1 from public.jobs where kid_id is not null) then
+    create temp table job_merge on commit drop as
+      select j.id, j.kid_id, j.enabled,
+             first_value(j.id) over (partition by j.family_id, lower(trim(j.title)) order by j.enabled desc, j.sort, j.created_at, j.id) as keep_id
+        from public.jobs j where j.kid_id is not null;
+    update public.jobs j
+       set kid_ids = coalesce((select array_agg(distinct m.kid_id) from job_merge m where m.keep_id = j.id and m.enabled), '{}')
+     where j.id in (select keep_id from job_merge);
+    update public.credits c set job_id = m.keep_id from job_merge m where c.job_id = m.id and m.id <> m.keep_id;
+    delete from public.jobs where id in (select id from job_merge where id <> keep_id);
+    -- Jobs no kid had switched on were only suggestions; they live in the app's ideas list now.
+    update public.credits set job_id = null where job_id in (select id from public.jobs where kid_id is not null and kid_ids = '{}');
+    delete from public.jobs where kid_id is not null and kid_ids = '{}';
+    update public.jobs set kid_id = null, enabled = true where kid_id is not null;
+  end if;
+end $$;
+
+-- When a kid is removed, take them off every job.
+create or replace function public.jobs_drop_kid()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  update public.jobs set kid_ids = array_remove(kid_ids, old.id) where family_id = old.family_id and old.id = any(kid_ids);
+  return old;
+end $$;
+drop trigger if exists kids_drop_from_jobs on public.kids;
+create trigger kids_drop_from_jobs after delete on public.kids for each row execute function public.jobs_drop_kid();
+
+create index if not exists jobs_family on public.jobs (family_id);
 create index if not exists credits_kid on public.credits (kid_id, week_start);
 create index if not exists tx_kid on public.transactions (kid_id);
 create index if not exists reading_kid on public.reading_sessions (kid_id, week_start);

@@ -352,7 +352,6 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--blue);outline-of
 .kidform-h{display:flex;align-items:center;gap:12px}
 .kidform-h .avatar{width:54px;height:54px;font-size:26px;transition:background .15s}
 .kidform-h b{display:block;font:400 24px/1.1 var(--display)}
-.kidrow{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 0;border-top:2px solid var(--rule)}
 .swatches{display:flex;gap:12px;flex-wrap:wrap}
 .sw{position:relative;width:40px;height:40px;border-radius:50%;border:var(--line-w) solid var(--edge);transition:transform .1s}
 .sw[aria-pressed="true"]{transform:scale(1.12);box-shadow:0 0 0 3px var(--paper),0 0 0 6px var(--edge)}
@@ -370,8 +369,44 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--blue);outline-of
 .form{display:grid;gap:12px}
 .foot{display:grid;gap:10px;justify-items:center;padding-top:6px;font-size:14px;color:var(--muted);text-align:center}
 .steps{display:flex;gap:6px}
-.steps i{flex:1;height:8px;border-radius:4px;background:var(--paper);border:var(--line-w) solid var(--edge)}
+.steps i{flex:1;height:14px;border-radius:7px;background:var(--paper);border:var(--line-w) solid var(--edge)}
 .steps i.on{background:var(--pink)}
+/* Onboarding: one question per screen, answer button in thumb reach. */
+.ob{display:flex;flex-direction:column;gap:18px;padding-block:6px 28px}
+.ob-top{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:14px;min-height:44px}
+.ob-back{display:inline-flex;align-items:center;gap:2px;min-height:44px;padding-right:4px;font-weight:600;color:var(--muted)}
+.ob-back svg{width:18px;height:18px;transform:rotate(180deg)}
+.ob-q{display:grid;gap:8px;margin-top:clamp(8px,4vh,36px)}
+.ob-q h2{font:400 clamp(30px,7.6vw,40px)/1.08 var(--display);text-wrap:balance}
+.ob-q .lede{max-width:38ch}
+.ob>.save{margin-top:6px}
+.ob.ob-long>.save{position:sticky;bottom:16px;z-index:5}
+input.inbig{font-size:21px;min-height:58px}
+.ob-kid{display:flex;justify-content:center;padding-top:4px}
+.avatar.big{width:88px;height:88px;font-size:42px;transition:background .15s}
+.moneyin{position:relative}
+.moneyin>span{position:absolute;left:16px;top:50%;transform:translateY(-50%);font:600 21px var(--body);color:var(--muted);pointer-events:none}
+.moneyin>input{padding-left:34px}
+.ob .chips .chip{min-height:46px;padding:0 18px;font-size:16px}
+/* Shared job list: who can do each job. */
+.jobs-lede{padding:0 2px}
+.jrow{flex-wrap:wrap;row-gap:10px}
+.jrow>.t{flex:1 1 0;text-align:left}
+.jrow.off>.t,.jrow.off>.stack{opacity:.45}
+.jkids{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px}
+.kchk{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:0 14px 0 6px;border-radius:999px;border:var(--line-w) solid var(--edge);background:var(--paper);color:var(--text);font:600 14px var(--body)}
+.kchk i{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:3px solid var(--kc)}
+.kchk i svg{width:13px;height:13px;stroke-width:3.6;opacity:0}
+.kchk[aria-pressed="true"]{background:var(--kc);color:#fff}
+.kchk[aria-pressed="true"] i{background:#fff;border-color:#fff;color:var(--kc)}
+.kchk[aria-pressed="true"] i svg{opacity:1}
+.ideas>summary{list-style:none;display:inline-flex;align-items:center;gap:10px;min-height:46px;padding:0 16px;border-radius:999px;background:var(--paper);border:var(--line-w) solid var(--edge);box-shadow:var(--pop);font-weight:600;cursor:pointer;user-select:none}
+.ideas>summary::-webkit-details-marker{display:none}
+.ideas>summary::after{content:"";width:8px;height:8px;border-right:2.5px solid currentColor;border-bottom:2.5px solid currentColor;transform:rotate(45deg) translateY(-2px)}
+.ideas[open]>summary::after{transform:rotate(-135deg) translateY(-1px)}
+.ideas>summary .n{min-width:28px;height:26px;padding:0 8px;border-radius:13px;background:var(--wash);display:grid;place-items:center;font-size:13px}
+.ideas>.list{margin-top:12px}
+.ico.add{background:var(--wash);color:var(--pink)}
 .support{width:100%;max-width:320px;margin:0 auto}
 .card .support{max-width:none}
 .support summary{list-style:none;display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;background:var(--paper);border:var(--line-w) solid var(--edge);box-shadow:var(--pop);font-weight:600;font-size:15px;cursor:pointer;user-select:none}

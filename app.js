@@ -6,7 +6,7 @@ const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, { 
 const COLORS = { green: '#1FA34A', blue: '#2F6BFF', purple: '#7A3FF2', orange: '#FF6B1A', pink: '#F0418C', teal: '#0FA3A3' };
 const S = {
   user: null, family: null, members: [], invites: [], kids: [], jobs: [], weeks: [], credits: [], tx: [], reading: [], screen: [], sbonus: [],
-  view: 'loading', profile: null, parentOk: false, tab: 'home', ptab: 'kids', jobKid: null, jobFilter: 'All',
+  view: 'loading', profile: null, parentOk: false, tab: 'home', ptab: 'kids', jobFilter: 'All',
   authEmail: '', authStep: 'email', onboard: null
 };
 const store = {
@@ -188,6 +188,7 @@ const I = {
   coin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6.5v11"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h-1A.5.5 0 0 1 4 15.5z"/><path d="M8.5 8.5h7M8.5 12h4.5"/></svg>',
   bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path d="M10 21h4M12 3v2"/></svg>',
   dollar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 7.5C15.7 5.9 14.1 5 12 5c-2.8 0-4.5 1.4-4.5 3.4 0 4.6 9.2 2.6 9.2 7.2 0 2-1.9 3.4-4.7 3.4-2.3 0-4-1-4.8-2.7M12 2.5v19"/></svg>',
@@ -520,49 +521,152 @@ async function verifyCode() {
   if (error) { console.error(error); b.disabled = false; b.textContent = 'Sign in'; return toast(/expired|invalid/i.test(error.message) ? 'That code didn\u2019t match or has expired. Use the code in the newest email.' : 'Couldn\u2019t sign in: ' + error.message) }
 }
 
-/* ---------- onboarding ---------- */
+/* ---------- onboarding: one friendly question per screen ---------- */
+const OB_STAGES = 4, obStage = s => ({ family: 0, pin: 1, jobs: 3 }[s] ?? 2);
+const ALLOW_PICKS = [0, 3, 5, 7, 10, 15], SCREEN_PICKS = [0, 60, 120, 180, 300];
+const DAY_SETS = [['Weekends', [6, 0]], ['Fri to Sun', [5, 6, 0]], ['Every day', [1, 2, 3, 4, 5, 6, 0]]];
+const sameDays = (a, b) => a.length === b.length && a.every(d => b.includes(d));
+const daysLabel = d => d.length === 7 ? 'every day' : !d.length ? 'no screen days' : sameDays(d, [6, 0]) ? 'weekends' : sameDays(d, [1, 2, 3, 4, 5]) ? 'weekdays' : [1, 2, 3, 4, 5, 6, 0].filter(x => d.includes(x)).map(x => DOW[x]).join(', ');
+const kidSummary = k => `${Number(k.weekly_allowance) ? money(Number(k.weekly_allowance)) + ' a week' : 'No allowance'} · ${Number(k.base_screen_minutes) ? `${mins(Number(k.base_screen_minutes))} of screens, ${daysLabel(k.screen_days || [])}` : 'No screen time'}`;
+function newKidDraft() {
+  const O = S.onboard, last = O.kids[O.kids.length - 1], keys = Object.keys(COLORS);
+  return { key: 'k' + Math.random().toString(36).slice(2, 10), name: '', color: keys.find(c => !O.kids.some(k => k.color === c)) || keys[O.kids.length % keys.length],
+    weekly_allowance: last ? last.weekly_allowance : 5, base_screen_minutes: last ? last.base_screen_minutes : 120, reading_cap: 60, screen_days: last ? [...last.screen_days] : [6, 0] };
+}
 function onboardHTML() {
-  const O = S.onboard;
-  const steps = `<div class="steps">${[0, 1, 2].map(i => `<i class="${i <= O.step ? 'on' : ''}"></i>`).join('')}</div>`;
-  if (O.step === 0) return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Welcome</h2>
-    <p class="lede">Set up your family in about a minute.</p>
-    <div class="card form"><div class="field"><label class="label" for="famName">Family name</label><input id="famName" maxlength="60" placeholder="Family name" autocapitalize="words" value="${esc(O.name)}"></div>
-    <p class="hint">Weeks start Monday in your time zone: <b>${esc(O.tz)}</b>.</p>
-    <button class="save" id="ob0" type="button">Next</button></div></section>`;
-  if (O.step === 1) return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Parent/guardian PIN</h2>
-    <p class="lede">Kids use your email to sign in, so a 4-digit PIN keeps the grown-up tools to you.</p>
-    <div class="card form"><div class="field"><label class="label" for="pin1">Choose a PIN</label><input id="pin1" class="pin" inputmode="numeric" type="password" maxlength="4" autocomplete="off"></div>
-    <div class="field"><label class="label" for="pin2">Type it again</label><input id="pin2" class="pin" inputmode="numeric" type="password" maxlength="4" autocomplete="off"></div>
-    <button class="save" id="ob1" type="button">Next</button></div></section>`;
-  const D = O.draft, n = O.kids.length;
-  return `<section class="screen-center">${steps}<h2 style="font:600 34px/1.05 var(--display)">Add your kids</h2>
-    <p class="lede">First names only. Each kid gets their own job board, which you can change later.</p>
-    ${n ? `<div class="card form"><span class="label">Your kids · ${n}</span>${O.kids.map((k, i) => `<div class="kidrow">${avatar(k)}<span><b>${esc(k.name)}</b><span class="hint" style="display:block">${money(Number(k.allowance))} a week</span></span><button class="link" type="button" data-rmkid="${i}">Remove</button></div>`).join('')}</div>` : ''}
-    <div class="card form kidform">
-      <div class="kidform-h"><span class="avatar" id="kPrev" style="background:${COLORS[D.color]}">${esc((D.name || '?').slice(0, 1).toUpperCase())}</span><span><span class="label">${n ? 'Add another kid' : 'Your first kid'}</span><b id="kPrevName">${esc(D.name || 'First name')}</b></span></div>
-      <div class="row2"><div class="field"><label class="label" for="kName">First name</label><input id="kName" maxlength="40" autocomplete="off" autocapitalize="words" value="${esc(D.name)}" placeholder="Name"></div>
-      <div class="field"><label class="label" for="kAllow">Weekly allowance ($)</label><input id="kAllow" type="number" inputmode="decimal" min="0" step="0.5" value="${esc(D.allowance)}"></div></div>
-      <div class="field"><span class="label">Color</span>${swatchesHTML(D.color)}</div>
-      <button class="pill soft" id="kAdd" type="button" style="justify-self:start">+ Save and add another kid</button></div>
-    <button class="save" id="ob2" type="button">Finish setup</button></section>`;
+  const O = S.onboard, st = obStage(O.step), K = O.cur, nm = esc(K?.name || 'your kid'), n = O.kids.length;
+  const top = `<div class="ob-top">${O.step === 'family' ? '<span></span>' : `<button class="ob-back" id="obBack" type="button">${I.chev}Back</button>`}<div class="steps" role="img" aria-label="Step ${st + 1} of ${OB_STAGES}">${Array.from({ length: OB_STAGES }, (_, i) => `<i class="${i <= st ? 'on' : ''}"></i>`).join('')}</div></div>`;
+  const ask = (h, sub, body, next = 'Next', cls = '') => `<section class="ob ${cls}">${top}<div class="ob-q"><h2>${h}</h2>${sub ? `<p class="lede">${sub}</p>` : ''}</div>${body}<button class="save" id="obNext" type="button">${next}</button></section>`;
+  const chip = (attr, v, on, label) => `<button class="chip" type="button" ${attr}="${v}" aria-pressed="${on}">${label}</button>`;
+  switch (O.step) {
+    case 'family': return ask('Welcome! What’s your family’s name?', 'Setup takes about a minute. You can change anything later.',
+      `<div class="field"><label class="label" for="famName">Family name</label><input id="famName" class="inbig" maxlength="60" placeholder="The Rivera Family" autocapitalize="words" value="${esc(O.name)}"></div>`);
+    case 'pin': return ask('Now pick a parent PIN.', 'Kids use this app too. A 4-digit PIN keeps the grown-up tools to you.',
+      `<div class="row2"><div class="field"><label class="label" for="pin1">PIN</label><input id="pin1" class="pin inbig" inputmode="numeric" type="password" maxlength="4" autocomplete="off" value="${esc(O.pin)}"></div>
+      <div class="field"><label class="label" for="pin2">Type it again</label><input id="pin2" class="pin inbig" inputmode="numeric" type="password" maxlength="4" autocomplete="off" value="${esc(O.pin)}"></div></div>`);
+    case 'kidName': return ask(n ? 'What’s your next kid’s name?' : 'Let’s add your kids. What’s the first one’s name?', 'First names only.',
+      `<div class="ob-kid"><span class="avatar big" id="obPrev" style="background:${COLORS[K.color]}">${esc((K.name || '?').slice(0, 1).toUpperCase())}</span></div>
+      <div class="field"><label class="label" for="obName">First name</label><input id="obName" class="inbig" maxlength="40" autocomplete="off" autocapitalize="words" value="${esc(K.name)}"></div>
+      <div class="field"><span class="label">Pick a color</span>${swatchesHTML(K.color)}</div>`);
+    case 'allow': return ask(`How much allowance does ${nm} get each week?`, `It goes into ${nm}’s bank every Monday. Jobs earn extra.`,
+      `<div class="field"><label class="label" for="obAmt">Each week</label><div class="moneyin"><span>$</span><input id="obAmt" class="inbig" type="number" inputmode="decimal" min="0" max="1000" step="0.5" value="${esc(K.weekly_allowance)}"></div></div>
+      <div class="chips">${ALLOW_PICKS.map(v => chip('data-amt', v, Number(K.weekly_allowance) === v, v ? '$' + v : 'None')).join('')}</div>`);
+    case 'screen': return ask(`How much screen time does ${nm} get each week?`, `Reading earns more: every minute ${nm} reads adds a screen minute, up to 1 hr a week.`,
+      `<div class="chips">${SCREEN_PICKS.map(v => chip('data-smin', v, Number(K.base_screen_minutes) === v, v ? mins(v) : 'None')).join('')}</div>
+      <div class="field"><label class="label" for="obMin">Or type the minutes</label><input id="obMin" class="inbig" type="number" inputmode="numeric" min="0" max="2000" step="5" value="${esc(K.base_screen_minutes)}"></div>`);
+    case 'days': return ask(`Which days are screen days for ${nm}?`, 'Screens only count on these days.',
+      `<div class="chips">${DAY_SETS.map(([l, d]) => chip('data-dset', d.join(','), sameDays(K.screen_days, d), l)).join('')}</div>
+      <div class="chips daychips">${[1, 2, 3, 4, 5, 6, 0].map(d => chip('data-oday', d, K.screen_days.includes(d), DOW[d])).join('')}</div>`);
+    case 'more': return ask(n === 1 ? `${esc(O.kids[0].name)} is all set. Any other kids?` : `${n} kids so far. Any more?`, '',
+      `<div class="list">${O.kids.map((k, i) => `<button class="row" type="button" data-obedit="${i}">${avatar(k)}<span class="t"><b>${esc(k.name)}</b><span>${esc(kidSummary(k))}</span></span><span class="link">Edit</span></button>`).join('')}</div>
+      <button class="pill soft" id="obAddKid" type="button" style="justify-self:start">${I.plus}Add another kid</button>`, 'That’s everyone');
+    default: return ask(n > 1 ? 'What jobs can your kids do for extra money?' : `What jobs can ${esc(O.kids[0].name)} do for extra money?`,
+      n > 1 ? 'Here’s a starter list. Check who can do each one, and tap any job to change it.' : 'Here’s a starter list. Keep what fits, and tap any job to change or delete it.',
+      jobsEditorHTML(jobsModel()), 'Finish setup', 'ob-long');
+  }
+}
+/* A kid is added to the draft list once their last question is answered. If the job list already exists,
+   they join the jobs every other kid shares. */
+function commitKid() {
+  const O = S.onboard, K = O.cur; K.name = capFirst(K.name);
+  if (O.jobs && !O.jobs.some(j => j.kid_ids.includes(K.key))) for (const j of O.jobs) if (O.kids.every(k => j.kid_ids.includes(k.key))) j.kid_ids.push(K.key);
+  O.kids.push(K); O.cur = null;
+}
+function initJobs() {
+  const O = S.onboard, keys = O.kids.map(k => k.key);
+  if (!O.jobs) O.jobs = CATALOG.filter(c => c.on).map(c => ({ id: 'd' + c.id, title: c.title, done_means: c.done, category: c.cat, price: c.price, bonus_minutes: 0, kid_ids: [...keys] }));
+  else O.jobs.forEach(j => { j.kid_ids = j.kid_ids.filter(x => keys.includes(x)) });
+}
+function bindOnboard() {
+  const O = S.onboard, K = O.cur, val = id => $(id)?.value ?? '';
+  const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn }, each = (sel, fn) => app.querySelectorAll(sel).forEach(el => el.onclick = () => fn(el));
+  const go = s => { O.step = s; render(); window.scrollTo(0, 0); if (['family', 'pin', 'kidName'].includes(s)) app.querySelector('input')?.focus() };
+  const press = (attr, fn) => app.querySelectorAll(`[${attr}]`).forEach(b => b.setAttribute('aria-pressed', fn(b.getAttribute(attr))));
+  const next = {
+    family: () => { O.name = titleCase(val('famName')) || 'Our Family'; go('pin') },
+    pin: () => { const a = val('pin1'), b = val('pin2'); if (!/^\d{4}$/.test(a)) return toast('Use 4 digits.'); if (a !== b) return toast('The PINs don’t match.'); O.pin = a;
+      if (O.kids.length) return go('more'); O.cur = O.cur || newKidDraft(); go('kidName') },
+    kidName: () => { const nm = capFirst(val('obName')); if (!nm) { toast('Type a first name.'); return $('obName').focus() } K.name = nm; go('allow') },
+    allow: () => { K.weekly_allowance = Math.min(1000, Math.max(0, r2(parseFloat(val('obAmt')) || 0))); go('screen') },
+    screen: () => { K.base_screen_minutes = Math.min(2000, Math.max(0, parseInt(val('obMin')) || 0)); go('days') },
+    days: () => { commitKid(); go('more') },
+    more: () => { initJobs(); go('jobs') },
+    jobs: finishOnboard,
+  };
+  const back = { pin: 'family', kidName: () => O.kids.length ? (O.cur = null, 'more') : 'pin', allow: 'kidName', screen: 'allow', days: 'screen', more: () => { O.cur = O.kids.pop(); return 'days' }, jobs: 'more' };
+  on('obNext', () => next[O.step]());
+  on('obBack', () => { const b = back[O.step]; go(typeof b === 'function' ? b() : b) });
+  app.querySelectorAll('.ob input').forEach(i => i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('obNext').click() } });
+  if ($('famName')) $('famName').onblur = e => { e.target.value = titleCase(e.target.value) };
+  if (O.step === 'kidName') {
+    const prev = () => { const p = $('obPrev'); p.style.background = COLORS[K.color]; p.textContent = (K.name || '?').trim().slice(0, 1).toUpperCase() || '?' };
+    $('obName').oninput = e => { K.name = e.target.value; prev() };
+    bindSwatches(app, 'data-sw', c => { K.color = c; prev() });
+  }
+  each('[data-amt]', b => { K.weekly_allowance = Number(b.dataset.amt); $('obAmt').value = b.dataset.amt; press('data-amt', v => Number(v) === K.weekly_allowance) });
+  if ($('obAmt')) $('obAmt').oninput = e => { K.weekly_allowance = e.target.value; press('data-amt', v => e.target.value !== '' && Number(v) === Number(e.target.value)) };
+  each('[data-smin]', b => { K.base_screen_minutes = Number(b.dataset.smin); $('obMin').value = b.dataset.smin; press('data-smin', v => Number(v) === K.base_screen_minutes) });
+  if ($('obMin')) $('obMin').oninput = e => { K.base_screen_minutes = e.target.value; press('data-smin', v => e.target.value !== '' && Number(v) === Number(e.target.value)) };
+  const days = () => { press('data-oday', v => K.screen_days.includes(Number(v))); press('data-dset', v => sameDays(K.screen_days, v.split(',').map(Number))) };
+  each('[data-dset]', b => { K.screen_days = b.dataset.dset.split(',').map(Number); days() });
+  each('[data-oday]', b => { const d = Number(b.dataset.oday); K.screen_days = K.screen_days.includes(d) ? K.screen_days.filter(x => x !== d) : [...K.screen_days, d]; days() });
+  each('[data-obedit]', b => onboardKidSheet(Number(b.dataset.obedit)));
+  on('obAddKid', () => { O.cur = newKidDraft(); go('kidName') });
+}
+function onboardKidSheet(i) {
+  const O = S.onboard, k = O.kids[i], K = { ...k, screen_days: [...k.screen_days] };
+  openSheet(`<h2>Edit ${esc(k.name)}</h2>${kidFieldsHTML(K)}<button class="save" id="kGo" type="button">Save</button>
+    <button class="cancel danger-link" id="kDel" type="button">Remove ${esc(k.name)}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+    bindKidFields(layer, K);
+    $('kGo').onclick = () => { const b = kidBody(K); if (!b.name) { toast('Type a first name.'); return $('kN').focus() } Object.assign(k, b); closeSheet(); render() };
+    $('kDel').onclick = () => { O.kids.splice(i, 1); (O.jobs || []).forEach(j => { j.kid_ids = j.kid_ids.filter(x => x !== k.key) }); closeSheet();
+      if (!O.kids.length) { O.cur = newKidDraft(); O.step = 'kidName' } render() };
+  });
 }
 async function finishOnboard() {
-  const O = S.onboard; const b = $('ob2'); b.disabled = true; b.textContent = 'Setting up…';
+  const O = S.onboard, b = $('obNext'); b.disabled = true; b.textContent = 'Setting up…';
   try {
+    initJobs();
     const fid = await q(sb.rpc('create_family', { p_name: titleCase(O.name) || 'Our Family', p_tz: O.tz }));
     S.family = { id: fid, timezone: O.tz };
     await q(sb.from('families').update({ pin_hash: await hashPin(fid, O.pin) }).eq('id', fid));
-    for (const k of O.kids) await addKid(k.name, k.allowance, k.color);
+    // Remember what's been saved, so tapping Finish again after a dropped connection doesn't add anyone twice.
+    O.made = O.made || {};
+    for (const k of O.kids) if (!O.made[k.key]) O.made[k.key] = (await addKid(kidBody(k), { join: false })).id;
+    if (!O.jobsMade && O.jobs.length) await q(sb.from('jobs').insert(O.jobs.map((j, i) => ({ family_id: fid, title: j.title, done_means: j.done_means || '', category: j.category, price: Number(j.price) || 0,
+      bonus_minutes: Number(j.bonus_minutes) || 0, kid_ids: j.kid_ids.map(x => O.made[x]).filter(Boolean), enabled: true, sort: i }))));
+    O.jobsMade = true;
     S.parentOk = true; try { sessionStorage.setItem('cj-parent', '1') } catch (e) { }
-    await loadAll(); setProfile('parent'); S.ptab = 'kids'; render(); toast('You’re all set');
+    await loadAll(); setProfile('parent'); S.ptab = 'kids'; render(); window.scrollTo(0, 0); toast('You’re all set');
   } catch (e) { console.error(e); b.disabled = false; b.textContent = 'Finish setup'; toast(errMsg(e)) }
 }
-async function addKid(name, allowance, color) {
-  const kid = await q(sb.from('kids').insert({ family_id: S.family.id, name: name.trim(), weekly_allowance: Number(allowance) || 0, color: color || 'green', start_week: thisWeek() }).select().single());
-  const rows = CATALOG.map((j, i) => ({ family_id: S.family.id, kid_id: kid.id, title: j.title, done_means: j.done, category: j.cat, price: j.price, enabled: j.on, sort: i }));
-  await q(sb.from('jobs').insert(rows));
+/* A new kid gets every job the other kids all share (with no other kids, every job). */
+async function addKid(body, opt = {}) {
+  const kid = await q(sb.from('kids').insert({ family_id: S.family.id, start_week: thisWeek(), ...body }).select().single());
+  if (opt.join !== false) {
+    const others = S.kids.filter(k => k.id !== kid.id);
+    await Promise.all(S.jobs.filter(j => others.every(k => jobKids(j).includes(k.id))).map(j => q(sb.from('jobs').update({ kid_ids: [...jobKids(j), kid.id], kid_id: null, enabled: true }).eq('id', j.id))));
+  }
   return kid;
 }
+/* The same kid fields in Settings and in onboarding's edit sheet. */
+function kidFieldsHTML(K) {
+  return `<div class="field"><label class="label" for="kN">First name</label><input id="kN" maxlength="40" autocomplete="off" autocapitalize="words" value="${esc(K.name)}"></div>
+    <div class="field"><span class="label">Color</span>${swatchesHTML(K.color, 'data-ksw')}</div>
+    <div class="row2"><div class="field"><label class="label" for="kA">Weekly allowance ($)</label><input id="kA" type="number" inputmode="decimal" min="0" step="0.5" value="${esc(K.weekly_allowance)}"></div>
+    <div class="field"><label class="label" for="kS">Screen min / week</label><input id="kS" type="number" inputmode="numeric" min="0" step="5" value="${esc(K.base_screen_minutes)}"></div></div>
+    <div class="field"><span class="tiplabel"><label class="label" for="kR">Reading bonus limit</label><button class="tip" type="button" aria-label="What is the reading bonus limit?" aria-expanded="false">?</button></span><span class="tipbox" hidden>The most extra screen minutes reading can earn in one week. Every minute read adds a screen minute, up to this number.</span><input id="kR" type="number" inputmode="numeric" min="0" step="5" value="${esc(K.reading_cap)}"></div>
+    <div class="field"><span class="label">Screen days</span><div class="chips daychips">${[1, 2, 3, 4, 5, 6, 0].map(d => `<button class="chip" type="button" data-kd="${d}" aria-pressed="${K.screen_days.includes(d)}">${DOW[d]}</button>`).join('')}</div></div>`;
+}
+function bindKidFields(root, K) {
+  const g = id => root.querySelector('#' + id);
+  g('kN').oninput = e => { K.name = e.target.value }; g('kN').onblur = e => { e.target.value = K.name = capFirst(e.target.value) };
+  g('kA').oninput = e => { K.weekly_allowance = e.target.value }; g('kS').oninput = e => { K.base_screen_minutes = e.target.value }; g('kR').oninput = e => { K.reading_cap = e.target.value };
+  bindSwatches(root, 'data-ksw', c => { K.color = c });
+  root.querySelectorAll('[data-kd]').forEach(b => b.onclick = () => { const d = Number(b.dataset.kd); K.screen_days = K.screen_days.includes(d) ? K.screen_days.filter(x => x !== d) : [...K.screen_days, d]; b.setAttribute('aria-pressed', K.screen_days.includes(d)) });
+}
+const kidBody = K => ({ name: capFirst(K.name), color: K.color, weekly_allowance: Math.min(1000, Math.max(0, r2(Number(K.weekly_allowance) || 0))),
+  base_screen_minutes: Math.min(2000, Math.max(0, parseInt(K.base_screen_minutes) || 0)), reading_cap: Math.min(2000, Math.max(0, parseInt(K.reading_cap) || 0)), screen_days: K.screen_days });
 async function hashPin(fid, pin) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(fid + ':' + pin));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -638,7 +742,7 @@ function kidHome(kid) {
       <span class="hero-coin">${coinSVG()}</span><div class="label">In your bank</div><div class="big num" id="bankBig">${money(st.balance)}</div>
       ${g ? `<button class="goalline" type="button" id="goalBtn"><span>Saving for <b>${esc(g.name)}</b></span><span class="meter" id="goalMeter" data-pct="${pct}"><i style="width:${pct}%"></i></span><span class="num">${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}</span></button>` : ''}
       <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${g ? '' : '<button class="link-w" type="button" id="goalBtn">Set a saving goal</button>'}</div>
-      <button class="earn" type="button" data-tab="jobs">${I.jobs}<span>Earn more on the job board</span>${I.chev}</button>
+      <button class="earn" type="button" data-tab="jobs">${I.jobs}<span>Earn more with jobs</span>${I.chev}</button>
     </section>
     ${mine.length ? `<button class="waitline" type="button" data-tab="ledger">${I.clock}<span><b>${mine.length} job${mine.length > 1 ? 's' : ''}</b> waiting for a grown-up to check</span></button>` : ''}
     ${ra ? `<section class="board rdb" id="readBoard">${readBoardHTML(kid)}</section>` : ''}
@@ -710,8 +814,12 @@ function ledgerListHTML(kid, ws, f, parent) {
   for (const r of R) { if (r.date !== last) { out += `<div class="lgroup">${short(r.date)}${r.date === today() ? ' · today' : ''}</div>`; last = r.date } out += ledgerRowHTML(r, parent) }
   return `<div class="list">${out}</div>`;
 }
+/* Jobs belong to the family. kid_ids lists who sees each one, and every kid listed can do it and get paid.
+   (Rows from before shared jobs kept one copy per kid in kid_id.) */
+const jobKids = j => j.kid_id ? (j.enabled ? [j.kid_id] : []) : (j.kid_ids || []);
+const jobsFor = kid => S.jobs.filter(j => jobKids(j).includes(kid.id));
 function kidJobs(kid) {
-  const on = S.jobs.filter(j => j.kid_id === kid.id && j.enabled), mine = pendingClaims(kid);
+  const on = jobsFor(kid), mine = pendingClaims(kid);
   const cats = ['All', ...new Set(on.map(j => j.category))]; if (!cats.includes(S.jobFilter)) S.jobFilter = 'All';
   return `${mine.length ? `<section class="sect"><div class="sect-h"><h3>Waiting for a grown-up</h3></div><div class="list">${mine.map(c => `<div class="row wait-row"><span class="ico j">${I.clock}</span><span class="t"><b>${esc(c.title)}</b><span>${short(localDate(ms(c.created_at)))}</span></span><span class="amt">+${money(Number(c.amount))}</span></div>`).join('')}</div></section>` : ''}
     ${on.length ? `<section class="sect"><div class="filters">${cats.map(c => `<button class="chip" type="button" data-cat="${esc(c)}" aria-pressed="${c === S.jobFilter}">${esc(c)}</button>`).join('')}</div>
@@ -795,11 +903,11 @@ function boardHTML(kid) {
     <p class="note">Start the clock when screens go on. Pause it when you stop.</p><button class="go" id="startBtn" type="button">Start clock</button>`;
 }
 /* ---------- parent app ---------- */
-const PTABS = [['kids', 'Kids', 'kids'], ['jobs', 'Job boards', 'jobs'], ['pay', 'Ledger', 'pay'], ['settings', 'Settings', 'gear']];
+const PTABS = [['kids', 'Kids', 'kids'], ['jobs', 'Jobs', 'jobs'], ['pay', 'Ledger', 'pay'], ['settings', 'Settings', 'gear']];
 function parentAppHTML() {
   
-  const greet = { kids: 'Parent/guardian', jobs: 'Edit each kid’s board', pay: 'Every entry, editable', settings: 'Family settings' }[S.ptab];
-  return `<header><div class="hello"><small>${greet}</small><h1>${esc(S.family.name || APP)}</h1></div>
+  const greet = { kids: 'Parent/guardian', jobs: 'Family jobs', pay: 'Every entry, editable', settings: 'Family settings' }[S.ptab];
+  return `<header><div class="hello"><div><small>${greet}</small><h1>${esc(S.family.name || APP)}</h1></div></div>
     <div class="hbtns"><button class="lock icon" type="button" data-fb="hi" aria-label="Send feedback">${I.chat}</button><button class="lock on" id="swapBtn" type="button">${I.swap} Switch</button></div></header>
     <main>${({ kids: pKids, jobs: pJobs, pay: pPay, settings: pSettings })[S.ptab]()}</main>
     ${tabbar(PTABS, S.ptab, { kids: pendingClaims().length })}`;
@@ -821,15 +929,50 @@ function pKids() {
 }
 function pJobs() {
   if (!S.kids.length) return `<div class="card"><p class="hint">Add a kid first.</p></div>`;
-  if (!kidById(S.jobKid)) S.jobKid = S.kids[0].id;
-  const kid = kidById(S.jobKid), every = S.jobs.filter(j => j.kid_id === kid.id), nOn = every.filter(j => j.enabled).length;
-  const show = S.jobShow || 'on', all = every.filter(j => show === 'all' || (show === 'on' ? j.enabled : !j.enabled));
-  const cats = [...new Set(all.map(j => j.category))];
-  return `<div class="kpick">${S.kids.map(k => `<button class="chip" type="button" data-jk="${k.id}" aria-pressed="${k.id === kid.id}"><span class="dot" style="background:${COLORS[k.color]}"></span>${esc(k.name)}</button>`).join('')}</div>
-    <section class="card"><p class="hint">${nOn} of ${every.length} jobs are on ${esc(kid.name)}'s board. Switch jobs on or off, or tap a job to edit its name, price or description.</p>
-    <div class="seg">${[['on', `On (${nOn})`], ['off', `Off (${every.length - nOn})`], ['all', `All (${every.length})`]].map(([k, l]) => `<button type="button" data-show="${k}" aria-pressed="${show === k}">${l}</button>`).join('')}</div>
-    <div class="ptools"><button class="pill" id="newJob" type="button">+ New job</button>${S.kids.length > 1 ? `<button class="pill soft" id="copyBoard" type="button">Copy this board to…</button>` : ''}</div></section>
-    ${all.length ? '' : `<div class="list"><div class="empty">${show === 'on' ? 'No jobs switched on yet. Tap Off to find some.' : 'Every job is switched on.'}</div></div>`}${cats.map(c => `<section class="sect"><div class="sect-h"><h3>${esc(c)}</h3></div><div class="list">${all.filter(j => j.category === c).map(j => `<div class="row"><button class="tog" type="button" data-tog="${j.id}" aria-pressed="${j.enabled}" aria-label="Show ${esc(j.title)}"></button><button class="t" type="button" data-editjob="${j.id}" style="text-align:left"><b>${esc(j.title)}</b><span>${esc(j.done_means)}</span></button><span class="price num">${money(Number(j.price))}</span></div>`).join('')}</div></section>`).join('')}`;
+  return `<p class="hint jobs-lede">${S.kids.length > 1 ? 'Check who can do each job, or tap one to change it.' : `These jobs are on ${esc(S.kids[0].name)}’s board. Tap one to change it.`}</p>${jobsEditorHTML(jobsModel())}`;
+}
+/* The job list editor, shared by onboarding (a draft kept in S.onboard, saved when setup finishes) and the Jobs tab (saved jobs). */
+function jobsModel() {
+  if (S.view === 'onboard') {
+    const O = S.onboard;
+    return { kids: O.kids.map(k => ({ id: k.key, name: k.name, color: k.color })), jobs: O.jobs,
+      add: (b, ok) => { O.jobs.push({ id: 'd' + Math.random().toString(36).slice(2, 10), ...b }); render(); if (ok) toast(ok) },
+      save: (j, b) => { Object.assign(j, b); render() },
+      remove: j => { O.jobs.splice(O.jobs.indexOf(j), 1); render(); toast('Deleted') } };
+  }
+  return { kids: S.kids, jobs: S.jobs.map(j => ({ ...j, kid_ids: jobKids(j) })),
+    add: (b, ok = 'Added') => act(() => q(sb.from('jobs').insert({ ...b, family_id: S.family.id, enabled: true, sort: S.jobs.length })), ok),
+    save: (j, b) => act(() => q(sb.from('jobs').update({ ...b, kid_id: null, enabled: true }).eq('id', j.id)), 'Saved'),
+    remove: j => confirmSheet('Delete this job?', 'Money already earned for it stays.', 'Delete', () => q(sb.from('jobs').delete().eq('id', j.id)), 'Deleted') };
+}
+const kidChk = (k, on, attr, label) => `<button class="kchk" type="button" ${attr} aria-pressed="${on}" aria-label="${esc(label)}" style="--kc:${COLORS[k.color] || COLORS.green}"><i>${I.check}</i>${esc(k.name)}</button>`;
+function jobsEditorHTML(M) {
+  const multi = M.kids.length > 1, have = new Set(M.jobs.map(j => j.title.trim().toLowerCase()));
+  const cats = [...new Set([...CATALOG.map(c => c.cat), ...M.jobs.map(j => j.category)])].filter(c => M.jobs.some(j => j.category === c));
+  const ideas = CATALOG.filter(c => !have.has(c.title.toLowerCase()));
+  // With one kid there's nothing to choose, so no checkboxes, except on a job that isn't on their board (left over from a removed kid).
+  const row = j => { const chk = multi || !j.kid_ids.length;
+    return `<div class="row jrow${j.kid_ids.length ? '' : ' off'}"><button class="t" type="button" data-ej="${j.id}"><b>${esc(j.title)}</b><span>${esc(j.done_means || 'Tap to describe what done looks like')}</span></button>
+      <span class="stack"><span class="price num">${money(Number(j.price))}</span>${Number(j.bonus_minutes) ? `<span class="bal">+${j.bonus_minutes} screen min</span>` : ''}</span>
+      ${chk ? `<div class="jkids">${M.kids.map(k => kidChk(k, j.kid_ids.includes(k.id), `data-jkc="${j.id}|${k.id}"`, `${k.name} can do ${j.title}`)).join('')}</div>` : ''}</div>` };
+  return `${cats.map(c => `<section class="sect"><div class="sect-h"><h3>${esc(c)}</h3></div><div class="list">${M.jobs.filter(j => j.category === c).map(row).join('')}</div></section>`).join('') || '<div class="list"><div class="empty">No jobs yet. Add your own, or pick some from the ideas below.</div></div>'}
+    <button class="pill" id="newJob" type="button" style="justify-self:start">${I.plus}New job</button>
+    ${ideas.length ? `<details class="ideas" ${S.ideasOpen ? 'open' : ''}><summary>More job ideas<span class="n">${ideas.length}</span></summary><div class="list">${ideas.map(c => `<button class="row" type="button" data-idea="${c.id}"><span class="ico add">${I.plus}</span><span class="t"><b>${esc(c.title)}</b><span>${esc(c.cat)}</span></span><span class="price num">${money(c.price)}</span></button>`).join('')}</div></details>` : ''}`;
+}
+/* Check or uncheck a kid on a job. Saved quietly in place, so a parent can tick through a list without the page jumping. */
+function toggleJobKid(el) {
+  const [jid, kid] = el.dataset.jkc.split('|'), M = jobsModel(), j = M.jobs.find(x => x.id === jid); if (!j) return;
+  const on = !j.kid_ids.includes(kid), ids = on ? [...j.kid_ids, kid] : j.kid_ids.filter(x => x !== kid);
+  el.setAttribute('aria-pressed', on); el.closest('.jrow')?.classList.toggle('off', !ids.length);
+  if (S.view === 'onboard') { j.kid_ids = ids; return }
+  const live = S.jobs.find(x => x.id === jid); if (live) Object.assign(live, { kid_ids: ids, kid_id: null, enabled: true });
+  q(sb.from('jobs').update({ kid_ids: ids, kid_id: null, enabled: true }).eq('id', jid)).catch(e => { console.error(e); toast(errMsg(e)); refresh() });
+}
+/* Keep what the parent is looking at in place when a list above it grows. */
+async function keepPlace(sel, fn) { const a = app.querySelector(sel), top = a ? a.getBoundingClientRect().top : null; await fn(); const b = app.querySelector(sel); if (b && top != null) window.scrollBy(0, b.getBoundingClientRect().top - top) }
+function addIdea(id) {
+  const c = CATALOG.find(x => x.id === id), M = jobsModel(); if (!c) return;
+  keepPlace('details.ideas', () => M.add({ title: c.title, done_means: c.done, category: c.cat, price: c.price, bonus_minutes: 0, kid_ids: M.kids.map(k => k.id) }, `Added ${c.title}`));
 }
 /* Parent ledger: every line item for money, screen time and reading, each tappable to edit or delete. */
 function timeRows(kid, view, ws) {
@@ -991,20 +1134,13 @@ function bindAll() {
   if ($('emailIn')) $('emailIn').onkeydown = e => { if (e.key === 'Enter') sendCode() };
   if ($('codeIn')) $('codeIn').onkeydown = e => { if (e.key === 'Enter') verifyCode() };
   // onboarding
-  if ($('famName')) $('famName').onblur = e => { e.target.value = titleCase(e.target.value) };
-  on('ob0', () => { S.onboard.name = titleCase($('famName').value) || 'Our Family'; S.onboard.step = 1; render() });
-  on('ob1', () => { const a = $('pin1').value, b = $('pin2').value; if (!/^\d{4}$/.test(a)) return toast('Use 4 digits.'); if (a !== b) return toast('The PINs don’t match.'); S.onboard.pin = a; S.onboard.step = 2; render() });
-  if (S.view === 'onboard' && S.onboard.step === 2) {
-    const D = S.onboard.draft, prev = () => { const p = $('kPrev'); if (p) { p.style.background = COLORS[D.color]; p.textContent = (D.name || '?').slice(0, 1).toUpperCase() } const nm = $('kPrevName'); if (nm) nm.textContent = D.name || 'First name' };
-    $('kName').oninput = e => { D.name = e.target.value; prev() };
-    $('kName').onblur = e => { e.target.value = D.name = capFirst(e.target.value); prev() };
-    $('kAllow').oninput = e => { D.allowance = e.target.value };
-    bindSwatches(app, 'data-sw', c => { D.color = c; prev() });
-    const take = () => { const nm = capFirst(D.name); if (!nm) return false; S.onboard.kids.push({ name: nm, allowance: Number(D.allowance) || 0, color: D.color }); const keys = Object.keys(COLORS); S.onboard.draft = { name: '', allowance: D.allowance || '5', color: keys[S.onboard.kids.length % keys.length] }; return true };
-    on('kAdd', () => { if (!take()) { toast('Type a first name first.'); return $('kName').focus() } render(); toast('Added. Add another, or tap Finish setup.'); $('kName')?.focus() });
-    on('ob2', () => { take(); if (!S.onboard.kids.length) { toast('Add at least one kid.'); return $('kName').focus() } finishOnboard() });
-  }
-  each('[data-rmkid]', el => { S.onboard.kids.splice(Number(el.dataset.rmkid), 1); render() });
+  if (S.view === 'onboard') bindOnboard();
+  // job lists (onboarding and the Jobs tab)
+  each('[data-ej]', el => jobSheet(jobsModel().jobs.find(j => j.id === el.dataset.ej)));
+  each('[data-jkc]', toggleJobKid);
+  each('[data-idea]', el => addIdea(el.dataset.idea));
+  on('newJob', () => jobSheet(null));
+  const ideas = app.querySelector('details.ideas'); if (ideas) ideas.ontoggle = () => { S.ideasOpen = ideas.open };
   // who
   each('[data-who]', el => chooseProfile(el.dataset.who));
   on('swapBtn', switchProfile);
@@ -1032,12 +1168,6 @@ function bindAll() {
     act(() => q(sb.from('families').update({ penalty_enabled: v, penalty_name: nm }).eq('id', S.family.id)), v ? `${nm} is on` : `${nm} is off`) });
   on('addKidBtn', () => kidSheet());
   each('[data-editkid]', el => kidSheet(kidById(el.dataset.editkid)));
-  each('[data-jk]', el => { S.jobKid = el.dataset.jk; render() });
-  each('[data-show]', el => { S.jobShow = el.dataset.show; render() });
-  each('[data-tog]', el => { const j = S.jobs.find(x => x.id === el.dataset.tog); j.enabled = !j.enabled; el.setAttribute('aria-pressed', j.enabled); act(() => q(sb.from('jobs').update({ enabled: j.enabled }).eq('id', j.id))) });
-  each('[data-editjob]', el => jobSheet(S.jobs.find(x => x.id === el.dataset.editjob)));
-  on('newJob', () => jobSheet(null));
-  on('copyBoard', copyBoardSheet);
   each('[data-payout]', el => txSheet(kidById(el.dataset.payout), 'payout'));
   each('[data-purchase]', el => { const k = kidById(el.dataset.purchase), g = goalOf(k); txSheet(k, 'purchase', g && stats(k).balance >= g.amount ? { amount: g.amount, note: g.name } : {}) });
   each('[data-allstmt]', el => statementSheet(kidById(el.dataset.allstmt)));
@@ -1277,7 +1407,7 @@ function newPinSheet(force, after) {
 /* How it works: short, and only the rules this family has actually set up. */
 function rulesSheet(kid) {
   const allow = Number(kid.weekly_allowance) || 0, base = Number(kid.base_screen_minutes) || 0, cap = Number(kid.reading_cap) || 0;
-  const days = (kid.screen_days || []).length, jobs = S.jobs.some(j => j.kid_id === kid.id && j.enabled);
+  const days = (kid.screen_days || []).length, jobs = jobsFor(kid).length > 0;
   const R = [
     allow && ['coin', 'm', `<b>${money(allow)} every Monday.</b> It's yours, no matter what.`],
     jobs && ['jobs', 'j', `<b>Jobs earn more.</b> Do one, tap I did it, and a grown-up checks.`],
@@ -1314,7 +1444,7 @@ function manualSheet(kid, kind) { entrySheet(kind === 'read' ? 'read' : 'screen'
 /* In a kid's view, manual entry needs the parent PIN each time, and doesn't leave parent mode unlocked. */
 function manualGate(kid, kind) { if (S.view === 'parent') return manualSheet(kid, kind); pinSheet(() => { S.parentOk = false; try { sessionStorage.removeItem('cj-parent') } catch (e) { } manualSheet(kid, kind) }) }
 function logJobSheet(kid) {
-  const on = S.jobs.filter(j => j.kid_id === kid.id && j.enabled).sort((a, b) => a.title.localeCompare(b.title)), ws = creditWeek();
+  const on = jobsFor(kid).sort((a, b) => a.title.localeCompare(b.title)), ws = creditWeek();
   openSheet(`<span class="label">Log a job for ${esc(kid.name)}</span><h2>What did ${esc(kid.name)} do?</h2>
     <div class="field"><label class="label" for="jobSearch">Search</label><input id="jobSearch" placeholder="Dishes, trash, laundry…" autocomplete="off"></div>
     <div class="list" style="box-shadow:none;border:1px solid var(--line)" id="jobList">${on.map(j => `<button class="row" type="button" data-pickjob="${j.id}" data-q="${esc((j.title + ' ' + j.category).toLowerCase())}"><span class="t"><b>${esc(j.title)}</b><span>${esc(j.category)}</span></span><span class="price num">${money(Number(j.price))}</span></button>`).join('') || '<div class="empty">No jobs on this board.</div>'}</div>
@@ -1407,56 +1537,38 @@ function kidMoreSheet(kid) {
 }
 
 function kidSheet(kid) {
-  const K = kid ? { ...kid, screen_days: [...(kid.screen_days || [6, 0])] } : { name: '', weekly_allowance: 5, color: Object.keys(COLORS)[S.kids.length % 6], base_screen_minutes: 100, reading_cap: 60, max_read_session: 60, screen_days: [6, 0] };
-  const draw = () => openSheet(`<h2>${kid ? `Edit ${esc(kid.name)}` : 'Add a kid'}</h2>
-    <div class="field"><label class="label" for="kN">First name</label><input id="kN" maxlength="40" value="${esc(K.name)}"></div>
-    <div class="field"><span class="label">Color</span>${swatchesHTML(K.color, 'data-ksw')}</div>
-    <div class="row2"><div class="field"><label class="label" for="kA">Weekly allowance ($)</label><input id="kA" type="number" min="0" step="0.5" value="${K.weekly_allowance}"></div>
-    <div class="field"><label class="label" for="kS">Screen min / week</label><input id="kS" type="number" min="0" step="5" value="${K.base_screen_minutes}"></div></div>
-    <div class="field"><span class="tiplabel"><label class="label" for="kR">Reading bonus limit</label><button class="tip" type="button" aria-label="What is the reading bonus limit?" aria-expanded="false">?</button></span><span class="tipbox" hidden>The most extra screen minutes reading can earn in one week. Every minute read adds a screen minute, up to this number.</span><input id="kR" type="number" min="0" step="5" value="${K.reading_cap}"></div>
-    <div class="field"><span class="label">Screen days</span><div class="chips">${[1, 2, 3, 4, 5, 6, 0].map(d => `<button class="chip" type="button" data-kd="${d}" aria-pressed="${K.screen_days.includes(d)}">${DOW[d]}</button>`).join('')}</div></div>
-    ${kid ? '<p class="hint">A new allowance amount starts next Monday. This week stays the same.</p>' : '<p class="hint">Starts with the standard job board. You can edit it after.</p>'}
+  const K = kid ? { ...kid, screen_days: [...(kid.screen_days || [6, 0])] } : { name: '', weekly_allowance: 5, color: Object.keys(COLORS).find(c => !S.kids.some(k => k.color === c)) || 'green', base_screen_minutes: 120, reading_cap: 60, screen_days: [6, 0] };
+  openSheet(`<h2>${kid ? `Edit ${esc(kid.name)}` : 'Add a kid'}</h2>${kidFieldsHTML(K)}
+    <p class="hint">${kid ? 'A new allowance amount counts from this week on.' : S.kids.length ? 'They get the jobs your other kids all share. You can change that in Jobs.' : 'They get every job on your list.'}</p>
     <button class="save" id="kGo" type="button">${kid ? 'Save' : 'Add kid'}</button>
     ${kid ? `<button class="cancel danger-link" id="kDel" type="button">Remove ${esc(kid.name)} and their history</button>` : ''}<button class="cancel" data-close type="button">Cancel</button>`, () => {
-    const keep = () => { K.name = $('kN').value; K.weekly_allowance = $('kA').value; K.base_screen_minutes = $('kS').value; K.reading_cap = $('kR').value };
-    bindSwatches(layer, 'data-ksw', c => { K.color = c });
-    $('kN').onblur = e => { e.target.value = capFirst(e.target.value) };
-    layer.querySelectorAll('[data-kd]').forEach(b => b.onclick = () => { keep(); const d = Number(b.dataset.kd); K.screen_days = K.screen_days.includes(d) ? K.screen_days.filter(x => x !== d) : [...K.screen_days, d]; draw() });
-    $('kGo').onclick = async () => { keep(); const name = capFirst(K.name); if (!name) { toast('Type a first name.'); return $('kN').focus() } closeSheet();
-      const body = { name, color: K.color, weekly_allowance: Math.max(0, Number(K.weekly_allowance) || 0), base_screen_minutes: Math.max(0, parseInt(K.base_screen_minutes) || 0), reading_cap: Math.max(0, parseInt(K.reading_cap) || 0), screen_days: K.screen_days };
+    bindKidFields(layer, K);
+    $('kGo').onclick = async () => { const body = kidBody(K); if (!body.name) { toast('Type a first name.'); return $('kN').focus() } closeSheet();
       // A new allowance starts this week, so the bank and How it works match what was just set.
       if (kid) await act(async () => { await q(sb.from('kids').update(body).eq('id', kid.id)); if (Number(kid.weekly_allowance) !== body.weekly_allowance) await q(sb.from('weeks').update({ allowance: body.weekly_allowance }).eq('kid_id', kid.id).eq('week_start', thisWeek())) }, 'Saved');
-      else await act(() => addKid(name, body.weekly_allowance, body.color).then(k => q(sb.from('kids').update(body).eq('id', k.id))), `${name} added`) };
-    if (kid) $('kDel').onclick = () => confirmSheet(`Remove ${kid.name}?`, 'This deletes their job board, earnings history, reading and screen time. It can’t be undone.', 'Remove for good', () => q(sb.from('kids').delete().eq('id', kid.id)), 'Removed');
+      else await act(() => addKid(body), `${body.name} added`) };
+    if (kid) $('kDel').onclick = () => confirmSheet(`Remove ${kid.name}?`, 'This deletes their earnings history, reading and screen time, and takes them off every job. It can’t be undone.', 'Remove for good', () => q(sb.from('kids').delete().eq('id', kid.id)), 'Removed');
   });
-  draw();
 }
+/* Add or edit a job. With two or more kids, it also says who can do it. Works on the onboarding draft and on saved jobs. */
 function jobSheet(job) {
-  const kid = kidById(S.jobKid), cats = [...new Set(S.jobs.filter(j => j.kid_id === kid.id).map(j => j.category).concat(CATALOG.map(c => c.cat)))];
-  const J = job ? { ...job } : { title: '', done_means: '', price: 1, category: cats[0], enabled: true };
-  openSheet(`<span class="label">${esc(kid.name)}'s board</span><h2>${job ? 'Edit job' : 'New job'}</h2>
-    <div class="field"><label class="label" for="jT">Job</label><input id="jT" maxlength="80" value="${esc(J.title)}"></div>
+  const M = jobsModel(), multi = M.kids.length > 1, cats = [...new Set(M.jobs.map(j => j.category).concat(CATALOG.map(c => c.cat)))];
+  const J = job ? { ...job, kid_ids: [...job.kid_ids] } : { title: '', done_means: '', price: 1, category: cats[0], bonus_minutes: 0, kid_ids: M.kids.map(k => k.id) };
+  const showKids = multi || (job && !J.kid_ids.length);
+  openSheet(`<h2>${job ? 'Edit job' : 'New job'}</h2>
+    <div class="field"><label class="label" for="jT">Job</label><input id="jT" maxlength="80" value="${esc(J.title)}" placeholder="Feed the fish"></div>
     <div class="field"><label class="label" for="jD">Done means</label><input id="jD" maxlength="160" value="${esc(J.done_means)}" placeholder="What finished looks like"></div>
-    <div class="row2"><div class="field"><label class="label" for="jP">Price ($)</label><input id="jP" type="number" min="0" step="0.25" value="${J.price}"></div>
+    <div class="row2"><div class="field"><label class="label" for="jP">Pays ($)</label><input id="jP" type="number" inputmode="decimal" min="0" step="0.25" value="${J.price}"></div>
     <div class="field"><label class="label" for="jC">Group</label><select id="jC">${cats.map(c => `<option ${c === J.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div></div>
     <div class="field"><label class="label" for="jM">Bonus screen minutes (optional)</label><input id="jM" type="number" inputmode="numeric" min="0" max="240" step="5" value="${Number(J.bonus_minutes) || 0}"></div>
-    <button class="save" id="jGo" type="button">${job ? 'Save' : 'Add to board'}</button>${job ? '<button class="cancel danger-link" id="jDel" type="button">Delete job</button>' : ''}<button class="cancel" data-close type="button">Cancel</button>`, () => {
-    $('jGo').onclick = async () => { const title = $('jT').value.trim(); if (!title) return toast('Name the job.'); const price = Math.max(0, r2(parseFloat($('jP').value) || 0)); closeSheet();
-      const body = { title, done_means: $('jD').value.trim(), price, category: $('jC').value, bonus_minutes: Math.min(240, Math.max(0, parseInt($('jM').value) || 0)) };
-      if (job) await act(() => q(sb.from('jobs').update(body).eq('id', job.id)), 'Saved');
-      else await act(() => q(sb.from('jobs').insert({ ...body, family_id: S.family.id, kid_id: kid.id, enabled: true, sort: S.jobs.length })), 'Added') };
-    if (job) $('jDel').onclick = () => confirmSheet('Delete this job?', 'Money already earned for it stays.', 'Delete', () => q(sb.from('jobs').delete().eq('id', job.id)), 'Deleted');
-  });
-}
-function copyBoardSheet() {
-  const src = kidById(S.jobKid), others = S.kids.filter(k => k.id !== src.id);
-  openSheet(`<h2>Copy ${esc(src.name)}'s board</h2><p class="hint">Replaces the other kid's job board with this one, including prices and which jobs are on.</p>
-    ${others.map(k => `<button class="row" type="button" data-copyto="${k.id}" style="border:1px solid var(--line);border-radius:14px">${avatar(k)}<span class="t"><b>${esc(k.name)}</b></span></button>`).join('')}
-    <button class="cancel" data-close type="button">Cancel</button>`, () => {
-    layer.querySelectorAll('[data-copyto]').forEach(b => b.onclick = () => { const k = kidById(b.dataset.copyto); confirmSheet(`Replace ${k.name}'s board?`, 'Their current jobs are swapped for a copy of this board.', 'Replace board', async () => {
-      await q(sb.from('jobs').delete().eq('kid_id', k.id));
-      await q(sb.from('jobs').insert(S.jobs.filter(j => j.kid_id === src.id).map(j => ({ family_id: S.family.id, kid_id: k.id, title: j.title, done_means: j.done_means, category: j.category, price: j.price, bonus_minutes: j.bonus_minutes || 0, enabled: j.enabled, sort: j.sort }))));
-    }, 'Board copied') });
+    ${showKids ? `<div class="field"><span class="label">Who can do it</span><div class="jkids">${M.kids.map(k => kidChk(k, J.kid_ids.includes(k.id), `data-sk="${k.id}"`, `${k.name} can do this job`)).join('')}</div><p class="hint">Everyone checked can do it and get paid.</p></div>` : ''}
+    <button class="save" id="jGo" type="button">${job ? 'Save' : 'Add job'}</button>${job ? '<button class="cancel danger-link" id="jDel" type="button">Delete job</button>' : ''}<button class="cancel" data-close type="button">Cancel</button>`, () => {
+    layer.querySelectorAll('[data-sk]').forEach(b => b.onclick = () => { const id = b.dataset.sk; J.kid_ids = J.kid_ids.includes(id) ? J.kid_ids.filter(x => x !== id) : [...J.kid_ids, id]; b.setAttribute('aria-pressed', J.kid_ids.includes(id)) });
+    $('jGo').onclick = () => { const title = capFirst($('jT').value); if (!title) { toast('Name the job.'); return $('jT').focus() }
+      const body = { title, done_means: $('jD').value.trim(), price: Math.min(1000, Math.max(0, r2(parseFloat($('jP').value) || 0))), category: $('jC').value,
+        bonus_minutes: Math.min(240, Math.max(0, parseInt($('jM').value) || 0)), kid_ids: showKids ? J.kid_ids : M.kids.map(k => k.id) };
+      closeSheet(); job ? M.save(job, body) : M.add(body, `Added ${title}`) };
+    if (job) $('jDel').onclick = () => { if (S.view === 'onboard') closeSheet(); M.remove(job) };
   });
 }
 const FB = { bug: ['Report a bug', 'What happened, and what did you expect? Which screen were you on?'], idea: ['Request a feature', 'What would make this more useful for your family?'], hi: ['Say hi', 'Questions, thanks, anything.'] };
@@ -1507,7 +1619,7 @@ async function enter(session) {
   try {
     let fid = (await q(sb.from('family_members').select('family_id').eq('user_id', S.user.id).limit(1)))[0]?.family_id;
     if (!fid) fid = await q(sb.rpc('accept_invites'));
-    if (!fid) { S.onboard = { step: 0, name: '', tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Denver', pin: '', kids: [], draft: { name: '', allowance: '5', color: 'green' } }; S.view = 'onboard'; return render() }
+    if (!fid) { S.onboard = { step: 'family', name: '', tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Denver', pin: '', kids: [], cur: null, jobs: null }; S.view = 'onboard'; return render() }
     S.family = { id: fid }; await loadAll();
     const fresh = store.get('signed-in') !== S.user.id; store.set('signed-in', S.user.id); S.canResetPin = fresh;
     const p = store.get('profile');
