@@ -583,9 +583,10 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:#fff}
 .lock.icon svg{width:20px;height:20px}
 /* parents and guardians list */
 .people{display:grid}
-.person{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:2px solid var(--rule)}
+.person{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 0;border-top:2px solid var(--rule)}
 .person:first-child{border-top:0;padding-top:0}
-.person .t{flex:1;min-width:0;display:grid;gap:1px}
+.person .t{flex:1 1 150px;min-width:0;display:grid;gap:1px}
+.person .ptools{gap:8px}
 .person b{font-weight:600;overflow-wrap:anywhere}
 .person .t span{font-size:13px;color:var(--muted)}
 

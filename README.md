@@ -84,7 +84,7 @@ That's it. Visit the site, sign in with your email, and set up your family.
 | Screen time | Base minutes plus reading minutes, used on the kid's screen days. The clock counts down the week's time to the second and can be paused. It stops itself at zero. Parents can add screen time used by hand (it counts this week). Time is only taken away through the optional jar. Base minutes, screen days and reading limit are in **Settings → Screen time**. |
 | Timers | Reading and screens can each run as a **stopwatch** or a **timer**. Timers come in 5-minute steps; for screens, never more than what's left, plus that exact amount (22 min left offers 5, 10, 15, 20, 22). At zero the session stops at exactly that length, so exactly that much is used, and an alarm rings until it's turned off. Each kid's last choice is remembered. The app needs to be open for the alarm to ring; the screen stays awake while a timer runs. |
 | Parent PIN | Kids share the parent's sign-in, so parent tools sit behind a 4-digit PIN. After signing in fresh with the email code, a parent can reset a forgotten PIN. |
-| Second parent | Settings → **Invite another parent**. They sign in with that email and join automatically. |
+| Second parent | Settings → **Parents and guardians → Send invite** emails them a link (via the `/api/invite` Netlify function and Resend). They sign in with that email and join automatically. **Send again** re-sends it. Needs `RESEND_API_KEY` set in Netlify's environment variables. |
 | Delete | Settings → **Delete account and all data** removes the family and the login. |
 | Feedback | Settings → **Report a bug / Request a feature / Say hi**, or **Contact** on the sign-in screen. Sent through Netlify Forms. |
 

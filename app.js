@@ -487,11 +487,13 @@ document.addEventListener('click', e => {
 });
 oriLoad();
 /* ---------- sign in ---------- */
+// An invite email links to #invite=<email>: fill in the email and say why they're here. The address stays out of the URL afterwards.
+try { const m = location.hash.match(/invite=([^&]+)/); if (m) { S.authEmail = decodeURIComponent(m[1]); S.invited = true; history.replaceState(null, '', location.pathname + location.search) } } catch (e) { }
 function authHTML() {
   const code = S.authStep === 'code';
   return `<section class="screen-center">
     ${logoAnim()}
-    <p class="lede">Allowance, chores, reading and screen time, all in one place kids can see and trust.</p>
+    <p class="lede">${S.invited && !code ? 'You’re invited! Sign in with your email to join your family.' : 'Allowance, chores, reading and screen time, all in one place kids can see and trust.'}</p>
     <div class="card form">
       ${code ? `<div class="field"><label class="label" for="codeIn">Enter the code we sent to ${esc(S.authEmail)}</label>
         <input id="codeIn" class="code-in" inputmode="numeric" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" maxlength="12" placeholder="Code"></div>
@@ -1150,10 +1152,10 @@ function pSettings() {
       <button class="pill soft" id="changePin" type="button" style="justify-self:start">Change parent/guardian PIN</button></section>
     <section class="card"><span class="label">Parents and guardians</span>
       <div class="people">${S.members.map(m => `<div class="person"><span class="t"><b>${esc(m.email || 'Parent/guardian')}</b><span>${m.user_id === S.user.id ? 'You' : 'Can sign in'}</span></span>${m.user_id === S.user.id ? '' : `<button class="pill no" type="button" data-rmmember="${m.user_id}" data-email="${esc(m.email || '')}">Remove</button>`}</div>`).join('')}
-      ${S.invites.map(i => `<div class="person"><span class="t"><b>${esc(i.email)}</b><span>Invited, hasn't signed in yet</span></span><button class="pill soft" type="button" data-rminvite="${esc(i.email)}">Cancel invite</button></div>`).join('')}</div>
+      ${S.invites.map(i => `<div class="person"><span class="t"><b>${esc(i.email)}</b><span>Invited, hasn't joined yet</span></span><span class="ptools"><button class="pill soft" type="button" data-reinvite="${esc(i.email)}">Send again</button><button class="pill no" type="button" data-rminvite="${esc(i.email)}">Cancel</button></span></div>`).join('')}</div>
       <div class="field"><label class="label" for="invEmail">Add a parent or guardian</label><input id="invEmail" type="email" placeholder="Email address"></div>
-      <button class="pill" id="invGo" type="button" style="justify-self:start">Add</button>
-      <p class="hint">They sign in here with that email and join your family. Anyone you add can add or remove others too.</p></section>
+      <button class="pill" id="invGo" type="button" style="justify-self:start">Send invite</button>
+      <p class="hint">We email them a link. They sign in with that email and join your family. Anyone you add can add or remove others too.</p></section>
     <section class="card"><span class="label">Contact & feedback</span><p class="hint">Found a bug, have an idea, or just want to say hi? It goes straight to the person who makes ${esc(APP)}.</p>
       <div class="ptools"><button class="pill soft" type="button" data-fb="bug">Report a bug</button><button class="pill soft" type="button" data-fb="idea">Request a feature</button><button class="pill soft" type="button" data-fb="hi">Say hi</button></div></section>
     <section class="card"><span class="label">Support ${esc(APP)}</span><p class="hint">${esc(APP)} is free. If it helps your family, a coffee keeps it running.</p>${supportHTML(true)}</section>
@@ -1229,7 +1231,11 @@ function bindAll() {
   on('changePin', () => newPinSheet());
   each('[data-rmmember]', el => confirmSheet(`Remove ${el.dataset.email || 'this person'}?`, 'They lose access to your family right away. You can invite them again later.', 'Remove', () => q(sb.from('family_members').delete().eq('family_id', S.family.id).eq('user_id', el.dataset.rmmember)), 'Removed'));
   each('[data-rminvite]', el => act(() => q(sb.from('family_invites').delete().eq('family_id', S.family.id).eq('email', el.dataset.rminvite)), 'Invite canceled'));
-  on('invGo', () => { const e = $('invEmail').value.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return toast('Enter a valid email.'); act(() => q(sb.from('family_invites').upsert({ family_id: S.family.id, email: e })), 'Added. They can sign in with that email now.') });
+  on('invGo', () => { const e = $('invEmail').value.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return toast('Enter a valid email.');
+    if (S.members.some(m => (m.email || '').toLowerCase() === e)) return toast('They’re already in your family.');
+    const b = $('invGo'); b.disabled = true; b.textContent = 'Sending…';
+    act(async () => { await q(sb.from('family_invites').upsert({ family_id: S.family.id, email: e })); toast(await sendInvite(e) ? `Invite sent to ${e}` : `Added. The email didn’t send, so ask them to sign in at ${location.host || 'paperpig.app'} with ${e}.`) }) });
+  each('[data-reinvite]', async el => { el.disabled = true; el.textContent = 'Sending…'; const ok = await sendInvite(el.dataset.reinvite); el.disabled = false; el.textContent = 'Send again'; toast(ok ? `Sent again to ${el.dataset.reinvite}` : 'Couldn’t send the email. Try again in a minute.') });
   on('signOutWho', async () => { await sb.auth.signOut(); store.set('profile', null); store.set('signed-in', null); location.reload() });
   on('signOut', async () => { await sb.auth.signOut(); store.set('profile', null); location.reload() });
   on('delAcct', deleteSheet);
@@ -1639,6 +1645,15 @@ function deleteSheet() {
   });
 }
 
+/* Emails the invite through the site's /api/invite function (Netlify + Resend). Returns false if it couldn't send. */
+async function sendInvite(email) {
+  try {
+    const tok = (await sb.auth.getSession()).data?.session?.access_token; if (!tok) return false;
+    const r = await fetch('/api/invite', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ email }) });
+    if (!r.ok) console.warn('invite email', r.status, await r.text().catch(() => ''));
+    return r.ok;
+  } catch (e) { console.warn('invite email', e); return false }
+}
 /* ---------- boot ---------- */
 async function enter(session) {
   S.user = session.user;
