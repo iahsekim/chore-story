@@ -160,6 +160,11 @@ const READ_GUARD_SEC = 3 * 60 * 60;
 const capSec = () => READ_GUARD_SEC;
 const readSec = (r, kid) => r.source === 'manual' ? Number(r.seconds) || 0 : Math.min(liveSec(r), capSec(kid));
 const activeRead = kid => S.reading.find(r => r.kid_id === kid.id && !r.ended_at && r.source !== 'manual' && r.week_start === thisWeek());
+/* Reading always counts; only the screen-minute bonus stops at the weekly limit. */
+const readMaxed = kid => { const cap = Number(kid.reading_cap) || 0; return cap > 0 && readWeek(kid).bonus >= cap };
+const MAXED = 'You’ve earned all your bonus screen time this week. This reading is just for you!';
+function readCheer(kid, before, after) { const earned = after - before, cap = Number(kid.reading_cap) || 0;
+  return earned > 0 ? `+${earned} screen minute${earned > 1 ? 's' : ''} earned${after >= cap ? '. You maxed out your bonus this week!' : ''}` : cap > 0 && before >= cap ? 'Your screen bonus was already maxed, so this one was just for you. Nice reading!' : cap > 0 ? 'Every second counts toward your next minute.' : 'Nice reading!' }
 function readWeek(kid, ws = thisWeek()) { const sec = S.reading.filter(r => r.kid_id === kid.id && r.week_start === ws).reduce((a, r) => a + readSec(r, kid), 0); const minutes = Math.floor(sec / 60); return { sec, minutes, bonus: Math.min(minutes, Number(kid.reading_cap) || 0) } }
 function screenWeek(kid, ws = thisWeek()) {
   const base = Number(kid.base_screen_minutes) || 0, bonus = readWeek(kid, ws).bonus;
@@ -491,6 +496,27 @@ document.addEventListener('click', e => {
   el.classList.remove('still', 'play', 'done'); void el.offsetWidth; oriMount();
 });
 oriLoad();
+/* ---------- install on the home screen (no app store) ---------- */
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e });
+addEventListener('appinstalled', () => { installEvt = null; toast('Paper Pig is on your home screen'); if (S.view !== 'kid') render() });
+const isInstalled = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if ('serviceWorker' in navigator && /(^|\.)paperpig\.app$|\.netlify\.app$/.test(location.hostname)) addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => { }));
+const installLink = () => isInstalled() ? '' : '<button class="link" type="button" data-install>Get the app</button> · ';
+const SHARE_ICO = '<svg class="ishare" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="Share"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5v9h14v-9h-1"/></svg>';
+function installSheet() {
+  // Chrome and Edge (Android, computers) can install with one tap. iPhone and iPad need Safari's Share menu.
+  if (installEvt) { const e = installEvt; installEvt = null; e.prompt(); return }
+  const ios = isIOS(), android = /Android/i.test(navigator.userAgent);
+  const steps = ios ? [`Open <b>${esc(location.host || 'paperpig.app')}</b> in Safari.`, `Tap <b>Share</b> ${SHARE_ICO}. If you don’t see it, tap <b>•••</b> first.`, 'Scroll down, tap <b>Add to Home Screen</b>, then <b>Add</b>. If you see <b>Open as Web App</b>, leave it on.', 'Open Paper Pig from your home screen and sign in with the <b>code</b> from the email.']
+    : android ? [`Open <b>${esc(location.host || 'paperpig.app')}</b> in Chrome.`, 'Tap the menu <b>⋮</b> at the top right.', 'Tap <b>Add to Home screen</b> or <b>Install app</b>, then <b>Install</b>.']
+    : ['In <b>Chrome</b> or <b>Edge</b>: click the install icon at the right end of the address bar, or open the menu and choose <b>Install Paper Pig</b>.', 'In <b>Safari</b> on a Mac: choose <b>File → Add to Dock</b>.'];
+  openSheet(`<h2>Put Paper Pig on your home screen</h2><p class="hint">It opens full screen with its own icon, like any other app. Free, and no app store needed.</p>
+    <ol class="isteps">${steps.map(t => `<li>${t}</li>`).join('')}</ol>
+    ${ios ? '<p class="hint">The home-screen app keeps its own sign-in, so you’ll sign in once more inside it. Use the code: links in emails open in Safari instead.</p>' : ''}
+    <button class="save" data-close type="button">Got it</button>`);
+}
 /* ---------- sign in ---------- */
 // An invite email links to #invite=<email>: fill in the email and say why they're here. The address stays out of the URL afterwards.
 try { const m = location.hash.match(/invite=([^&]+)/); if (m) { S.authEmail = decodeURIComponent(m[1]); S.invited = true; history.replaceState(null, '', location.pathname + location.search) } } catch (e) { }
@@ -509,7 +535,7 @@ function authHTML() {
         <button class="save" id="emailGo" type="button">Email me a sign-in code</button>
         <p class="hint">No password. We email you a code each time you sign in on a new device. Kids sign in with your email too, then pick their name.</p>`}
     </div>
-    <div class="foot">${supportHTML()}<span><button class="link" type="button" data-fb="hi">Feedback</button> · <button class="link" type="button" data-privacy>Privacy</button></span></div></section>`;
+    <div class="foot">${supportHTML()}<span>${installLink()}<button class="link" type="button" data-fb="hi">Feedback</button> · <button class="link" type="button" data-privacy>Privacy</button></span></div></section>`;
 }
 async function sendCode() {
   const email = $('emailIn').value.trim().toLowerCase();
@@ -708,7 +734,7 @@ function whoHTML() {
     <h2 class="who-q">${hello()}! Who's here?</h2>
     ${S.kids.length ? `<div class="kidtiles ${S.kids.length === 1 ? 'one' : ''}">${tiles}</div>` : '<p class="hint" style="text-align:center">No kids yet. Choose Parent/guardian to add one.</p>'}
     <button class="partile" type="button" data-who="parent"><span class="pt-lock">${I.lock}</span><span class="t"><b>Parent/guardian</b><span>Settings, approvals and the ledger. PIN needed.</span></span>${I.chev}</button>
-    <div class="foot">${supportHTML()}<span><button class="link" type="button" data-fb="hi">Feedback</button> · <button class="link" id="signOutWho" type="button">Switch account</button></span></div></section>`;
+    <div class="foot">${supportHTML()}<span>${installLink()}<button class="link" type="button" data-fb="hi">Feedback</button> · <button class="link" id="signOutWho" type="button">Switch account</button></span></div></section>`;
 }
 function setProfile(p) { S.profile = p; store.set('profile', p); S.view = p === 'parent' ? 'parent' : 'kid'; S.tab = 'home'; if (p !== 'parent') { const k = kidById(p); if (k) setTimeout(() => cheerNews(k), 50) } }
 function chooseProfile(p) {
@@ -755,7 +781,7 @@ function kidHome(kid) {
     ${ra ? `<section class="board rdb" id="readBoard">${readBoardHTML(kid)}</section>` : ''}
     ${sa ? `<section class="board" id="board">${boardHTML(kid)}</section>` : ''}
     ${ra && sa ? '' : `<section class="starts">
-      ${ra ? '' : `<button class="start rd" type="button" id="startRead"><span class="pl">${I.read}</span><b>Start reading</b>${cap ? `<span class="mini-bar"><i style="width:${Math.min(100, 100 * rw.bonus / cap)}%"></i></span>` : ''}<span>${cap ? `${rw.bonus} of ${cap} min` : `${rw.minutes} min`}</span></button>`}
+      ${ra ? '' : `<button class="start rd" type="button" id="startRead"><span class="pl">${I.read}</span><b>Start reading</b>${cap ? `<span class="mini-bar"><i style="width:${Math.min(100, 100 * rw.bonus / cap)}%"></i></span>` : ''}<span>${cap ? (rw.bonus >= cap ? 'Bonus maxed! Read for fun' : `${rw.bonus} of ${cap} min`) : `${rw.minutes} min`}</span></button>`}
       ${sa ? '' : `<button class="start sc ${isScreenDay(kid) && sw.leftSec ? '' : 'off'}" type="button" id="startScr"><span class="pl">${I.screen}</span><b>Start screens</b><span class="mini-bar"><i style="width:${sw.totalSec ? Math.min(100, 100 * sw.leftSec / sw.totalSec) : 0}%"></i></span><span>${scrSub}</span></button>`}
     </section>`}
     <section class="sect"><div class="sect-h"><h3>This week</h3><button class="link" type="button" data-tab="ledger">See ledger</button></div>
@@ -867,9 +893,9 @@ function readBoardHTML(kid) {
     return `<div class="bline"><span class="label">${run ? (tg ? `${I.bell}Timer · ${minLabel(Math.round(tg / 60))}` : 'Reading now') : 'Paused'}</span><b>${esc(a.book)}</b></div>
     <div class="digits num ${run ? '' : 'idle'}" id="readDigits">${hms(tg ? tg - sec : sec)}</div>
     ${tg ? `<div class="bar"><i id="readBar" style="width:${Math.min(100, 100 * sec / tg)}%"></i></div>` : ''}
-    <p class="note">${run ? (tg ? 'It rings when the timer is done. Every second counts.' : 'Every second counts. Pause any time.') : 'Your time is saved. Tap Resume when you pick the book back up.'}</p>
+    <p class="note">${run ? (readMaxed(kid) ? 'Your screen bonus is maxed this week, so this one’s just for you. ' : '') + (tg ? 'It rings when the timer is done.' : 'Pause any time.') : 'Your time is saved. Tap Resume when you pick the book back up.'}</p>
     <div class="row2">${run ? '<button class="ghost" id="pauseRead" type="button">Pause</button>' : '<button class="ghost" id="resumeRead" type="button">Resume</button>'}<button class="go white" id="stopRead" type="button">I'm done</button></div>`; }
-  return `<div class="bline"><span class="label">Reading timer</span><span>1 min = <b>1 screen min</b></span></div>
+  return `<div class="bline"><span class="label">Reading timer</span>${readMaxed(kid) ? '<span><b>Bonus maxed!</b> Read for fun</span>' : '<span>1 min = <b>1 screen min</b></span>'}</div>
     <div class="digits idle num">00:00</div><button class="go white" id="startRead" type="button">Start reading</button>`;
 }
 let pick = null, confirming = false;
@@ -1163,6 +1189,7 @@ function pSettings() {
       <p class="hint">We email them a link. They sign in with that email and join your family. Anyone you add can add or remove others too.</p></section>
     <section class="card"><span class="label">Contact & feedback</span><p class="hint">Found a bug, have an idea, or just want to say hi? It goes straight to the person who makes ${esc(APP)}.</p>
       <div class="ptools"><button class="pill soft" type="button" data-fb="bug">Report a bug</button><button class="pill soft" type="button" data-fb="idea">Request a feature</button><button class="pill soft" type="button" data-fb="hi">Say hi</button></div></section>
+    ${isInstalled() ? '' : `<section class="card"><span class="label">Get the app</span><p class="hint">Put ${esc(APP)} on your phone’s home screen. It opens full screen like a regular app. Free, no app store.</p><button class="pill" type="button" data-install style="justify-self:start">Add to home screen</button></section>`}
     <section class="card"><span class="label">Support ${esc(APP)}</span><p class="hint">${esc(APP)} is free. If it helps your family, a coffee keeps it running.</p>${supportHTML(true)}</section>
     <section class="card"><span class="label">Account</span><p class="hint">Signed in as ${esc(S.user.email)}</p>
       <div class="ptools"><button class="pill soft" id="signOut" type="button">Sign out</button><button class="pill no" id="delAcct" type="button">Delete account and all data</button></div>
@@ -1182,6 +1209,7 @@ function bindAll() {
   on('emailGo', sendCode); on('codeGo', verifyCode); on('authBack', () => { S.authStep = 'email'; render() });
   if ($('emailIn')) $('emailIn').onkeydown = e => { if (e.key === 'Enter') sendCode() };
   if ($('codeIn')) $('codeIn').onkeydown = e => { if (e.key === 'Enter') verifyCode() };
+  app.querySelectorAll('[data-install]').forEach(b => b.onclick = installSheet);
   // onboarding
   if (S.view === 'onboard') bindOnboard();
   // job lists (onboarding and the Jobs tab)
@@ -1284,7 +1312,7 @@ function timerPickHTML(kind, st, maxMin) {
   const ch = timerChoices(kind, maxMin);
   return `<div class="field"><span class="label">How long?</span>
     <div class="seg tmode"><button type="button" data-tm="watch" aria-pressed="${st.mode === 'watch'}">${I.clock}Stopwatch</button><button type="button" data-tm="timer" aria-pressed="${st.mode === 'timer'}">${I.bell}Timer</button></div>
-    ${st.mode === 'timer' ? `<div class="chips tmins ${ch.length > 12 ? 'scroll' : ''}" role="radiogroup" aria-label="Minutes">${ch.map(m => `<button class="chip" type="button" role="radio" data-tmin="${m}" aria-checked="${m === st.min}" aria-pressed="${m === st.min}">${minLabel(m)}</button>`).join('')}</div>
+    ${st.mode === 'timer' ? `<div class="chips tmins ${ch.length > 12 ? 'scroll' : ''}" role="radiogroup" aria-label="Minutes">${ch.map(m => `<button class="chip" type="button" role="radio" data-tmin="${m}" aria-checked="${m === st.min}" aria-pressed="${m === st.min}">${kind === 'screen' && m === maxMin ? `All ${minLabel(m)}` : minLabel(m)}</button>`).join('')}</div>
       <div class="tcustom"><label for="tminIn">Or type the minutes</label><span class="minin"><input id="tminIn" type="number" inputmode="numeric" min="1" max="${maxMin}" step="1" value="${st.min}" data-kind="${kind}"><span>min</span></span></div>
       <p class="hint" id="tHint">${timerHint(kind, st.min)}</p>`
       : `<p class="hint">${kind === 'screen' ? 'Runs until you stop it. At zero for the week, screens go off.' : 'Counts up until you tap I’m done.'}</p>`}</div>`;
@@ -1356,7 +1384,7 @@ async function stopRead(kid) {
   const a = activeRead(kid); if (!a) return; const sec = timerSec(a, kid), before = Math.min(Number(kid.reading_cap) || 0, Math.floor((readWeek(kid).sec - readSec(a, kid)) / 60));
   await doneTimer('reading_sessions', a, null, kid);
   const after = readWeek(kid).bonus, earned = after - before;
-  celebrate(`You read ${dur(sec)}!`, earned > 0 ? `+${earned} screen minute${earned > 1 ? 's' : ''} earned${after >= kid.reading_cap ? '. You maxed out this week!' : ''}` : 'Every second counts toward your next minute.', { power: earned > 0 ? 1.3 : .6, icon: 'read' });
+  celebrate(`You read ${dur(sec)}!`, readCheer(kid, before, after), { power: earned > 0 ? 1.3 : .8, icon: 'read' });
 }
 function txSheet(kid, kind, pre = {}) {
   const st = stats(kid), pay = kind === 'payout';
@@ -1409,7 +1437,7 @@ setInterval(() => {
       autoStopping = true; const before = Math.min(Number(kid.reading_cap) || 0, Math.floor((readWeek(kid).sec - readSec(r, kid)) / 60));
       doneTimer('reading_sessions', r, null, kid, rt).then(() => ringAlarm('Time\u2019s up!', `You read ${minLabel(Math.round(rt / 60))}!`, () => {
         const after = readWeek(kid).bonus, earned = after - before;
-        celebrate(`You read ${dur(rt)}!`, earned > 0 ? `+${earned} screen minute${earned > 1 ? 's' : ''} earned${after >= kid.reading_cap ? '. You maxed out this week!' : ''}` : 'Every second counts toward your next minute.', { power: earned > 0 ? 1.3 : .6, icon: 'read' });
+        celebrate(`You read ${dur(rt)}!`, readCheer(kid, before, after), { power: earned > 0 ? 1.3 : .8, icon: 'read' });
       })).finally(() => { autoStopping = false });
       return;
     }
@@ -1496,7 +1524,7 @@ function readStartSheet(kid) {
   const draw = () => openSheet(`<h2>Start reading</h2><div class="field"><label class="label" for="bookIn">What are you reading?</label><input id="bookIn" maxlength="100" placeholder="Book title" value="${esc(book)}">
     ${books.length ? `<div class="chips">${books.map(b => `<button class="chip" type="button" data-book="${esc(b)}">${esc(b)}</button>`).join('')}</div>` : ''}</div>
     ${timerPickHTML('read', st, 60)}
-    <p class="hint">Chapter books and graphic novels count. Audiobooks don't.</p><button class="save" id="rdGo" type="button" style="background:var(--read)">${st.mode === 'timer' ? `Start ${minLabel(st.min)} timer` : 'Start the stopwatch'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+    ${readMaxed(kid) ? `<p class="done-box maxed">${MAXED}</p>` : ''}<p class="hint">Chapter books and graphic novels count. Audiobooks don't.</p><button class="save" id="rdGo" type="button" style="background:var(--read)">${st.mode === 'timer' ? `Start ${minLabel(st.min)} timer` : 'Start the stopwatch'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
     $('bookIn').oninput = e => { book = e.target.value };
     layer.querySelectorAll('[data-book]').forEach(b => b.onclick = () => { book = b.dataset.book; $('bookIn').value = book });
     bindTimerPick(st, draw);
