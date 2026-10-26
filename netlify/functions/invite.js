@@ -10,17 +10,17 @@ const SITE = (process.env.SITE_URL || 'https://paperpig.app').replace(/\/$/, '')
 const FROM = process.env.INVITE_FROM || 'Paper Pig <noreply@paperpig.app>';
 const MAX_INVITES = 10;
 
-const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify(body) });
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-export default async (req) => {
-  if (req.method !== 'POST') return json(405, { error: 'method' });
+exports.handler = async (event) => {
+  if (event.httpMethod !== 'POST') return json(405, { error: 'method' });
   const key = process.env.RESEND_API_KEY;
   if (!key) return json(503, { error: 'not_configured' });
-  const auth = req.headers.get('authorization') || '';
+  const h = event.headers || {}, auth = h.authorization || h.Authorization || '';
   if (!/^Bearer \S+$/.test(auth)) return json(401, { error: 'signin' });
   let email = '';
-  try { email = String((await req.json()).email || '').trim().toLowerCase() } catch (e) { }
+  try { const raw = event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString() : (event.body || '{}'); email = String(JSON.parse(raw).email || '').trim().toLowerCase() } catch (e) { }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return json(400, { error: 'email' });
 
   const sb = path => fetch(`${SB_URL}${path}`, { headers: { apikey: SB_KEY, authorization: auth } });
@@ -62,4 +62,3 @@ export default async (req) => {
   return json(200, { ok: true });
 };
 
-export const config = { path: '/api/invite' };

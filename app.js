@@ -1645,11 +1645,11 @@ function deleteSheet() {
   });
 }
 
-/* Emails the invite through the site's /api/invite function (Netlify + Resend). Returns false if it couldn't send. */
+/* Emails the invite through the site's invite function (Netlify + Resend). Returns false if it couldn't send. */
 async function sendInvite(email) {
   try {
     const tok = (await sb.auth.getSession()).data?.session?.access_token; if (!tok) return false;
-    const r = await fetch('/api/invite', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ email }) });
+    const r = await fetch('/.netlify/functions/invite', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ email }) });
     if (!r.ok) console.warn('invite email', r.status, await r.text().catch(() => ''));
     return r.ok;
   } catch (e) { console.warn('invite email', e); return false }
