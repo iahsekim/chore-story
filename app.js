@@ -359,7 +359,10 @@ function render() {
   bindAll();
   if (v === 'kid' && S.tab === 'home') bankAnim(kidById(S.profile));
   if (v === 'auth' || v === 'who') oriMount();
+  // Keep the tour in step with the screen right away, so an old tip never flashes over a new screen.
+  if (!renderTour) { renderTour = true; try { tourTick() } catch (e) { } finally { renderTour = false } }
 }
+let renderTour = false;
 
 /* ---------- the logo, as a book that opens ----------
    Drawn on a canvas. The book is a set of sheets hinged on the spine. Each sheet has a front
@@ -1856,7 +1859,6 @@ const TOUR_KEY = () => 'tour-' + (S.user?.id || 'x');
 function tourGet() { try { return JSON.parse(store.get(TOUR_KEY()) || 'null') } catch (e) { return null } }
 function tourSet(t) { store.set(TOUR_KEY(), t ? JSON.stringify(t) : null) }
 function tourStart() { tourSet({ i: 0 }); tourShown = -1; tourTick() }
-function tourEnd() { tourSet({ done: true }); tourHide() }
 function tourSteps() {
   const n = esc(S.kids[0]?.name || 'your kid');
   return [
@@ -1878,10 +1880,19 @@ function tourSteps() {
     { view: 'kid', sel: '#swapBtn', title: 'Back to the grown-up side', text: 'Tap <b>Switch</b> and enter your PIN. That’s the tour. Have fun!', next: 'Done' },
   ];
 }
-let tourShown = -1;
-function tourHide() { $('tour')?.remove() }
+/* The overlay is built once and moved, not redrawn: the highlight glides from step to step and follows the page
+   every frame, and the tip only fades in once scrolling has settled. Built for phones first. */
+let tourShown = -1, tourEl = null, tourTarget = null, tourRaf = 0, tourSettle = 0, tourStable = 0, tourSig = '', tourSafe = -1;
+function tourBox() {
+  if (tourEl && tourEl.isConnected) return tourEl;
+  tourEl = document.createElement('div'); tourEl.id = 'tour';
+  tourEl.innerHTML = '<div class="tour-dim"></div><div class="tour-hole"></div><i class="tour-block"></i><i class="tour-block"></i><i class="tour-block"></i><i class="tour-block"></i><i class="tour-block tour-cover"></i><div class="tour-tip" role="dialog" aria-modal="true" aria-live="polite"></div>';
+  document.body.appendChild(tourEl); return tourEl;
+}
+function tourHide(remove) { if (!tourEl) return; tourEl.classList.remove('on'); if (remove) { tourEl.remove(); tourEl = null; tourShown = -1 } }
+function tourEnd() { tourSet({ done: true }); tourHide(true) }
 function tourTick() {
-  const t = tourGet(); if (!t || t.done || t.i == null || !S.family) return tourHide();
+  const t = tourGet(); if (!t || t.done || t.i == null || !S.family) return tourHide(true);
   const steps = tourSteps(), st = steps[t.i]; if (!st) return tourEnd();
   if (st.view !== S.view) {
     // The parent did the step's action themselves (tapped Switch, or a kid): carry on from there.
@@ -1894,38 +1905,66 @@ function tourTick() {
   if ($('scrim')) return tourHide();                       // wait until a sheet or celebration is closed
   const el = st.sel ? app.querySelector(st.sel) : null;
   if (st.sel && !el) { tourSet({ i: t.i + 1 }); return tourTick() }   // not on screen right now (say, screens already running)
-  if (tourShown !== t.i) { tourShown = t.i; if (el) el.scrollIntoView({ block: 'center', behavior: reduceMotion() ? 'auto' : 'smooth' }); setTimeout(tourTick, 420); }
-  tourDraw(st, el, t.i, steps.length);
+  const box = tourBox(), fresh = tourShown !== t.i || tourTarget !== el;
+  tourTarget = el;
+  if (fresh) { const first = tourShown < 0 || !box.classList.contains('on'); tourShown = t.i; tourContent(st, t.i, steps.length); tourBring(el, first) }
+  box.classList.toggle('center', !el); box.classList.toggle('act', !!st.act); box.classList.add('on');
+  if (!tourRaf) tourRaf = requestAnimationFrame(tourFollow);
 }
-function tourDraw(st, el, i, n) {
-  let box = $('tour'); if (!box) { box = document.createElement('div'); box.id = 'tour'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-live', 'polite'); document.body.appendChild(box) }
-  const W = innerWidth, H = innerHeight, pad = 8, r = el ? el.getBoundingClientRect() : null;
-  const hole = r ? { x: Math.max(4, r.left - pad), y: Math.max(4, r.top - pad), w: Math.min(W - 8, r.width + pad * 2), h: Math.min(H - 8, r.height + pad * 2) } : null;
-  const key = `${i}|${hole ? [hole.x, hole.y, hole.w, hole.h].map(Math.round).join(',') : 'c'}|${W}x${H}`;
-  if (box.dataset.key === key) return; box.dataset.key = key;
-  const tipW = Math.min(340, W - 32), below = !hole || hole.y + hole.h / 2 < H * 0.52;
-  const left = hole ? Math.min(W - tipW - 16, Math.max(16, hole.x + hole.w / 2 - tipW / 2)) : (W - tipW) / 2;
-  const pos = !hole ? `top:${Math.max(16, Math.round(H / 2 - 120))}px` : below ? `top:${Math.min(H - 220, hole.y + hole.h + 14)}px` : `bottom:${Math.min(H - 220, H - hole.y + 14)}px`;
-  const block = (x, y, w, h) => `<i class="tour-block" style="left:${x}px;top:${y}px;width:${Math.max(0, w)}px;height:${Math.max(0, h)}px"></i>`;
-  box.innerHTML = (hole ? `<div class="tour-hole" style="left:${hole.x}px;top:${hole.y}px;width:${hole.w}px;height:${hole.h}px"></div>
-      ${block(0, 0, W, hole.y)}${block(0, hole.y + hole.h, W, H - hole.y - hole.h)}${block(0, hole.y, hole.x, hole.h)}${block(hole.x + hole.w, hole.y, W - hole.x - hole.w, hole.h)}
-      ${st.act ? '' : block(hole.x, hole.y, hole.w, hole.h)}` : '<div class="tour-dim"></div>') +
-    `<div class="tour-tip" style="left:${left}px;width:${tipW}px;${pos}">
-      <div class="tour-top"><span class="label">${i + 1} of ${n}</span><button class="link quiet" type="button" id="tourSkip">${i === n - 1 ? 'Close' : 'Skip tour'}</button></div>
-      <h3>${st.title}</h3><p>${st.text}</p>
-      <div class="tour-btns">${i > 0 && !st.act && tourSteps()[i - 1].view === st.view ? '<button class="pill soft" type="button" id="tourBack">Back</button>' : '<span></span>'}<button class="pill" type="button" id="tourNext">${st.next || 'Next'}</button></div></div>`;
+function tourContent(st, i, n) {
+  const box = tourBox(), tip = box.querySelector('.tour-tip'), steps = tourSteps();
+  tip.innerHTML = `<div class="tour-top"><span class="label">${i + 1} of ${n}</span><button class="link quiet" type="button" id="tourSkip">${i === n - 1 ? 'Close' : 'Skip tour'}</button></div>
+    <h3>${st.title}</h3><p>${st.text}</p>
+    <div class="tour-btns">${i > 0 && !st.act && steps[i - 1].view === st.view ? '<button class="pill soft" type="button" id="tourBack">Back</button>' : '<span></span>'}<button class="pill" type="button" id="tourNext">${st.next || 'Next'}</button></div>`;
   $('tourSkip').onclick = tourEnd;
   if ($('tourBack')) $('tourBack').onclick = () => { tourSet({ i: i - 1 }); tourTick() };
   $('tourNext').onclick = () => {
-    if (st.act === 'switch') return switchProfile();
-    if (st.act === 'pick') return chooseProfile(S.kids[0].id);
+    if (st.act === 'switch') { tourHide(); return switchProfile() }
+    if (st.act === 'pick') { tourHide(); return chooseProfile(S.kids[0].id) }
     if (i === n - 1) { tourEnd(); return celebrate('You’re all set!', 'Have fun with Paper Pig.', { power: .8, icon: 'star' }) }
     tourSet({ i: i + 1 }); tourTick();
   };
 }
-setInterval(tourTick, 300);
-addEventListener('resize', () => { const b = $('tour'); if (b) b.dataset.key = ''; });
-addEventListener('keydown', e => { if (e.key === 'Escape' && $('tour')) tourEnd() });
+const tourView = () => { const v = window.visualViewport; return { W: v ? v.width : innerWidth, H: v ? v.height : innerHeight } };
+/* Scroll only when the target, or room for the tip next to it, is off screen. The tip waits until that's done. */
+function tourBring(el, first) {
+  const box = tourBox(); box.classList.add('moving'); tourStable = 0; tourSettle = Date.now() + (first ? 120 : 260);
+  box.classList.toggle('jump', !first);
+  if (!el) return;
+  const { H } = tourView(), r = el.getBoundingClientRect(), th = (box.querySelector('.tour-tip').offsetHeight || 190) + 28, bar = S.view !== 'who' ? 96 : 16;
+  if (getComputedStyle(el).position === 'fixed' || el.closest('.tabbar')) return;
+  const fits = r.top >= 12 && r.bottom <= H - bar && (r.top >= th || H - bar - r.bottom >= th);
+  if (fits) return;
+  const goal = r.height + th > H - bar - 24 ? 14 : Math.max(14, (H - bar - (r.height + th)) / 2);
+  box.classList.remove('jump'); tourSettle = Date.now() + 520;
+  window.scrollBy({ top: r.top - goal, behavior: reduceMotion() ? 'auto' : 'smooth' });
+}
+function tourFollow() {
+  tourRaf = 0; if (!tourEl || !tourEl.classList.contains('on')) return;
+  const { W, H } = tourView(), el = tourTarget, tip = tourEl.querySelector('.tour-tip'), hole = tourEl.querySelector('.tour-hole');
+  if (tourSafe < 0) { const pr = document.createElement('div'); pr.style.cssText = 'position:fixed;bottom:0;height:env(safe-area-inset-bottom,0px)'; document.body.appendChild(pr); tourSafe = pr.offsetHeight || 0; pr.remove() }
+  const tipW = Math.min(360, W - 24); tip.style.width = tipW + 'px';
+  const th = tip.offsetHeight || 190; let x = (W - tipW) / 2, y = Math.max(16, (H - th) / 2 - 20), sig = 'c';
+  if (el && el.isConnected) {
+    const r = el.getBoundingClientRect(), p = 8;
+    const hx = Math.max(6, r.left - p), hy = Math.max(6, r.top - p), hw = Math.max(0, Math.min(W - 6, r.right + p) - hx), hh = Math.max(0, Math.min(H - 6, r.bottom + p) - hy);
+    sig = [hx, hy, hw, hh, W, H, th].map(Math.round).join(',');
+    if (sig !== tourSig) {
+      Object.assign(hole.style, { left: hx + 'px', top: hy + 'px', width: hw + 'px', height: hh + 'px' });
+      const B = tourEl.querySelectorAll('.tour-block');
+      [[0, 0, W, hy], [0, hy + hh, W, H - hy - hh], [0, hy, hx, hh], [hx + hw, hy, W - hx - hw, hh], [hx, hy, hw, hh]].forEach(([l, t, w, h], k) => Object.assign(B[k].style, { left: l + 'px', top: t + 'px', width: Math.max(0, w) + 'px', height: Math.max(0, h) + 'px' }));
+    }
+    const room = H - (hy + hh) - tourSafe;
+    y = room >= th + 22 ? hy + hh + 14 : hy >= th + 22 ? hy - th - 14 : H - th - 14 - tourSafe;   // below, above, or over the bottom of a tall target
+    x = Math.min(W - tipW - 12, Math.max(12, hx + hw / 2 - tipW / 2));
+  }
+  tip.style.transform = `translate3d(${Math.round(x)}px,${Math.round(y)}px,0)`;
+  if (sig === tourSig) tourStable++; else { tourStable = 0; tourSig = sig }
+  if (tourEl.classList.contains('moving') && Date.now() > tourSettle && tourStable > 3) { tourEl.classList.remove('moving'); setTimeout(() => tourEl?.classList.remove('jump'), 320) }
+  tourRaf = requestAnimationFrame(tourFollow);
+}
+setInterval(tourTick, 250);
+addEventListener('keydown', e => { if (e.key === 'Escape' && tourEl?.classList.contains('on')) tourEnd() });
 
 /* ---------- boot ---------- */
 async function enter(session) {
