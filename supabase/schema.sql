@@ -179,6 +179,40 @@ create table if not exists public.screen_adjust (
   created_at  timestamptz not null default now()
 );
 
+-- Savings goals: up to 10 per kid. Moving money into a goal takes it out of the kid's bank (what they can spend)
+-- and keeps it for that goal; the money is still the kid's. A goal's balance = moves in - moves out - purchases from it.
+create table if not exists public.savings_goals (
+  id          uuid primary key default gen_random_uuid(),
+  family_id   uuid not null references public.families on delete cascade,
+  kid_id      uuid not null references public.kids on delete cascade,
+  name        text not null check (char_length(trim(name)) between 1 and 40),
+  emoji       text not null default '' check (char_length(emoji) <= 16),
+  target      numeric(8,2) check (target is null or (target > 0 and target <= 100000)),
+  sort        int not null default 0,
+  archived    boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+-- from_goal / to_goal null = the bank.
+create table if not exists public.savings_moves (
+  id          uuid primary key default gen_random_uuid(),
+  family_id   uuid not null references public.families on delete cascade,
+  kid_id      uuid not null references public.kids on delete cascade,
+  from_goal   uuid references public.savings_goals on delete cascade,
+  to_goal     uuid references public.savings_goals on delete cascade,
+  amount      numeric(8,2) not null check (amount > 0 and amount <= 100000),
+  by_role     text not null default 'kid' check (by_role in ('kid','parent')),
+  created_at  timestamptz not null default now(),
+  created_by  uuid default auth.uid(),
+  check (from_goal is distinct from to_goal)
+);
+-- A purchase can be paid from a goal instead of the bank.
+alter table public.transactions add column if not exists goal_id uuid references public.savings_goals on delete set null;
+-- When on, kids can put money into goals and move it between goals, but only a parent/guardian can move it back to the bank.
+alter table public.families add column if not exists savings_locked boolean not null default false;
+create index if not exists goals_kid on public.savings_goals (kid_id);
+create index if not exists moves_kid on public.savings_moves (kid_id);
+
+
 -- Upgrades for databases created from an earlier version of this file (safe to re-run).
 alter table public.reading_sessions add column if not exists seconds int not null default 0;
 alter table public.reading_sessions add column if not exists running_since timestamptz;
@@ -197,6 +231,12 @@ alter table public.credits add column if not exists job_id uuid references publi
 alter table public.jobs add column if not exists bonus_minutes int not null default 0;
 alter table public.kids add column if not exists goal_name text;
 alter table public.kids add column if not exists goal_amount numeric(8,2);
+
+-- Earlier versions had one saving goal on the kid. It becomes their first savings goal (starting at $0, so no balance moves).
+insert into public.savings_goals (family_id, kid_id, name, target)
+  select k.family_id, k.id, left(trim(k.goal_name), 40), k.goal_amount from public.kids k
+   where coalesce(trim(k.goal_name), '') <> '' and not exists (select 1 from public.savings_goals g where g.kid_id = k.id);
+update public.kids set goal_name = null, goal_amount = null where goal_name is not null;
 
 -- Shared jobs: one job list per family. kid_ids says which kids see each job on their board,
 -- and every kid listed can do it and get paid. (Earlier versions kept a separate copy per kid in kid_id.)
@@ -309,6 +349,8 @@ alter table public.screen_sessions  enable row level security;
 alter table public.screen_adjust    enable row level security;
 alter table public.screen_bonus     enable row level security;
 alter table public.penalties        enable row level security;
+alter table public.savings_goals    enable row level security;
+alter table public.savings_moves    enable row level security;
 
 drop policy if exists fam_select on public.families;
 drop policy if exists fam_update on public.families;
@@ -329,7 +371,7 @@ create policy inv_all on public.family_invites for all to authenticated
 do $$
 declare t text;
 begin
-  foreach t in array array['kids','jobs','reading_sessions','screen_sessions','screen_adjust','screen_bonus','penalties'] loop
+  foreach t in array array['kids','jobs','reading_sessions','screen_sessions','screen_adjust','screen_bonus','penalties','savings_goals','savings_moves'] loop
     execute format('drop policy if exists fam_all on public.%I', t);
     execute format('create policy fam_all on public.%I for all to authenticated using (family_id in (select public.my_family_ids())) with check (family_id in (select public.my_family_ids()))', t);
   end loop;

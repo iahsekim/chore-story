@@ -5,7 +5,7 @@ const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, { 
 
 const COLORS = { green: '#1FA34A', blue: '#2F6BFF', purple: '#7A3FF2', orange: '#FF6B1A', pink: '#F0418C', teal: '#0FA3A3' };
 const S = {
-  user: null, family: null, members: [], invites: [], kids: [], jobs: [], weeks: [], credits: [], tx: [], reading: [], screen: [], sbonus: [],
+  user: null, family: null, members: [], invites: [], kids: [], jobs: [], goals: [], moves: [], weeks: [], credits: [], tx: [], reading: [], screen: [], sbonus: [],
   view: 'loading', profile: null, parentOk: false, tab: 'home', ptab: 'kids', jobFilter: 'All',
   authEmail: '', authStep: 'email', onboard: null
 };
@@ -56,7 +56,7 @@ function bindSwatches(root, attr, onPick) { root.querySelectorAll(`[${attr}]`).f
 async function q(p) { const { data, error } = await p; if (error) throw error; return data }
 async function loadAll() {
   const fid = S.family.id, since = addDays(today(), -70);
-  const [fam, members, invites, kids, jobs, weeks, credits, tx, reading, screen, sbonus, pen] = await Promise.all([
+  const [fam, members, invites, kids, jobs, weeks, credits, tx, reading, screen, sbonus, pen, goals, moves] = await Promise.all([
     q(sb.from('families').select('*').eq('id', fid).single()),
     q(sb.from('family_members').select('email,user_id').eq('family_id', fid)),
     q(sb.from('family_invites').select('email').eq('family_id', fid)),
@@ -70,8 +70,11 @@ async function loadAll() {
     q(sb.from('screen_bonus').select('*').eq('family_id', fid).gte('week_start', since)),
     // Older databases may not have the jar table yet; the app keeps working without it.
     Promise.resolve(sb.from('penalties').select('*').eq('family_id', fid).order('created_at', { ascending: false })).then(r => r.error ? [] : r.data || [], () => []),
+    // Savings goals arrived later too: until the database has them, there are simply no goals.
+    Promise.resolve(sb.from('savings_goals').select('*').eq('family_id', fid).order('sort')).then(r => r.error ? [] : r.data || [], () => []),
+    Promise.resolve(sb.from('savings_moves').select('*').eq('family_id', fid).order('created_at', { ascending: false })).then(r => r.error ? [] : r.data || [], () => []),
   ]);
-  Object.assign(S, { family: fam, members, invites, kids, jobs, weeks, credits, tx, reading, screen, sbonus, pen });
+  Object.assign(S, { family: fam, members, invites, kids, jobs, weeks, credits, tx, reading, screen, sbonus, pen, goals, moves });
   await ensureWeeks();
 }
 /* Each Monday a kid's week starts fresh at their allowance. Rows are created lazily. */
@@ -124,31 +127,49 @@ function stats(kid) {
   const tx = S.tx.filter(t => t.kid_id === kid.id);
   const paid = tx.filter(t => t.kind === 'payout').reduce((a, t) => a + Number(t.amount), 0);
   const spent = tx.filter(t => t.kind === 'purchase').reduce((a, t) => a + Number(t.amount), 0);
-  const pen = penMoney(kid);
-  return { week: weekTotal(kid, cur), month: r2(monthT), lifetime: r2(earned), paid: r2(paid), spent: r2(spent), pen, balance: r2(earned - paid - spent - pen) };
+  const pen = penMoney(kid), balance = r2(earned - paid - spent - pen), saved = savedTotal(kid);
+  // balance = all the kid's money; saved = what's set aside in goals; bank = what's left to spend or withdraw.
+  return { week: weekTotal(kid, cur), month: r2(monthT), lifetime: r2(earned), paid: r2(paid), spent: r2(spent), pen, balance, saved, bank: r2(balance - saved) };
 }
+/* ---------- savings goals ----------
+   Up to 10 per kid. Moving money into a goal takes it out of the bank and keeps it for that goal (it's still the kid's).
+   A goal's balance is the money moved in, minus money moved out, minus purchases paid from it. */
+const MAX_GOALS = 10;
+const GOAL_EMOJI = ['🎮', '🧸', '🚲', '⚽', '🎨', '📚', '🎧', '🛹', '🎁', '🐶', '🍦', '💰'];
+const kidGoals = kid => (S.goals || []).filter(g => g.kid_id === kid.id && !g.archived).sort((a, b) => (a.sort - b.sort) || String(a.created_at).localeCompare(String(b.created_at)));
+function goalBal(g) {
+  let b = 0;
+  for (const m of S.moves || []) { if (m.to_goal === g.id) b += Number(m.amount); if (m.from_goal === g.id) b -= Number(m.amount) }
+  for (const t of S.tx) if (t.goal_id === g.id && t.kind === 'purchase') b -= Number(t.amount);
+  return r2(b);
+}
+const savedTotal = kid => r2(kidGoals(kid).reduce((a, g) => a + goalBal(g), 0));
+const goalById = id => (S.goals || []).find(g => g.id === id);
+const goalLabel = g => g ? `${g.emoji ? g.emoji + ' ' : ''}${g.name}` : 'a goal';
+const goalReady = g => Number(g.target) > 0 && goalBal(g) >= Number(g.target) - 0.004;
+const savLocked = () => !!S.family?.savings_locked;
 /* How long the balance has been building: last payment, and what each week since added. */
 function owedInfo(kid) {
   const st = stats(kid), pays = S.tx.filter(t => t.kid_id === kid.id && t.kind === 'payout').sort((a, b) => b.local_date.localeCompare(a.local_date));
   const last = pays[0]?.local_date || null, since = last ? monday(last) : (kidWeeks(kid).slice(-1)[0]?.week_start || thisWeek());
   const weeks = kidWeeks(kid).filter(w => w.week_start >= since).map(w => ({ ws: w.week_start, amt: weekTotal(kid, w.week_start) })).filter(w => w.amt > 0);
   const days = Math.round((parseD(today()) - parseD(last || since)) / 864e5);
-  const saving = goalOf(kid) && st.balance <= Number(kid.goal_amount);
-  return { balance: st.balance, last, days, weeks, nudge: st.balance > 0 && days >= 14 && !saving, saving };
+  return { balance: st.bank, last, days, weeks, nudge: st.bank > 0 && days >= 14 };
 }
-const goalOf = kid => kid.goal_name && Number(kid.goal_amount) > 0 ? { name: kid.goal_name, amount: Number(kid.goal_amount) } : null;
 const ago = d => d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 14 ? `${d} days ago` : `${Math.round(d / 7)} weeks ago`;
 /* Every entry in a kid's bank, newest first, each with the balance after it. */
 function statement(kid) {
   const L = [];
   for (const w of kidWeeks(kid)) L.push({ date: w.week_start, ts: ms(w.week_start + 'T00:00:00Z'), title: 'Weekly allowance', kind: 'Allowance', v: Number(w.allowance), type: 'allow', id: w.week_start, week: w.week_start });
   for (const c of approvedCredits(kid)) L.push({ date: localDate(ms(c.created_at)), ts: ms(c.created_at), title: c.title, kind: c.kind === 'job' ? 'Job' : 'Bonus', v: Number(c.amount), type: c.kind, id: c.id, week: c.week_start });
-  for (const t of S.tx.filter(t => t.kid_id === kid.id)) L.push({ date: t.local_date, ts: ms(t.created_at), title: t.note, kind: t.kind === 'payout' ? 'Withdrawal' : 'Bought for ' + kid.name, v: -Number(t.amount), type: t.kind, id: t.id });
+  for (const t of S.tx.filter(t => t.kid_id === kid.id)) L.push({ date: t.local_date, ts: ms(t.created_at), title: t.note, kind: t.kind === 'payout' ? 'Withdrawal' : 'Bought for ' + kid.name + (t.goal_id ? ` · from ${goalLabel(goalById(t.goal_id))}` : ''), v: -Number(t.amount), type: t.kind, id: t.id });
+  for (const m of (S.moves || []).filter(m => m.kid_id === kid.id)) L.push({ date: localDate(ms(m.created_at)), ts: ms(m.created_at), title: moveTitle(m), kind: 'Savings', v: 0, mv: Number(m.amount), type: 'move', id: '' });
   for (const p of kidPen(kid).filter(p => Number(p.amount) > 0)) L.push({ date: p.local_date, ts: ms(p.created_at), title: p.note, kind: penName(), v: -Number(p.amount), type: 'penalty', id: p.id });
   L.sort((a, b) => a.date.localeCompare(b.date) || a.ts - b.ts);
   let run = 0; for (const l of L) { run = r2(run + l.v); l.bal = run }
   return L.reverse();
 }
+function moveTitle(m) { const f = goalById(m.from_goal), t = goalById(m.to_goal); return !f ? `Saved for ${goalLabel(t)}` : !t ? `${goalLabel(f)} back to the bank` : `${goalLabel(f)} to ${goalLabel(t)}` }
 /* New money goes to this week, or next week if this week is already paid. */
 function creditWeek() { return thisWeek() }
 /* ---------- reading + screen math ---------- */
@@ -718,16 +739,15 @@ const hello = () => { const h = new Date().getHours(); return h < 12 ? 'Good mor
 /* Who's using: each kid is their own paper pig, in their color, with a reason to tap. */
 function whoHTML() {
   const tiles = S.kids.map((k, i) => {
-    const st = stats(k), sw = screenWeek(k), news = unseenMoney(k), g = goalOf(k), pend = pendingClaims(k).length;
-    const pct = g ? Math.min(100, Math.round(100 * st.balance / g.amount)) : 0;
+    const st = stats(k), sw = screenWeek(k), news = unseenMoney(k), pend = pendingClaims(k).length, ready = kidGoals(k).find(goalReady);
     // One extra line, only when it matters right now: a job waiting, or screens open today.
     const extra = pend ? `${I.clock}${pend} job${pend > 1 ? 's' : ''} waiting for a grown-up` : isScreenDay(k) && sw.leftSec ? `${I.screen}${mins(sw.left)} of screens left` : '';
     return `<button class="kidtile" type="button" data-who="${k.id}" style="--kc:${COLORS[k.color]};--i:${i}">
       ${news > 0 ? `<span class="news">+${money(news)} new!</span>` : ''}
       <span class="kt-face">${esc((k.name || '?').slice(0, 1).toUpperCase())}</span>
       <b class="kt-name">${esc(k.name)}</b>
-      <span class="kt-info"><span class="kt-bal">${coinSVG('mini')}${money(st.balance)}</span>
-        ${g ? `<span class="kt-goal"><span class="meter"><i style="width:${pct}%"></i></span><span class="kt-sub">${pct >= 100 ? `Enough for ${esc(g.name)}!` : `${pct}% of the way to ${esc(g.name)}`}</span></span>` : '<span class="kt-sub">in the bank</span>'}
+      <span class="kt-info"><span class="kt-bal">${coinSVG('mini')}${money(st.bank)}</span>
+        <span class="kt-sub">${ready ? `Enough for ${esc(goalLabel(ready))}!` : st.saved > 0 ? `in the bank · ${money(st.saved)} saved` : 'in the bank'}</span>
         ${extra ? `<span class="kt-line">${extra}</span>` : ''}</span></button>`;
   }).join('');
   return `<section class="screen-center whoscreen">${logoAnim()}
@@ -760,30 +780,32 @@ function tabbar(tabs, cur, badges = {}) {
 }
 function creditRow(c) { return `<div class="row"><span class="ico ${c.kind === 'job' ? 'j' : 'm'}">${c.kind === 'job' ? I.check : I.star}</span><span class="t"><b>${esc(c.title)}</b><span>${c.kind === 'job' ? 'Job' : 'Bonus'} · ${short(localDate(ms(c.created_at)))}</span></span><span class="amt up">+${money(Number(c.amount))}</span></div>` }
 function stmtRow(l, kid, parent) {
-  const ico = l.type === 'job' ? `<span class="ico j">${I.check}</span>` : l.type === 'bonus' ? `<span class="ico m">${I.star}</span>` : l.type === 'payout' ? `<span class="ico s">${I.cash}</span>` : l.type === 'purchase' ? `<span class="ico r">${I.bag}</span>` : l.type === 'penalty' ? `<span class="ico x">${I.jar}</span>` : `<span class="ico m">${I.coin}</span>`;
+  const ico = l.type === 'job' ? `<span class="ico j">${I.check}</span>` : l.type === 'bonus' ? `<span class="ico m">${I.star}</span>` : l.type === 'payout' ? `<span class="ico s">${I.cash}</span>` : l.type === 'purchase' ? `<span class="ico r">${I.bag}</span>` : l.type === 'penalty' ? `<span class="ico x">${I.jar}</span>` : l.type === 'move' ? `<span class="ico sv">${I.swap}</span>` : `<span class="ico m">${I.coin}</span>`;
   const tg = parent && l.id ? 'button' : 'div';
-  return `<${tg} ${tg === 'button' ? `type="button" data-edit="${l.type}|${l.id}|${kid.id}"` : ''} class="row">${ico}<span class="t"><b>${esc(l.title)}</b><span>${esc(l.kind)} · ${short(l.date)}${l.type !== 'allow' && l.ts ? ' · ' + clockTime(l.ts) : ''}${tg === 'button' ? ' · tap to edit' : ''}</span></span><span class="stack"><span class="amt ${l.v >= 0 ? 'up' : 'out'}">${l.v >= 0 ? '+' : '\u2212'}${money(Math.abs(l.v))}</span><span class="bal num">${money(l.bal)}</span></span></${tg}>`;
+  return `<${tg} ${tg === 'button' ? `type="button" data-edit="${l.type}|${l.id}|${kid.id}"` : ''} class="row">${ico}<span class="t"><b>${esc(l.title)}</b><span>${esc(l.kind)} · ${short(l.date)}${l.type !== 'allow' && l.ts ? ' · ' + clockTime(l.ts) : ''}${tg === 'button' ? ' · tap to edit' : ''}</span></span><span class="stack">${l.type === 'move' ? `<span class="amt mv">${money(l.mv)}</span>` : `<span class="amt ${l.v >= 0 ? 'up' : 'out'}">${l.v >= 0 ? '+' : '\u2212'}${money(Math.abs(l.v))}</span>`}<span class="bal num">${money(l.bal)}</span></span></${tg}>`;
 }
 /* Kid home: status first. The bank (with a way to earn more), then the two timers, then this week's log. */
+/* Big minute numbers on the reading and screen cards: "45 min", "1 hr 20 min". */
+const bigMin = m => { m = Math.max(0, Math.floor(m)); const h = Math.floor(m / 60), r = m % 60; return h ? `${h} hr${r ? ` ${r} min` : ''}` : `${m} min` };
 function kidHome(kid) {
-  const st = stats(kid), sw = screenWeek(kid), rw = readWeek(kid), g = goalOf(kid), mine = pendingClaims(kid);
+  const st = stats(kid), sw = screenWeek(kid), rw = readWeek(kid), mine = pendingClaims(kid), G = kidGoals(kid);
   const ra = activeRead(kid), sa = sw.active, cap = Number(kid.reading_cap) || 0;
-  const pct = g ? Math.min(100, Math.round(100 * st.balance / g.amount)) : 0;
-  const scrSub = !isScreenDay(kid) ? `Opens ${screenDayNames(kid)}` : sw.leftSec ? `${dur(sw.leftSec)} left` : 'All used this week';
+  const scrSub = !isScreenDay(kid) ? `Opens ${screenDayNames(kid)}` : sw.leftSec ? `of ${mins(Math.round(sw.totalSec / 60))} this week` : 'All used this week';
+  const rdSub = cap ? (rw.bonus >= cap ? 'Bonus maxed! Read for fun' : `${rw.bonus} of ${cap} bonus min`) : 'this week';
   const recent = ledgerItems(kid, thisWeek()).slice(0, 4);
   return `<section class="hero bank">
-      <span class="hero-coin">${coinSVG()}</span><div class="label">In your bank</div><div class="big num" id="bankBig">${money(st.balance)}</div>
-      ${g ? `<button class="goalline" type="button" id="goalBtn"><span>Saving for <b>${esc(g.name)}</b></span><span class="meter" id="goalMeter" data-pct="${pct}"><i style="width:${pct}%"></i></span><span class="num">${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}</span></button>` : ''}
-      <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${g ? '' : '<button class="link-w" type="button" id="goalBtn">Set a saving goal</button>'}</div>
+      <span class="hero-coin">${coinSVG()}</span><div class="label">In your bank</div><div class="big num" id="bankBig">${money(st.bank)}</div>
+      <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${G.length ? `<a class="link-w" href="#savings">🐷 ${money(st.saved)} saved</a>` : `<button class="link-w" type="button" data-newgoal="${kid.id}">Start saving for something</button>`}</div>
       <button class="earn" type="button" data-tab="jobs">${I.jobs}<span>Earn more with jobs</span>${I.chev}</button>
     </section>
     ${mine.length ? `<button class="waitline" type="button" data-tab="ledger">${I.clock}<span><b>${mine.length} job${mine.length > 1 ? 's' : ''}</b> waiting for a grown-up to check</span></button>` : ''}
     ${ra ? `<section class="board rdb" id="readBoard">${readBoardHTML(kid)}</section>` : ''}
     ${sa ? `<section class="board" id="board">${boardHTML(kid)}</section>` : ''}
     ${ra && sa ? '' : `<section class="starts">
-      ${ra ? '' : `<button class="start rd" type="button" id="startRead"><span class="pl">${I.read}</span><b>Start reading</b>${cap ? `<span class="mini-bar"><i style="width:${Math.min(100, 100 * rw.bonus / cap)}%"></i></span>` : ''}<span>${cap ? (rw.bonus >= cap ? 'Bonus maxed! Read for fun' : `${rw.bonus} of ${cap} min`) : `${rw.minutes} min`}</span></button>`}
-      ${sa ? '' : `<button class="start sc ${isScreenDay(kid) && sw.leftSec ? '' : 'off'}" type="button" id="startScr"><span class="pl">${I.screen}</span><b>Start screens</b><span class="mini-bar"><i style="width:${sw.totalSec ? Math.min(100, 100 * sw.leftSec / sw.totalSec) : 0}%"></i></span><span>${scrSub}</span></button>`}
+      ${ra ? '' : `<button class="start rd" type="button" id="startRead"><span class="pl">${I.read}</span><span class="sbig num ${bigMin(rw.minutes).length > 7 ? 'long' : ''}">${bigMin(rw.minutes)} <small>read</small></span>${cap ? `<span class="mini-bar"><i style="width:${Math.min(100, 100 * rw.bonus / cap)}%"></i></span>` : ''}<span class="ssub">${rdSub}</span><b>Start reading ${I.chev}</b></button>`}
+      ${sa ? '' : `<button class="start sc ${isScreenDay(kid) && sw.leftSec ? '' : 'off'}" type="button" id="startScr"><span class="pl">${I.screen}</span><span class="sbig num ${bigMin(sw.left).length > 7 ? 'long' : ''}">${bigMin(sw.left)} <small>left</small></span><span class="mini-bar"><i style="width:${sw.totalSec ? Math.min(100, 100 * sw.leftSec / sw.totalSec) : 0}%"></i></span><span class="ssub">${scrSub}</span><b>Start screens ${I.chev}</b></button>`}
     </section>`}
+    ${savingsHTML(kid)}
     <section class="sect"><div class="sect-h"><h3>This week</h3><button class="link" type="button" data-tab="ledger">See ledger</button></div>
       <div class="list">${recent.length ? recent.map(r => ledgerRowHTML(r, false)).join('') : '<div class="empty">Nothing logged yet this week.</div>'}</div></section>
     <section class="ptools"><button class="pill soft" id="rulesBtn" type="button">How it works</button></section>`;
@@ -820,7 +842,9 @@ function ledgerItems(kid, ws, f = 'all') {
         sub: (wait ? 'Waiting for a grown-up' : c.kind === 'job' ? 'Job' : 'Bonus') + (m ? ` · +${m} screen min` : ''), amt: '+' + money(Number(c.amount)), cls: wait ? 'wait' : 'up', edit: `${c.kind === 'job' ? 'job' : 'bonus'}|${c.id}|${kid.id}` });
     }
     for (const t of S.tx.filter(t => t.kid_id === kid.id && monday(t.local_date) === ws))
-      R.push({ date: t.local_date, ts: ms(t.created_at), ico: `<span class="ico ${t.kind === 'payout' ? 's' : 'r'}">${t.kind === 'payout' ? I.cash : I.bag}</span>`, title: t.note, sub: t.kind === 'payout' ? 'Withdrawal' : 'Spent', amt: '−' + money(Number(t.amount)), cls: 'out', edit: `${t.kind}|${t.id}|${kid.id}` });
+      R.push({ date: t.local_date, ts: ms(t.created_at), ico: `<span class="ico ${t.kind === 'payout' ? 's' : 'r'}">${t.kind === 'payout' ? I.cash : I.bag}</span>`, title: t.note, sub: t.kind === 'payout' ? 'Withdrawal' : 'Spent' + (t.goal_id ? ` · from ${goalLabel(goalById(t.goal_id))}` : ''), amt: '−' + money(Number(t.amount)), cls: 'out', edit: `${t.kind}|${t.id}|${kid.id}` });
+    for (const m of (S.moves || []).filter(m => m.kid_id === kid.id && monday(localDate(ms(m.created_at))) === ws))
+      R.push({ date: localDate(ms(m.created_at)), ts: ms(m.created_at), ico: `<span class="ico sv">${I.swap}</span>`, title: moveTitle(m), sub: 'Savings' + (m.by_role === 'parent' ? ' · by a grown-up' : ''), amt: money(Number(m.amount)), cls: 'mv', edit: '' });
     for (const p of kidPen(kid).filter(p => p.week_start === ws && Number(p.amount) > 0))
       R.push({ date: p.local_date, ts: ms(p.created_at), ico: `<span class="ico x">${I.jar}</span>`, title: p.note, sub: penName(), amt: '−' + money(Number(p.amount)), cls: 'out', edit: `penalty|${p.id}` });
   }
@@ -868,16 +892,112 @@ function claimSheet(kid, job) {
       celebrate(praise(), `${job.title} is waiting for a grown-up to check. ${money(Number(job.price))} is on the way!`, { icon: 'check' }) };
   });
 }
-function goalSheet(kid) {
-  const g = goalOf(kid);
-  openSheet(`<h2>${g ? 'Change your goal' : 'Set a saving goal'}</h2><p class="hint">What are you saving for? Money you leave in your bank counts toward it.</p>
-    <div class="field"><label class="label" for="gName">I'm saving for</label><input id="gName" maxlength="60" placeholder="Something you want" value="${esc(g?.name || '')}"></div>
-    <div class="field"><label class="label" for="gAmt">It costs ($)</label><input id="gAmt" type="number" inputmode="decimal" min="1" step="0.01" placeholder="0.00" value="${g ? g.amount : ''}"></div>
-    <button class="save" id="gGo" type="button">Save goal</button>${g ? '<button class="cancel danger-link" id="gClear" type="button">Remove goal</button>' : ''}<button class="cancel" data-close type="button">Cancel</button>`, () => {
-    $('gGo').onclick = async () => { const name = capFirst($('gName').value), amt = r2(parseFloat($('gAmt').value) || 0); if (!name) return toast('What are you saving for?'); if (amt <= 0) return toast('How much does it cost?'); closeSheet();
-      unlockAudio(); await act(() => q(sb.from('kids').update({ goal_name: name, goal_amount: amt }).eq('id', kid.id)));
-      const bal = stats(kid).balance; celebrate(bal >= amt ? 'You already have enough!' : 'Goal set!', bal >= amt ? `Ask a grown-up to buy ${name}.` : `Saving for ${name}. ${money(amt - bal)} to go!`, { power: .8 }) };
-    if ($('gClear')) $('gClear').onclick = async () => { closeSheet(); await act(() => q(sb.from('kids').update({ goal_name: null, goal_amount: null }).eq('id', kid.id)), 'Goal removed') };
+/* The savings goals list: on the kid's home screen, and in a sheet for parents. */
+function savingsHTML(kid) {
+  const G = kidGoals(kid), st = stats(kid);
+  const card = g => { const b = goalBal(g), t = Number(g.target) || 0, pct = t ? Math.min(100, Math.round(100 * b / t)) : 0, ready = goalReady(g);
+    return `<button class="goal${ready ? ' ready' : ''}" type="button" data-goal="${g.id}"><span class="g-emo">${esc(g.emoji || '🐷')}</span>
+      <span class="g-main"><b>${esc(g.name)}</b>${t ? `<span class="meter gmeter" data-gid="${g.id}" data-pct="${pct}"><i style="width:${pct}%"></i></span>` : ''}
+      <span class="g-sub">${ready ? 'Ready to buy! 🎉' : t ? `${money(b)} of ${money(t)} · ${money(t - b)} to go` : 'Saving, no price set'}</span></span>
+      <span class="g-amt num">${money(b)}<small>saved</small></span></button>` };
+  return `<section class="sect savings" id="savings"><div class="sect-h"><h3>Savings goals</h3>${G.length && G.length < MAX_GOALS ? `<button class="link" type="button" data-newgoal="${kid.id}">+ New goal</button>` : ''}</div>
+    ${G.length ? `<div class="list goals">${G.map(card).join('')}</div>
+      <button class="pill soft movebtn" type="button" data-move="${kid.id}">${I.swap}Move money</button>`
+      : `<button class="goal-empty" type="button" data-newgoal="${kid.id}"><span class="g-emo">🐷</span><span class="g-main"><b>Save up for something</b><span class="g-sub">Put money aside for a goal. It's still yours, just saved for later.</span></span>${I.chev}</button>`}
+  </section>`;
+}
+function savingsSheet(kid) {
+  openSheet(`<span class="label">${esc(kid.name)} · ${money(stats(kid).bank)} in the bank</span><h2>${esc(kid.name)}’s savings</h2>${savingsHTML(kid)}
+    ${savLocked() ? '<p class="hint">Savings are locked: kids can add money and move it between goals; only you can move it back to the bank. Change this in Settings.</p>' : ''}
+    <button class="cancel" data-close type="button">Close</button>`, () => bindSavings(layer));
+}
+function bindSavings(root) {
+  root.querySelectorAll('[data-goal]').forEach(b => b.onclick = () => goalSheet(goalById(b.dataset.goal)));
+  root.querySelectorAll('[data-newgoal]').forEach(b => b.onclick = () => goalEditSheet(kidById(b.dataset.newgoal)));
+  root.querySelectorAll('[data-move]').forEach(b => b.onclick = () => moveSheet(kidById(b.dataset.move)));
+}
+function goalSheet(g) {
+  if (!g) return; const kid = kidById(g.kid_id), b = goalBal(g), t = Number(g.target) || 0, pct = t ? Math.min(100, Math.round(100 * b / t)) : 0;
+  const parent = S.view === 'parent', locked = savLocked() && !parent, others = kidGoals(kid).filter(x => x.id !== g.id);
+  openSheet(`<div class="gs-head"><span class="g-emo big">${esc(g.emoji || '🐷')}</span><span><span class="label">Savings goal${parent ? ` · ${esc(kid.name)}` : ''}</span><h2>${esc(g.name)}</h2></span></div>
+    <div class="gs-amt"><b class="num">${money(b)}</b><span>${t ? `saved of ${money(t)}` : 'saved'}</span></div>
+    ${t ? `<span class="meter gs-meter"><i style="width:${pct}%"></i></span><p class="hint">${goalReady(g) ? (parent ? 'Ready to buy! When you buy it, tap <b>Bought it</b> and the money comes out of this goal.' : '<b>Ready to buy! 🎉</b> Tell a grown-up.') : `<b>${money(t - b)}</b> to go.`}</p>` : ''}
+    <div class="row2"><button class="pill" type="button" id="gIn">Add money</button><button class="pill soft" type="button" id="gOut" ${b > 0 ? '' : 'disabled'}>Move out</button></div>
+    ${parent && b > 0 ? `<button class="pill ok" type="button" id="gBought">${I.bag}Bought it</button>` : ''}
+    <button class="pill soft" type="button" id="gEdit" style="justify-self:start">Edit goal</button>
+    <button class="cancel danger-link" type="button" id="gDel">Delete goal</button><button class="cancel" data-close type="button">Close</button>`, () => {
+    $('gIn').onclick = () => moveSheet(kid, { to: g.id });
+    $('gOut').onclick = () => { if (locked && !others.length) return toast('Savings are locked. A grown-up can move this back to the bank.'); moveSheet(kid, { from: g.id }) };
+    if ($('gBought')) $('gBought').onclick = () => txSheet(kid, 'purchase', { goal: g.id, amount: t ? Math.min(b, t) : b, note: g.name });
+    $('gEdit').onclick = () => goalEditSheet(kid, g);
+    $('gDel').onclick = () => {
+      if (b > 0 && locked) return toast('Savings are locked. Ask a grown-up to delete a goal that has money in it.');
+      confirmSheet(`Delete ${g.name}?`, b > 0 ? `The ${money(b)} saved in it goes back to ${parent ? kid.name + '’s' : 'your'} bank.` : 'It has no money in it.', 'Delete goal', async () => {
+        if (b > 0) await q(sb.from('savings_moves').insert({ family_id: S.family.id, kid_id: kid.id, from_goal: g.id, to_goal: null, amount: b, by_role: parent ? 'parent' : 'kid' }));
+        await q(sb.from('savings_goals').update({ archived: true }).eq('id', g.id));
+      }, 'Goal deleted');
+    };
+  });
+}
+/* Move money between the bank and goals, or from one goal to another. */
+function moveSheet(kid, pre = {}) {
+  const G = kidGoals(kid), parent = S.view === 'parent', locked = savLocked() && !parent;
+  if (!G.length) return goalEditSheet(kid);
+  const acct = [{ id: '', name: 'Bank', emoji: '🏦', bal: stats(kid).bank }, ...G.map(g => ({ id: g.id, name: g.name, emoji: g.emoji || '🐷', bal: goalBal(g) }))];
+  const st = { from: pre.from ?? '', to: pre.to ?? null, amt: pre.amt ? String(pre.amt) : '' };
+  // Locked savings: from a goal, a kid can only move to another goal.
+  const canTo = a => a.id !== st.from && !(locked && st.from !== '' && a.id === '');
+  const draw = () => {
+    if (st.to === null || !canTo(acct.find(a => a.id === st.to) || { id: st.from })) st.to = acct.find(canTo)?.id ?? null;
+    const src = acct.find(a => a.id === st.from) || acct[0];
+    openSheet(`<h2>Move money</h2>
+      <div class="field"><span class="label">From</span><div class="chips acct">${acct.map(a => `<button class="chip" type="button" data-mfrom="${a.id}" aria-pressed="${a.id === st.from}">${esc(a.emoji)} ${esc(a.name)} <small>${money(a.bal)}</small></button>`).join('')}</div></div>
+      <div class="field"><span class="label">To</span><div class="chips acct">${acct.filter(a => a.id !== st.from).map(a => `<button class="chip" type="button" data-mto="${a.id}" aria-pressed="${a.id === st.to}" ${canTo(a) ? '' : 'disabled'}>${esc(a.emoji)} ${esc(a.name)}</button>`).join('')}</div>
+        ${locked && st.from !== '' ? '<p class="hint">Savings are locked, so only a grown-up can move money back to the bank.</p>' : ''}</div>
+      <div class="field"><label class="label" for="mvAmt">How much?</label><div class="moneyin"><span>$</span><input id="mvAmt" class="inbig" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" value="${esc(st.amt)}"></div>
+        ${src.bal > 0 ? `<div class="chips">${[1, 5, 10].filter(v => v < src.bal).map(v => `<button class="chip" type="button" data-mva="${v}">$${v}</button>`).join('')}<button class="chip" type="button" data-mva="${src.bal}">All · ${money(src.bal)}</button></div>` : `<p class="hint">${src.id ? 'This goal is empty.' : 'The bank is empty right now.'}</p>`}</div>
+      <button class="save" id="mvGo" type="button" ${src.bal > 0 && st.to !== null ? '' : 'disabled'}>Move it</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+      const amt = $('mvAmt'); amt.oninput = () => { st.amt = amt.value };
+      layer.querySelectorAll('[data-mfrom]').forEach(b => b.onclick = () => { st.from = b.dataset.mfrom; if (st.to === st.from) st.to = null; draw() });
+      layer.querySelectorAll('[data-mto]').forEach(b => b.onclick = () => { st.to = b.dataset.mto; draw() });
+      layer.querySelectorAll('[data-mva]').forEach(b => b.onclick = () => { st.amt = Number(b.dataset.mva).toFixed(2); amt.value = st.amt });
+      $('mvGo').onclick = async () => {
+        const a = r2(parseFloat(amt.value) || 0), from = acct.find(x => x.id === st.from), to = acct.find(x => x.id === st.to);
+        if (a <= 0) return toast('Enter an amount.'); if (!to) return toast('Pick where it goes.');
+        if (a > from.bal + 0.001) return toast(`${from.id ? from.name : 'The bank'} only has ${money(from.bal)}.`);
+        closeSheet(); unlockAudio();
+        await act(() => q(sb.from('savings_moves').insert({ family_id: S.family.id, kid_id: kid.id, from_goal: from.id || null, to_goal: to.id || null, amount: a, by_role: parent ? 'parent' : 'kid' })));
+        const g = goalById(to.id);
+        if (!g) return toast(`Moved ${money(a)} back to the bank`);
+        const left = Number(g.target) ? r2(Number(g.target) - goalBal(g)) : 0;
+        if (parent) return toast(`Moved ${money(a)} to ${goalLabel(g)}`);
+        celebrate(goalReady(g) ? 'You reached your goal!' : 'Saved!', goalReady(g) ? `${goalLabel(g)} is ready. Tell a grown-up!` : `${money(a)} is saved for ${goalLabel(g)}.${left > 0 ? ` ${money(left)} to go!` : ''}`, { power: goalReady(g) ? 1.4 : .9, icon: 'coin' });
+      };
+    });
+  };
+  draw();
+}
+function goalEditSheet(kid, g) {
+  const G = kidGoals(kid); if (!g && G.length >= MAX_GOALS) return toast(`That's the most goals (${MAX_GOALS}). Finish or delete one first.`);
+  const E = { emoji: g?.emoji || GOAL_EMOJI[G.length % GOAL_EMOJI.length] }, i = g ? G.findIndex(x => x.id === g.id) : -1;
+  openSheet(`<h2>${g ? 'Edit goal' : 'New savings goal'}</h2>
+    <div class="field"><label class="label" for="gN">What are you saving for?</label><input id="gN" maxlength="40" autocapitalize="sentences" value="${esc(g?.name || '')}" placeholder="A new video game"></div>
+    <div class="field"><span class="label">Pick an emoji</span><div class="chips emojis">${GOAL_EMOJI.map(e => `<button class="chip emo" type="button" data-emo="${e}" aria-pressed="${e === E.emoji}" aria-label="${e}">${e}</button>`).join('')}</div></div>
+    <div class="field"><label class="label" for="gT">How much does it cost? <span class="opt">(optional)</span></label><div class="moneyin"><span>$</span><input id="gT" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Leave blank to just save" value="${g?.target ? Number(g.target) : ''}"></div></div>
+    ${g && G.length > 1 ? `<div class="ptools"><button class="pill soft" type="button" id="gUp" ${i === 0 ? 'disabled' : ''}>Move up</button><button class="pill soft" type="button" id="gDown" ${i === G.length - 1 ? 'disabled' : ''}>Move down</button></div>` : ''}
+    <button class="save" id="gSave" type="button">${g ? 'Save' : 'Start saving'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+    layer.querySelectorAll('[data-emo]').forEach(b => b.onclick = () => { E.emoji = b.dataset.emo; layer.querySelectorAll('[data-emo]').forEach(x => x.setAttribute('aria-pressed', x === b)) });
+    const swap = d => act(async () => { const order = G.map(x => x.id), j = i + d;[order[i], order[j]] = [order[j], order[i]]; await Promise.all(order.map((id, k) => q(sb.from('savings_goals').update({ sort: k }).eq('id', id)))) }).then(() => goalEditSheet(kid, goalById(g.id)));
+    if ($('gUp')) $('gUp').onclick = () => swap(-1); if ($('gDown')) $('gDown').onclick = () => swap(1);
+    $('gSave').onclick = async () => {
+      const name = capFirst($('gN').value), tv = parseFloat($('gT').value), target = tv > 0 ? Math.min(100000, r2(tv)) : null;
+      if (!name) { toast('What are you saving for?'); return $('gN').focus() }
+      closeSheet();
+      if (g) return act(() => q(sb.from('savings_goals').update({ name, emoji: E.emoji, target }).eq('id', g.id)), 'Saved');
+      let row; try { row = await q(sb.from('savings_goals').insert({ family_id: S.family.id, kid_id: kid.id, name, emoji: E.emoji, target, sort: G.length ? Math.max(...G.map(x => x.sort || 0)) + 1 : 0 }).select().single()) } catch (e) { console.error(e); return toast(errMsg(e)) }
+      await refresh();
+      if (stats(kid).bank > 0) moveSheet(kid, { to: row.id }); else toast(`${goalLabel(row)} is set. Earn some money to start saving!`);
+    };
   });
 }
 function txListSheet(kid, kind) {
@@ -952,9 +1072,10 @@ function pKids() {
       <span class="decide"><button class="pill soft" type="button" data-notyet="${c.id}">Not yet</button><button class="pill ok" type="button" data-approve="${c.id}">OK +${money(Number(c.amount))}${Number(c.minutes) ? ` +${c.minutes}m` : ''}</button></span></div>` }).join('')}</div></section>` : '';
   for (const k of S.kids) { const o = owedInfo(k); if (o.nudge) h += `<div class="nudge"><span><b>${esc(k.name)} has ${money(o.balance)} banked</b> · ${o.last ? `last withdrawal ${ago(o.days)}` : `no withdrawals yet, ${o.weeks.length} week${o.weeks.length === 1 ? '' : 's'} of savings`}</span><button class="pill" type="button" data-payall="${k.id}">Withdraw ${money(o.balance)}</button></div>` }
   return h + S.kids.map(k => {
-    const st = stats(k), sw = screenWeek(k), rw = readWeek(k), o = owedInfo(k), g = goalOf(k);
-    return `<article class="kcard" style="--kc:${COLORS[k.color]}"><div class="kh">${avatar(k)}<h3>${esc(k.name)}</h3><span class="wk num" style="color:color-mix(in srgb, ${COLORS[k.color]} 78%, var(--ink))">${money(st.balance)}<small>Banked</small></span></div>
-      <div class="owedline">${o.saving ? `Saving for ${esc(g.name)} · ${money(Math.min(st.balance, g.amount))} of ${money(g.amount)}` : o.last ? `Last withdrawal ${short(o.last)} (${ago(o.days)})` : 'No withdrawals yet'}</div>
+    const st = stats(k), sw = screenWeek(k), rw = readWeek(k), o = owedInfo(k), G = kidGoals(k), ready = G.filter(goalReady);
+    return `<article class="kcard" style="--kc:${COLORS[k.color]}"><div class="kh">${avatar(k)}<h3>${esc(k.name)}</h3><span class="wk num" style="color:color-mix(in srgb, ${COLORS[k.color]} 78%, var(--ink))">${money(st.bank)}<small>In the bank</small></span></div>
+      <div class="owedline">${o.last ? `Last withdrawal ${short(o.last)} (${ago(o.days)})` : 'No withdrawals yet'}</div>
+      <button class="saveline" type="button" data-savings="${k.id}"><span>🐷 ${G.length ? `<b>${money(st.saved)}</b> saved in ${G.length} goal${G.length > 1 ? 's' : ''}${ready.length ? ` · <span class="rdy">${ready.length > 1 ? `${ready.length} ready to buy` : `${esc(goalLabel(ready[0]))} is ready to buy`}</span>` : ''}` : 'No savings goals yet'}</span>${I.chev}</button>
       <div class="kstats"><div><b class="num">${money(st.week)}</b><span>This week</span></div><div><b class="num">${money(st.month)}</b><span>Month</span></div><div><b class="num">${money(st.lifetime)}</b><span>Lifetime</span></div></div>
       <div class="kstats"><div><b class="num">${hms(sw.leftSec)}</b><span>Screen left</span></div><div><b class="num" style="color:var(--read)">+${rw.bonus}</b><span>Reading bonus</span></div><div><b class="num">${hms(rw.sec)}</b><span>Read</span></div></div>
       <div class="kact"><button class="pill" type="button" data-logjob="${k.id}">Log a job</button><button class="pill ok" type="button" data-bonus="${k.id}">Add bonus</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button>${penOn() ? `<button class="pill soft jarpill" type="button" data-pen="${k.id}">${I.jar}${esc(penName())}</button>` : ''}<button class="pill soft" type="button" data-more="${k.id}">More</button></div></article>`;
@@ -1074,11 +1195,12 @@ function pPay() {
     <div class="seg">${[['all', 'All'], ['money', 'Money'], ['screen', 'Screens'], ['reading', 'Reading']].map(([v, l]) => `<button type="button" data-lview="${v}" aria-pressed="${view === v}">${l}</button>`).join('')}</div>`;
   if (view === 'all') {
     const st = stats(k);
-    h += `${weekNav(ws, 'lweek')}<button class="owedline-b" type="button" data-lview="money"><span>${esc(k.name)}’s bank <b class="num">${money(st.balance)}</b></span><span class="see">Withdraw or log a purchase ${I.chev}</span></button>${weekSummary(k, ws)}${ledgerListHTML(k, ws, 'all', true)}`;
+    h += `${weekNav(ws, 'lweek')}<button class="owedline-b" type="button" data-lview="money"><span>${esc(k.name)}’s bank <b class="num">${money(st.bank)}</b>${st.saved ? ` <small class="sv">+ ${money(st.saved)} saved</small>` : ''}</span><span class="see">Withdraw or log a purchase ${I.chev}</span></button>${weekSummary(k, ws)}${ledgerListHTML(k, ws, 'all', true)}`;
   } else if (view === 'money') {
-    const st = stats(k), L = statement(k), o = owedInfo(k), g = goalOf(k);
-    h += `<div class="card bankcard"><span class="label">In ${esc(k.name)}’s bank</span><b class="bankbig num">${money(st.balance)}</b>
-        <p class="hint owedhint">${o.last ? `Last withdrawal <b>${short(o.last)}</b>, ${ago(o.days)}.` : 'No withdrawals yet.'}${g ? ` Saving for <b>${esc(g.name)}</b> (${money(g.amount)}).` : ''}</p>
+    const st = stats(k), L = statement(k), o = owedInfo(k), G = kidGoals(k);
+    h += `<div class="card bankcard"><span class="label">In ${esc(k.name)}’s bank</span><b class="bankbig num">${money(st.bank)}</b>
+        <p class="hint owedhint">${o.last ? `Last withdrawal <b>${short(o.last)}</b>, ${ago(o.days)}.` : 'No withdrawals yet.'}</p>
+        <button class="saveline" type="button" data-savings="${k.id}"><span>🐷 ${G.length ? `<b>${money(st.saved)}</b> saved in ${G.length} goal${G.length > 1 ? 's' : ''}` : 'No savings goals yet'}</span>${I.chev}</button>
         ${o.weeks.length ? `<div class="weeksince">${o.weeks.map(w => `<span><small>Week of ${md(w.ws)}</small><b class="num">${money(w.amt)}</b></span>`).join('')}</div>` : ''}
         <div class="kstats flat"><div><b class="num">${money(st.lifetime)}</b><span>Earned</span></div><div><b class="num">${money(st.paid)}</b><span>Withdrawn</span></div><div><b class="num">${money(st.spent)}</b><span>Spent</span></div>${st.pen ? `<div><b class="num" style="color:var(--danger)">${money(st.pen)}</b><span>${esc(penName())}</span></div>` : ''}</div>
         <div class="row2"><button class="pill" type="button" data-payout="${k.id}">Withdraw cash</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button></div>
@@ -1136,7 +1258,7 @@ function entrySheet(kind, kid, row, ws0) {
         const at = kind === 'allow' ? '' : zonedISO(d, vals.time), endAt = at && new Date(ms(at) + s2 * 1000).toISOString();
         if (at && ms(at) > Date.now() + 60000) return toast('That time hasn\u2019t happened yet.');
         if (kind === 'credit') { if (!title) return toast('Add an explanation.'); if (amt <= 0) return toast('Enter an amount.'); tbl = 'credits'; body = { title, amount: amt, minutes: Math.min(600, Math.max(0, parseInt(vals.jobMin) || 0)), created_at: at, week_start: w } }
-        else if (kind === 'tx') { if (!title) return toast('Add an explanation.'); if (amt <= 0) return toast('Enter an amount.'); if (amt > stats(kid).balance + Number(row.amount) + 0.001) return toast(`That's more than ${kid.name} has.`); tbl = 'transactions'; body = { note: title, amount: amt, local_date: d, created_at: at } }
+        else if (kind === 'tx') { if (!title) return toast('Add an explanation.'); if (amt <= 0) return toast('Enter an amount.'); if (amt > (row.goal_id && goalById(row.goal_id) ? goalBal(goalById(row.goal_id)) : stats(kid).bank) + Number(row.amount) + 0.001) return toast(`That's more than ${kid.name} has.`); tbl = 'transactions'; body = { note: title, amount: amt, local_date: d, created_at: at } }
         else if (kind === 'allow') { if (amt < 0) return toast('Enter an amount.'); tbl = 'weeks'; body = { allowance: amt } }
         else if (kind === 'sbonus') { const m = Math.min(600, parseInt(vals.mins) || 0); if (m < 1) return toast('Enter minutes.'); if (!title) return toast('Add an explanation.'); tbl = 'screen_bonus'; body = { minutes: m, note: title, week_start: w, created_at: at } }
         else if (kind === 'read') { if (!title) return toast('Type the book\u2019s title.'); if (!s2) return toast('Enter the time.'); tbl = 'reading_sessions'; body = { book: title, seconds: s2, local_date: d, week_start: w, started_at: at, ended_at: endAt, ...(row ? {} : { source: 'manual' }) } }
@@ -1171,6 +1293,8 @@ function pSettings() {
       <div class="field"><span class="tiplabel"><label class="label" for="sr-${k.id}">Reading bonus limit</label><button class="tip" type="button" aria-label="What is the reading bonus limit?" aria-expanded="false">?</button></span><span class="tipbox" hidden>The most extra screen minutes reading can earn in one week. Every minute read adds a screen minute, up to this number.</span><input id="sr-${k.id}" type="number" inputmode="numeric" min="0" step="5" value="${k.reading_cap}"></div></div>
       <div class="field"><span class="label">Screen days</span><div class="chips daychips">${[1, 2, 3, 4, 5, 6, 0].map(d => `<button class="chip" type="button" data-sday="${k.id}|${d}" aria-pressed="${(k.screen_days || []).includes(d)}">${DOW[d]}</button>`).join('')}</div></div>
       <button class="pill" type="button" data-savescr="${k.id}" style="justify-self:start">Save ${esc(k.name)}'s screen time</button></div>`).join('')}</section>` : ''}
+    <section class="card"><div class="togline"><span><span class="label">Savings goals</span><b>Lock savings</b></span><button class="tog" id="savLock" type="button" aria-pressed="${!!F.savings_locked}" aria-label="Lock savings"></button></div>
+      <p class="hint">${F.savings_locked ? 'On: kids can put money into goals and move it between goals, but only a parent or guardian can move it back to the bank.' : 'Off: kids can move their savings back to the bank whenever they want. Turn this on if you want saved money to stay saved.'}</p></section>
     <section class="card jarset"><div class="togline"><span><span class="label">${esc(F.penalty_name || 'Oops Jar')} (optional)</span><b>Take away a little money or screen time</b></span><button class="tog" id="penTog" type="button" aria-pressed="${!!F.penalty_enabled}" aria-label="Use a jar for small take-aways"></button></div>
       <p class="hint">Off by default. When it's on, each kid card gets a jar button. Keep it small: 10¢ to 25¢, or 1 to 5 screen minutes. Every entry needs a reason and shows in the ledger.</p>
       <div id="penMore" ${F.penalty_enabled ? '' : 'hidden'}><div class="field"><label class="label" for="penNm">What your family calls it</label><input id="penNm" maxlength="30" autocapitalize="words" value="${esc(F.penalty_name || 'Oops Jar')}">
@@ -1238,12 +1362,14 @@ function bindAll() {
   each('[data-claim]', el => claimSheet(kidById(S.profile), S.jobs.find(j => j.id === el.dataset.claim)));
   each('[data-approve]', el => act(() => q(sb.from('credits').update({ status: 'approved' }).eq('id', el.dataset.approve)), 'Approved'));
   each('[data-notyet]', el => act(() => q(sb.from('credits').delete().eq('id', el.dataset.notyet)), 'Sent back to the board'));
-  each('[data-payall]', el => { const k = kidById(el.dataset.payall); txSheet(k, 'payout', { amount: stats(k).balance, note: 'Cash withdrawal' }) });
+  each('[data-payall]', el => { const k = kidById(el.dataset.payall); txSheet(k, 'payout', { amount: stats(k).bank, note: 'Cash withdrawal' }) });
   each('[data-txlist]', el => txListSheet(kidById(S.profile), el.dataset.txlist));
-  on('goalBtn', () => goalSheet(kidById(S.profile)));
+  bindSavings(app);
   each('[data-bonus]', el => bonusSheet(kidById(el.dataset.bonus)));
   each('[data-more]', el => kidMoreSheet(kidById(el.dataset.more)));
   each('[data-pen]', el => { const [id, m] = el.dataset.pen.split('|'); const k = kidById(id); penaltySheet(k); if (m === 'minutes') layer.querySelector('[data-pm="minutes"]')?.click() });
+  on('savLock', () => { const v = $('savLock').getAttribute('aria-pressed') !== 'true'; $('savLock').setAttribute('aria-pressed', v);
+    act(() => q(sb.from('families').update({ savings_locked: v }).eq('id', S.family.id)), v ? 'Savings locked' : 'Savings unlocked') });
   on('penTog', () => { const b = $('penTog'), v = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', v); $('penMore').hidden = !v });
   each('[data-pnm]', el => { $('penNm').value = el.dataset.pnm });
   on('penSave', () => { const v = $('penTog').getAttribute('aria-pressed') === 'true', nm = titleCase($('penNm').value.trim()) || 'Oops Jar';
@@ -1251,7 +1377,8 @@ function bindAll() {
   on('addKidBtn', () => kidSheet());
   each('[data-editkid]', el => kidSheet(kidById(el.dataset.editkid)));
   each('[data-payout]', el => txSheet(kidById(el.dataset.payout), 'payout'));
-  each('[data-purchase]', el => { const k = kidById(el.dataset.purchase), g = goalOf(k); txSheet(k, 'purchase', g && stats(k).balance >= g.amount ? { amount: g.amount, note: g.name } : {}) });
+  each('[data-purchase]', el => txSheet(kidById(el.dataset.purchase), 'purchase'));
+  each('[data-savings]', el => savingsSheet(kidById(el.dataset.savings)));
   each('[data-allstmt]', el => statementSheet(kidById(el.dataset.allstmt)));
   bindUndo(app);
   each('[data-lk]', el => { S.lk = el.dataset.lk; render() });
@@ -1387,28 +1514,36 @@ async function stopRead(kid) {
   celebrate(`You read ${dur(sec)}!`, readCheer(kid, before, after), { power: earned > 0 ? 1.3 : .8, icon: 'read' });
 }
 function txSheet(kid, kind, pre = {}) {
-  const st = stats(kid), pay = kind === 'payout';
-  openSheet(`<span class="label">${esc(kid.name)} has ${money(st.balance)} banked</span><h2>${pay ? `Withdraw cash for ${esc(kid.name)}` : `You bought something for ${esc(kid.name)}`}</h2>
-    <p class="hint">${pay ? 'Cash, a transfer, or anything you handed over. It comes out of their bank.' : 'Something you paid for with their money. It comes out of their balance.'}</p>
-    ${pay && st.balance > 0 ? `<div class="chips"><button class="chip" type="button" data-amt="${st.balance}">All of it · ${money(st.balance)}</button>${[5, 10, 20].filter(a => a < st.balance).map(a => `<button class="chip" type="button" data-amt="${a}">$${a}</button>`).join('')}</div>` : ''}
-    <div class="field"><label class="label" for="tAmt">Amount ($)</label><input id="tAmt" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" value="${pre.amount ? Number(pre.amount).toFixed(2) : ''}"></div>
-    <div class="field"><label class="label" for="tWhy">Explanation ${esc(kid.name)} will see</label><input id="tWhy" maxlength="120" placeholder="${pay ? 'Cash' : 'What you bought'}" value="${esc(pre.note || '')}"></div>
-    <div class="field"><label class="label" for="tDate">Date</label><input id="tDate" type="date" value="${today()}" max="${today()}"></div>
+  const st = stats(kid), pay = kind === 'payout', G = pay ? [] : kidGoals(kid).filter(g => goalBal(g) > 0);
+  const T = { goal: pre.goal && G.some(g => g.id === pre.goal) ? pre.goal : '', amt: pre.amount ? Number(pre.amount).toFixed(2) : '', note: pre.note || '', date: today() };
+  const srcBal = () => T.goal ? goalBal(goalById(T.goal)) : stats(kid).bank;
+  const draw = () => openSheet(`<span class="label">${esc(kid.name)} has ${money(st.bank)} in the bank${st.saved ? ` + ${money(st.saved)} saved` : ''}</span><h2>${pay ? `Withdraw cash for ${esc(kid.name)}` : `You bought something for ${esc(kid.name)}`}</h2>
+    <p class="hint">${pay ? 'Cash, a transfer, or anything you handed over. It comes out of their bank. Money saved in goals stays put.' : 'Something you paid for with their money.'}</p>
+    ${!pay && G.length ? `<div class="field"><span class="label">Paid from</span><div class="chips acct"><button class="chip" type="button" data-src="" aria-pressed="${!T.goal}">🏦 Bank <small>${money(st.bank)}</small></button>${G.map(g => `<button class="chip" type="button" data-src="${g.id}" aria-pressed="${T.goal === g.id}">${esc(g.emoji || '🐷')} ${esc(g.name)} <small>${money(goalBal(g))}</small></button>`).join('')}</div></div>` : ''}
+    ${srcBal() > 0 ? `<div class="chips"><button class="chip" type="button" data-amt="${srcBal()}">All of it · ${money(srcBal())}</button>${pay ? [5, 10, 20].filter(a => a < srcBal()).map(a => `<button class="chip" type="button" data-amt="${a}">$${a}</button>`).join('') : ''}</div>` : ''}
+    <div class="field"><label class="label" for="tAmt">Amount ($)</label><input id="tAmt" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" value="${esc(T.amt)}"></div>
+    <div class="field"><label class="label" for="tWhy">Explanation ${esc(kid.name)} will see</label><input id="tWhy" maxlength="120" placeholder="${pay ? 'Cash' : 'What you bought'}" value="${esc(T.note)}"></div>
+    <div class="field"><label class="label" for="tDate">Date</label><input id="tDate" type="date" value="${T.date}" max="${today()}"></div>
     <button class="save" id="tGo" type="button">${pay ? 'Record withdrawal' : 'Record purchase'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
+    const keep = () => { T.amt = $('tAmt').value; T.note = $('tWhy').value; T.date = $('tDate').value };
+    layer.querySelectorAll('[data-src]').forEach(b => b.onclick = () => { keep(); T.goal = b.dataset.src; const g = goalById(T.goal); if (g && !T.note) T.note = g.name; draw() });
     layer.querySelectorAll('[data-amt]').forEach(b => b.onclick = () => { $('tAmt').value = Number(b.dataset.amt).toFixed(2) });
     $('tGo').onclick = async () => {
-      const a = r2(parseFloat($('tAmt').value) || 0), why = $('tWhy').value.trim(), d = $('tDate').value || today();
+      const a = r2(parseFloat($('tAmt').value) || 0), why = $('tWhy').value.trim(), d = $('tDate').value || today(), g = goalById(T.goal);
       if (a <= 0) return toast('Enter an amount.');
       if (!why) return toast('Add an explanation so ' + kid.name + ' knows what this was.');
-      if (a > stats(kid).balance + 0.001) return toast(`That's more than ${kid.name} has (${money(stats(kid).balance)}).`);
+      if (a > srcBal() + 0.001) return toast(g ? `${g.name} only has ${money(srcBal())} saved.` : `That's more than ${kid.name} has in the bank (${money(stats(kid).bank)}).${stats(kid).saved ? ' Saved money stays in its goals.' : ''}`);
       closeSheet();
-      await act(() => q(sb.from('transactions').insert({ family_id: S.family.id, kid_id: kid.id, kind, amount: a, note: why, local_date: d })), pay ? `${money(a)} withdrawn` : `${money(a)} purchase recorded`);
+      await act(() => q(sb.from('transactions').insert({ family_id: S.family.id, kid_id: kid.id, kind, amount: a, note: why, local_date: d, ...(g ? { goal_id: g.id } : {}) })), pay ? `${money(a)} withdrawn` : `${money(a)} purchase recorded`);
+      // A goal that's been bought and emptied is done.
+      if (g && Number(g.target) > 0 && goalBal(g) <= 0.004) { await act(() => q(sb.from('savings_goals').update({ archived: true }).eq('id', g.id))); toast(`Bought! ${goalLabel(g)} is done.`) }
     };
   });
+  draw();
 }
 function statementSheet(kid) {
   const parent = S.view === 'parent';
-  openSheet(`<span class="label">${esc(kid.name)} · ${money(stats(kid).balance)}</span><h2>Bank statement</h2><div class="list">${statement(kid).map(l => stmtRow(l, kid, parent)).join('')}</div><button class="cancel" data-close type="button">Close</button>`, () => { bindUndo(layer); layer.querySelectorAll('[data-edit]').forEach(b => { const f = b.onclick; b.onclick = () => { closeSheet(); f() } }) });
+  openSheet(`<span class="label">${esc(kid.name)} · ${money(stats(kid).bank)} in the bank${stats(kid).saved ? ` + ${money(stats(kid).saved)} saved` : ''}</span><h2>Money statement</h2><p class="hint">The right column is all of ${esc(kid.name)}’s money, bank and savings together.</p><div class="list">${statement(kid).map(l => stmtRow(l, kid, parent)).join('')}</div><button class="cancel" data-close type="button">Close</button>`, () => { bindUndo(layer); layer.querySelectorAll('[data-edit]').forEach(b => { const f = b.onclick; b.onclick = () => { closeSheet(); f() } }) });
 }
 function bindUndo(root) { root.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEdit(b.dataset.edit)) }
 /* ticking: updates the display; it only writes to stop a timer that has run out */
@@ -1510,6 +1645,7 @@ function rulesSheet(kid) {
     allow && ['coin', 'm', `<b>${money(allow)} every Monday.</b> It's yours, no matter what.`],
     jobs && ['jobs', 'j', `<b>Jobs earn more.</b> Do one, tap I did it, and a grown-up checks.`],
     ['pay', 'p', `<b>Your money stays in your bank</b> until you spend it or take it out.`],
+    ['heart', 'j', `<b>Save up for things.</b> Move money into a goal and it's kept for that goal.${savLocked() ? ' A grown-up moves it back out.' : ''}`],
     penOn() ? ['jar', 'x', `<b>The ${esc(penName())}</b> can take a little, always with a reason.`] : ['star', 'm', `<b>Money is never taken away.</b>`],
     days && base && ['screen', 's', `<b>${mins(base)} of screens a week,</b> on ${screenDayNames(kid)}.`],
     days && cap && ['read', 'r', `<b>Every minute you read</b> earns a screen minute, up to ${mins(cap)} a week.`],
@@ -1577,12 +1713,12 @@ function penaltySheet(kid, row) {
   const ws = row ? row.week_start : thisWeek();
   let mode = row ? (Number(row.amount) > 0 ? 'money' : 'minutes') : 'money', all = false;
   const st = { why: row ? row.note : '', amt: row ? (Number(row.amount) || Number(row.minutes)) : null };
-  const maxFor = m => m === 'money' ? r2(stats(kid).balance + (row ? Number(row.amount) || 0 : 0)) : screenWeek(kid, ws).left + (row ? Number(row.minutes) || 0 : 0);
+  const maxFor = m => m === 'money' ? r2(stats(kid).bank + (row ? Number(row.amount) || 0 : 0)) : screenWeek(kid, ws).left + (row ? Number(row.minutes) || 0 : 0);
   const fmt = (m, v) => m === 'money' ? money(v) : `${v} min`;
   const draw = () => {
     const max = maxFor(mode), presets = (mode === 'money' ? PEN_MONEY : PEN_MIN).filter(v => v <= max);
     if (st.amt == null) st.amt = presets[0] ?? 0;
-    openSheet(`<span class="label">${esc(kid.name)} · ${money(stats(kid).balance)} banked · ${dur(screenWeek(kid, ws).leftSec)} screens left</span><h2>${row ? 'Edit' : 'Add to the'} ${esc(penName())}${row ? ' entry' : ''}</h2>
+    openSheet(`<span class="label">${esc(kid.name)} · ${money(stats(kid).bank)} in the bank · ${dur(screenWeek(kid, ws).leftSec)} screens left</span><h2>${row ? 'Edit' : 'Add to the'} ${esc(penName())}${row ? ' entry' : ''}</h2>
       <div class="seg" style="grid-template-columns:1fr 1fr"><button type="button" data-pm="money" aria-pressed="${mode === 'money'}">Money</button><button type="button" data-pm="minutes" aria-pressed="${mode === 'minutes'}">Screen minutes</button></div>
       <p class="hint">Keep it small: ${mode === 'money' ? '10¢ to 25¢' : '1 to 5 minutes'} is usually plenty.</p>
       ${max > 0 ? `<div class="chips">${presets.map(v => `<button class="chip" type="button" data-pa="${v}" aria-pressed="${!all && Number(st.amt) === v}">${mode === 'money' ? (v < 1 ? Math.round(v * 100) + '¢' : '$' + v) : v + ' min'}</button>`).join('')}</div>` : `<p class="hint">${esc(kid.name)} has no ${mode === 'money' ? 'money in the bank' : 'screen minutes left this week'} to take.</p>`}
@@ -1739,12 +1875,9 @@ document.addEventListener('click', e => {
 let bankAnimUntil = 0;
 function bankAnim(kid) {
   const el = $('bankBig'); if (!kid || !el) return;
-  const now = stats(kid).balance, key = 'bal-' + kid.id, raw = store.get(key); store.set(key, String(now));
-  const m = $('goalMeter'), gkey = 'goal-' + kid.id, gRaw = store.get(gkey);
-  if (m) { const pct = Number(m.dataset.pct); store.set(gkey, String(pct));
-    if (gRaw !== null && Number(gRaw) !== pct && !reduceMotion()) { const bar = m.querySelector('i');
-      bar.style.width = gRaw + '%';
-      requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = pct + '%' })) } }
+  const now = stats(kid).bank, key = 'bal-' + kid.id, raw = store.get(key); store.set(key, String(now));
+  app.querySelectorAll('.gmeter[data-gid]').forEach(m => { const pct = Number(m.dataset.pct), gkey = 'goal-' + m.dataset.gid, gRaw = store.get(gkey); store.set(gkey, String(pct));
+    if (gRaw !== null && Number(gRaw) !== pct && !reduceMotion()) { const bar = m.querySelector('i'); bar.style.width = gRaw + '%'; requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = pct + '%' })) } });
   if (raw === null) return;
   const prev = Number(raw); if (!isFinite(prev) || Math.abs(prev - now) < .005 || reduceMotion()) return;
   const t0 = performance.now(), D = 1100; if (now > prev) bankAnimUntil = Date.now() + 1700;
