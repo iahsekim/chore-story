@@ -135,7 +135,6 @@ function stats(kid) {
    Up to 10 per kid. Moving money into a goal takes it out of the bank and keeps it for that goal (it's still the kid's).
    A goal's balance is the money moved in, minus money moved out, minus purchases paid from it. */
 const MAX_GOALS = 10;
-const GOAL_EMOJI = ['🎮', '🧸', '🚲', '⚽', '🎨', '📚', '🎧', '🛹', '🎁', '🐶', '🍦', '💰'];
 const kidGoals = kid => (S.goals || []).filter(g => g.kid_id === kid.id && !g.archived).sort((a, b) => (a.sort - b.sort) || String(a.created_at).localeCompare(String(b.created_at)));
 function goalBal(g) {
   let b = 0;
@@ -145,7 +144,7 @@ function goalBal(g) {
 }
 const savedTotal = kid => r2(kidGoals(kid).reduce((a, g) => a + goalBal(g), 0));
 const goalById = id => (S.goals || []).find(g => g.id === id);
-const goalLabel = g => g ? `${g.emoji ? g.emoji + ' ' : ''}${g.name}` : 'a goal';
+const goalLabel = g => g ? g.name : 'a goal';
 const goalReady = g => Number(g.target) > 0 && goalBal(g) >= Number(g.target) - 0.004;
 const savLocked = () => !!S.family?.savings_locked;
 /* How long the balance has been building: last payment, and what each week since added. */
@@ -795,7 +794,7 @@ function kidHome(kid) {
   const recent = ledgerItems(kid, thisWeek()).slice(0, 4);
   return `<section class="hero bank">
       <span class="hero-coin">${coinSVG()}</span><div class="label">In your bank</div><div class="big num" id="bankBig">${money(st.bank)}</div>
-      <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${G.length ? `<a class="link-w" href="#savings">🐷 ${money(st.saved)} saved</a>` : `<button class="link-w" type="button" data-newgoal="${kid.id}">Start saving for something</button>`}</div>
+      <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${G.length ? `<a class="link-w" href="#savings">${money(st.saved)} saved</a>` : `<button class="link-w" type="button" data-newgoal="${kid.id}">Start saving for something</button>`}</div>
       <button class="earn" type="button" data-tab="jobs">${I.jobs}<span>Earn more with jobs</span>${I.chev}</button>
     </section>
     ${mine.length ? `<button class="waitline" type="button" data-tab="ledger">${I.clock}<span><b>${mine.length} job${mine.length > 1 ? 's' : ''}</b> waiting for a grown-up to check</span></button>` : ''}
@@ -896,14 +895,14 @@ function claimSheet(kid, job) {
 function savingsHTML(kid) {
   const G = kidGoals(kid), st = stats(kid);
   const card = g => { const b = goalBal(g), t = Number(g.target) || 0, pct = t ? Math.min(100, Math.round(100 * b / t)) : 0, ready = goalReady(g);
-    return `<button class="goal${ready ? ' ready' : ''}" type="button" data-goal="${g.id}"><span class="g-emo">${esc(g.emoji || '🐷')}</span>
+    return `<button class="goal${ready ? ' ready' : ''}" type="button" data-goal="${g.id}"><span class="g-pct num">${t ? pct + '%' : coinSVG('mini')}</span>
       <span class="g-main"><b>${esc(g.name)}</b>${t ? `<span class="meter gmeter" data-gid="${g.id}" data-pct="${pct}"><i style="width:${pct}%"></i></span>` : ''}
-      <span class="g-sub">${ready ? 'Ready to buy! 🎉' : t ? `${money(b)} of ${money(t)} · ${money(t - b)} to go` : 'Saving, no price set'}</span></span>
+      <span class="g-sub">${ready ? 'Ready to buy!' : t ? `${money(b)} of ${money(t)} · ${money(t - b)} to go` : 'Saving, no price set'}</span></span>
       <span class="g-amt num">${money(b)}<small>saved</small></span></button>` };
   return `<section class="sect savings" id="savings"><div class="sect-h"><h3>Savings goals</h3>${G.length && G.length < MAX_GOALS ? `<button class="link" type="button" data-newgoal="${kid.id}">+ New goal</button>` : ''}</div>
     ${G.length ? `<div class="list goals">${G.map(card).join('')}</div>
       <button class="pill soft movebtn" type="button" data-move="${kid.id}">${I.swap}Move money</button>`
-      : `<button class="goal-empty" type="button" data-newgoal="${kid.id}"><span class="g-emo">🐷</span><span class="g-main"><b>Save up for something</b><span class="g-sub">Put money aside for a goal. It's still yours, just saved for later.</span></span>${I.chev}</button>`}
+      : `<button class="goal-empty" type="button" data-newgoal="${kid.id}"><span class="g-pct add">${I.plus}</span><span class="g-main"><b>Save up for something</b><span class="g-sub">Put money aside for a goal. It's still yours, just saved for later.</span></span>${I.chev}</button>`}
   </section>`;
 }
 function savingsSheet(kid) {
@@ -919,9 +918,9 @@ function bindSavings(root) {
 function goalSheet(g) {
   if (!g) return; const kid = kidById(g.kid_id), b = goalBal(g), t = Number(g.target) || 0, pct = t ? Math.min(100, Math.round(100 * b / t)) : 0;
   const parent = S.view === 'parent', locked = savLocked() && !parent, others = kidGoals(kid).filter(x => x.id !== g.id);
-  openSheet(`<div class="gs-head"><span class="g-emo big">${esc(g.emoji || '🐷')}</span><span><span class="label">Savings goal${parent ? ` · ${esc(kid.name)}` : ''}</span><h2>${esc(g.name)}</h2></span></div>
+  openSheet(`<span class="label">Savings goal${parent ? ` · ${esc(kid.name)}` : ''}</span><h2>${esc(g.name)}</h2>
     <div class="gs-amt"><b class="num">${money(b)}</b><span>${t ? `saved of ${money(t)}` : 'saved'}</span></div>
-    ${t ? `<span class="meter gs-meter"><i style="width:${pct}%"></i></span><p class="hint">${goalReady(g) ? (parent ? 'Ready to buy! When you buy it, tap <b>Bought it</b> and the money comes out of this goal.' : '<b>Ready to buy! 🎉</b> Tell a grown-up.') : `<b>${money(t - b)}</b> to go.`}</p>` : ''}
+    ${t ? `<span class="meter gs-meter"><i style="width:${pct}%"></i></span><p class="hint">${goalReady(g) ? (parent ? 'Ready to buy! When you buy it, tap <b>Bought it</b> and the money comes out of this goal.' : '<b>Ready to buy!</b> Tell a grown-up.') : `<b>${money(t - b)}</b> to go.`}</p>` : ''}
     <div class="row2"><button class="pill" type="button" id="gIn">Add money</button><button class="pill soft" type="button" id="gOut" ${b > 0 ? '' : 'disabled'}>Move out</button></div>
     ${parent && b > 0 ? `<button class="pill ok" type="button" id="gBought">${I.bag}Bought it</button>` : ''}
     <button class="pill soft" type="button" id="gEdit" style="justify-self:start">Edit goal</button>
@@ -943,7 +942,7 @@ function goalSheet(g) {
 function moveSheet(kid, pre = {}) {
   const G = kidGoals(kid), parent = S.view === 'parent', locked = savLocked() && !parent;
   if (!G.length) return goalEditSheet(kid);
-  const acct = [{ id: '', name: 'Bank', emoji: '🏦', bal: stats(kid).bank }, ...G.map(g => ({ id: g.id, name: g.name, emoji: g.emoji || '🐷', bal: goalBal(g) }))];
+  const acct = [{ id: '', name: 'Bank', bal: stats(kid).bank }, ...G.map(g => ({ id: g.id, name: g.name, bal: goalBal(g) }))];
   const st = { from: pre.from ?? '', to: pre.to ?? null, amt: pre.amt ? String(pre.amt) : '' };
   // Locked savings: from a goal, a kid can only move to another goal.
   const canTo = a => a.id !== st.from && !(locked && st.from !== '' && a.id === '');
@@ -951,8 +950,8 @@ function moveSheet(kid, pre = {}) {
     if (st.to === null || !canTo(acct.find(a => a.id === st.to) || { id: st.from })) st.to = acct.find(canTo)?.id ?? null;
     const src = acct.find(a => a.id === st.from) || acct[0];
     openSheet(`<h2>Move money</h2>
-      <div class="field"><span class="label">From</span><div class="chips acct">${acct.map(a => `<button class="chip" type="button" data-mfrom="${a.id}" aria-pressed="${a.id === st.from}">${esc(a.emoji)} ${esc(a.name)} <small>${money(a.bal)}</small></button>`).join('')}</div></div>
-      <div class="field"><span class="label">To</span><div class="chips acct">${acct.filter(a => a.id !== st.from).map(a => `<button class="chip" type="button" data-mto="${a.id}" aria-pressed="${a.id === st.to}" ${canTo(a) ? '' : 'disabled'}>${esc(a.emoji)} ${esc(a.name)}</button>`).join('')}</div>
+      <div class="field"><span class="label">From</span><div class="chips acct">${acct.map(a => `<button class="chip" type="button" data-mfrom="${a.id}" aria-pressed="${a.id === st.from}">${esc(a.name)} <small>${money(a.bal)}</small></button>`).join('')}</div></div>
+      <div class="field"><span class="label">To</span><div class="chips acct">${acct.filter(a => a.id !== st.from).map(a => `<button class="chip" type="button" data-mto="${a.id}" aria-pressed="${a.id === st.to}" ${canTo(a) ? '' : 'disabled'}>${esc(a.name)}</button>`).join('')}</div>
         ${locked && st.from !== '' ? '<p class="hint">Savings are locked, so only a grown-up can move money back to the bank.</p>' : ''}</div>
       <div class="field"><label class="label" for="mvAmt">How much?</label><div class="moneyin"><span>$</span><input id="mvAmt" class="inbig" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" value="${esc(st.amt)}"></div>
         ${src.bal > 0 ? `<div class="chips">${[1, 5, 10].filter(v => v < src.bal).map(v => `<button class="chip" type="button" data-mva="${v}">$${v}</button>`).join('')}<button class="chip" type="button" data-mva="${src.bal}">All · ${money(src.bal)}</button></div>` : `<p class="hint">${src.id ? 'This goal is empty.' : 'The bank is empty right now.'}</p>`}</div>
@@ -979,22 +978,21 @@ function moveSheet(kid, pre = {}) {
 }
 function goalEditSheet(kid, g) {
   const G = kidGoals(kid); if (!g && G.length >= MAX_GOALS) return toast(`That's the most goals (${MAX_GOALS}). Finish or delete one first.`);
-  const E = { emoji: g?.emoji || GOAL_EMOJI[G.length % GOAL_EMOJI.length] }, i = g ? G.findIndex(x => x.id === g.id) : -1;
+  const i = g ? G.findIndex(x => x.id === g.id) : -1;
   openSheet(`<h2>${g ? 'Edit goal' : 'New savings goal'}</h2>
     <div class="field"><label class="label" for="gN">What are you saving for?</label><input id="gN" maxlength="40" autocapitalize="sentences" value="${esc(g?.name || '')}" placeholder="A new video game"></div>
-    <div class="field"><span class="label">Pick an emoji</span><div class="chips emojis">${GOAL_EMOJI.map(e => `<button class="chip emo" type="button" data-emo="${e}" aria-pressed="${e === E.emoji}" aria-label="${e}">${e}</button>`).join('')}</div></div>
-    <div class="field"><label class="label" for="gT">How much does it cost? <span class="opt">(optional)</span></label><div class="moneyin"><span>$</span><input id="gT" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Leave blank to just save" value="${g?.target ? Number(g.target) : ''}"></div></div>
+    <div class="field"><label class="label" for="gT">How much does it cost?</label><div class="moneyin"><span>$</span><input id="gT" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" value="${g?.target ? Number(g.target).toFixed(2) : ''}"></div></div>
     ${g && G.length > 1 ? `<div class="ptools"><button class="pill soft" type="button" id="gUp" ${i === 0 ? 'disabled' : ''}>Move up</button><button class="pill soft" type="button" id="gDown" ${i === G.length - 1 ? 'disabled' : ''}>Move down</button></div>` : ''}
     <button class="save" id="gSave" type="button">${g ? 'Save' : 'Start saving'}</button><button class="cancel" data-close type="button">Cancel</button>`, () => {
-    layer.querySelectorAll('[data-emo]').forEach(b => b.onclick = () => { E.emoji = b.dataset.emo; layer.querySelectorAll('[data-emo]').forEach(x => x.setAttribute('aria-pressed', x === b)) });
     const swap = d => act(async () => { const order = G.map(x => x.id), j = i + d;[order[i], order[j]] = [order[j], order[i]]; await Promise.all(order.map((id, k) => q(sb.from('savings_goals').update({ sort: k }).eq('id', id)))) }).then(() => goalEditSheet(kid, goalById(g.id)));
     if ($('gUp')) $('gUp').onclick = () => swap(-1); if ($('gDown')) $('gDown').onclick = () => swap(1);
     $('gSave').onclick = async () => {
-      const name = capFirst($('gN').value), tv = parseFloat($('gT').value), target = tv > 0 ? Math.min(100000, r2(tv)) : null;
+      const name = capFirst($('gN').value), target = Math.min(100000, r2(parseFloat($('gT').value) || 0));
       if (!name) { toast('What are you saving for?'); return $('gN').focus() }
+      if (target <= 0) { toast('How much does it cost? A goal needs a price.'); return $('gT').focus() }
       closeSheet();
-      if (g) return act(() => q(sb.from('savings_goals').update({ name, emoji: E.emoji, target }).eq('id', g.id)), 'Saved');
-      let row; try { row = await q(sb.from('savings_goals').insert({ family_id: S.family.id, kid_id: kid.id, name, emoji: E.emoji, target, sort: G.length ? Math.max(...G.map(x => x.sort || 0)) + 1 : 0 }).select().single()) } catch (e) { console.error(e); return toast(errMsg(e)) }
+      if (g) return act(() => q(sb.from('savings_goals').update({ name, target }).eq('id', g.id)), 'Saved');
+      let row; try { row = await q(sb.from('savings_goals').insert({ family_id: S.family.id, kid_id: kid.id, name, target, sort: G.length ? Math.max(...G.map(x => x.sort || 0)) + 1 : 0 }).select().single()) } catch (e) { console.error(e); return toast(errMsg(e)) }
       await refresh();
       if (stats(kid).bank > 0) moveSheet(kid, { to: row.id }); else toast(`${goalLabel(row)} is set. Earn some money to start saving!`);
     };
@@ -1075,7 +1073,7 @@ function pKids() {
     const st = stats(k), sw = screenWeek(k), rw = readWeek(k), o = owedInfo(k), G = kidGoals(k), ready = G.filter(goalReady);
     return `<article class="kcard" style="--kc:${COLORS[k.color]}"><div class="kh">${avatar(k)}<h3>${esc(k.name)}</h3><span class="wk num" style="color:color-mix(in srgb, ${COLORS[k.color]} 78%, var(--ink))">${money(st.bank)}<small>In the bank</small></span></div>
       <div class="owedline">${o.last ? `Last withdrawal ${short(o.last)} (${ago(o.days)})` : 'No withdrawals yet'}</div>
-      <button class="saveline" type="button" data-savings="${k.id}"><span>🐷 ${G.length ? `<b>${money(st.saved)}</b> saved in ${G.length} goal${G.length > 1 ? 's' : ''}${ready.length ? ` · <span class="rdy">${ready.length > 1 ? `${ready.length} ready to buy` : `${esc(goalLabel(ready[0]))} is ready to buy`}</span>` : ''}` : 'No savings goals yet'}</span>${I.chev}</button>
+      <button class="saveline" type="button" data-savings="${k.id}"><span>${G.length ? `<b>${money(st.saved)}</b> saved in ${G.length} goal${G.length > 1 ? 's' : ''}${ready.length ? ` · <span class="rdy">${ready.length > 1 ? `${ready.length} ready to buy` : `${esc(goalLabel(ready[0]))} is ready to buy`}</span>` : ''}` : 'No savings goals yet'}</span>${I.chev}</button>
       <div class="kstats"><div><b class="num">${money(st.week)}</b><span>This week</span></div><div><b class="num">${money(st.month)}</b><span>Month</span></div><div><b class="num">${money(st.lifetime)}</b><span>Lifetime</span></div></div>
       <div class="kstats"><div><b class="num">${hms(sw.leftSec)}</b><span>Screen left</span></div><div><b class="num" style="color:var(--read)">+${rw.bonus}</b><span>Reading bonus</span></div><div><b class="num">${hms(rw.sec)}</b><span>Read</span></div></div>
       <div class="kact"><button class="pill" type="button" data-logjob="${k.id}">Log a job</button><button class="pill ok" type="button" data-bonus="${k.id}">Add bonus</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button>${penOn() ? `<button class="pill soft jarpill" type="button" data-pen="${k.id}">${I.jar}${esc(penName())}</button>` : ''}<button class="pill soft" type="button" data-more="${k.id}">More</button></div></article>`;
@@ -1200,7 +1198,7 @@ function pPay() {
     const st = stats(k), L = statement(k), o = owedInfo(k), G = kidGoals(k);
     h += `<div class="card bankcard"><span class="label">In ${esc(k.name)}’s bank</span><b class="bankbig num">${money(st.bank)}</b>
         <p class="hint owedhint">${o.last ? `Last withdrawal <b>${short(o.last)}</b>, ${ago(o.days)}.` : 'No withdrawals yet.'}</p>
-        <button class="saveline" type="button" data-savings="${k.id}"><span>🐷 ${G.length ? `<b>${money(st.saved)}</b> saved in ${G.length} goal${G.length > 1 ? 's' : ''}` : 'No savings goals yet'}</span>${I.chev}</button>
+        <button class="saveline" type="button" data-savings="${k.id}"><span>${G.length ? `<b>${money(st.saved)}</b> saved in ${G.length} goal${G.length > 1 ? 's' : ''}` : 'No savings goals yet'}</span>${I.chev}</button>
         ${o.weeks.length ? `<div class="weeksince">${o.weeks.map(w => `<span><small>Week of ${md(w.ws)}</small><b class="num">${money(w.amt)}</b></span>`).join('')}</div>` : ''}
         <div class="kstats flat"><div><b class="num">${money(st.lifetime)}</b><span>Earned</span></div><div><b class="num">${money(st.paid)}</b><span>Withdrawn</span></div><div><b class="num">${money(st.spent)}</b><span>Spent</span></div>${st.pen ? `<div><b class="num" style="color:var(--danger)">${money(st.pen)}</b><span>${esc(penName())}</span></div>` : ''}</div>
         <div class="row2"><button class="pill" type="button" data-payout="${k.id}">Withdraw cash</button><button class="pill soft" type="button" data-purchase="${k.id}">Bought something</button></div>
@@ -1519,7 +1517,7 @@ function txSheet(kid, kind, pre = {}) {
   const srcBal = () => T.goal ? goalBal(goalById(T.goal)) : stats(kid).bank;
   const draw = () => openSheet(`<span class="label">${esc(kid.name)} has ${money(st.bank)} in the bank${st.saved ? ` + ${money(st.saved)} saved` : ''}</span><h2>${pay ? `Withdraw cash for ${esc(kid.name)}` : `You bought something for ${esc(kid.name)}`}</h2>
     <p class="hint">${pay ? 'Cash, a transfer, or anything you handed over. It comes out of their bank. Money saved in goals stays put.' : 'Something you paid for with their money.'}</p>
-    ${!pay && G.length ? `<div class="field"><span class="label">Paid from</span><div class="chips acct"><button class="chip" type="button" data-src="" aria-pressed="${!T.goal}">🏦 Bank <small>${money(st.bank)}</small></button>${G.map(g => `<button class="chip" type="button" data-src="${g.id}" aria-pressed="${T.goal === g.id}">${esc(g.emoji || '🐷')} ${esc(g.name)} <small>${money(goalBal(g))}</small></button>`).join('')}</div></div>` : ''}
+    ${!pay && G.length ? `<div class="field"><span class="label">Paid from</span><div class="chips acct"><button class="chip" type="button" data-src="" aria-pressed="${!T.goal}">Bank <small>${money(st.bank)}</small></button>${G.map(g => `<button class="chip" type="button" data-src="${g.id}" aria-pressed="${T.goal === g.id}">${esc(g.name)} <small>${money(goalBal(g))}</small></button>`).join('')}</div></div>` : ''}
     ${srcBal() > 0 ? `<div class="chips"><button class="chip" type="button" data-amt="${srcBal()}">All of it · ${money(srcBal())}</button>${pay ? [5, 10, 20].filter(a => a < srcBal()).map(a => `<button class="chip" type="button" data-amt="${a}">$${a}</button>`).join('') : ''}</div>` : ''}
     <div class="field"><label class="label" for="tAmt">Amount ($)</label><input id="tAmt" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" value="${esc(T.amt)}"></div>
     <div class="field"><label class="label" for="tWhy">Explanation ${esc(kid.name)} will see</label><input id="tWhy" maxlength="120" placeholder="${pay ? 'Cash' : 'What you bought'}" value="${esc(T.note)}"></div>
