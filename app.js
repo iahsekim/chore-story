@@ -784,6 +784,15 @@ function stmtRow(l, kid, parent) {
   return `<${tg} ${tg === 'button' ? `type="button" data-edit="${l.type}|${l.id}|${kid.id}"` : ''} class="row">${ico}<span class="t"><b>${esc(l.title)}</b><span>${esc(l.kind)} · ${short(l.date)}${l.type !== 'allow' && l.ts ? ' · ' + clockTime(l.ts) : ''}${tg === 'button' ? ' · tap to edit' : ''}</span></span><span class="stack">${l.type === 'move' ? `<span class="amt mv">${money(l.mv)}</span>` : `<span class="amt ${l.v >= 0 ? 'up' : 'out'}">${l.v >= 0 ? '+' : '\u2212'}${money(Math.abs(l.v))}</span>`}<span class="bal num">${money(l.bal)}</span></span></${tg}>`;
 }
 /* Kid home: status first. The bank (with a way to earn more), then the two timers, then this week's log. */
+/* One bar for all savings goals together, under the bank number. Each goal counts up to its price. */
+function allGoalsHTML(kid) {
+  const G = kidGoals(kid).filter(g => Number(g.target) > 0), want = r2(G.reduce((a, g) => a + Number(g.target), 0));
+  const have = r2(G.reduce((a, g) => a + Math.min(goalBal(g), Number(g.target)), 0)), pct = want ? Math.min(100, Math.round(100 * have / want)) : 0;
+  if (!G.length) return '';
+  return `<a class="allgoals" href="#savings"><span class="ag-top"><span>Saving for ${G.length} goal${G.length > 1 ? 's' : ''}</span><b class="num">${money(have)} of ${money(want)}</b></span>
+    <span class="meter gmeter" data-gid="all-${kid.id}" data-pct="${pct}"><i style="width:${pct}%"></i></span>
+    <span class="ag-sub">${pct >= 100 ? 'Every goal is ready!' : `${pct}% of the way`}<span class="ag-see">See goals ${I.chev}</span></span></a>`;
+}
 /* Big minute numbers on the reading and screen cards: "45 min", "1 hr 20 min". */
 const bigMin = m => { m = Math.max(0, Math.floor(m)); const h = Math.floor(m / 60), r = m % 60; return h ? `${h} hr${r ? ` ${r} min` : ''}` : `${m} min` };
 function kidHome(kid) {
@@ -794,7 +803,8 @@ function kidHome(kid) {
   const recent = ledgerItems(kid, thisWeek()).slice(0, 4);
   return `<section class="hero bank">
       <span class="hero-coin">${coinSVG()}</span><div class="label">In your bank</div><div class="big num" id="bankBig">${money(st.bank)}</div>
-      <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${G.length ? `<a class="link-w" href="#savings">${money(st.saved)} saved</a>` : `<button class="link-w" type="button" data-newgoal="${kid.id}">Start saving for something</button>`}</div>
+      ${G.length ? allGoalsHTML(kid) : ''}
+      <div class="hero-foot"><span>This week <b>+${money(st.week)}</b></span>${G.length ? '' : `<button class="link-w" type="button" data-newgoal="${kid.id}">Start saving for something</button>`}</div>
       <button class="earn" type="button" data-tab="jobs">${I.jobs}<span>Earn more with jobs</span>${I.chev}</button>
     </section>
     ${mine.length ? `<button class="waitline" type="button" data-tab="ledger">${I.clock}<span><b>${mine.length} job${mine.length > 1 ? 's' : ''}</b> waiting for a grown-up to check</span></button>` : ''}
@@ -994,7 +1004,7 @@ function goalEditSheet(kid, g) {
       if (g) return act(() => q(sb.from('savings_goals').update({ name, target }).eq('id', g.id)), 'Saved');
       let row; try { row = await q(sb.from('savings_goals').insert({ family_id: S.family.id, kid_id: kid.id, name, target, sort: G.length ? Math.max(...G.map(x => x.sort || 0)) + 1 : 0 }).select().single()) } catch (e) { console.error(e); return toast(errMsg(e)) }
       await refresh();
-      if (stats(kid).bank > 0) moveSheet(kid, { to: row.id }); else toast(`${goalLabel(row)} is set. Earn some money to start saving!`);
+      toast(stats(kid).bank > 0 ? `${goalLabel(row)} is set. Tap Move money to start saving.` : `${goalLabel(row)} is set. Earn some money to start saving!`);
     };
   });
 }
