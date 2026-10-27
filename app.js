@@ -690,7 +690,7 @@ async function finishOnboard() {
       bonus_minutes: Number(j.bonus_minutes) || 0, kid_ids: j.kid_ids.map(x => O.made[x]).filter(Boolean), enabled: true, sort: i }))));
     O.jobsMade = true;
     S.parentOk = true; try { sessionStorage.setItem('cj-parent', '1') } catch (e) { }
-    await loadAll(); setProfile('parent'); S.ptab = 'kids'; render(); window.scrollTo(0, 0); toast('You’re all set');
+    await loadAll(); setProfile('parent'); S.ptab = 'kids'; render(); window.scrollTo(0, 0); tourStart();
   } catch (e) { console.error(e); b.disabled = false; b.textContent = 'Finish setup'; toast(errMsg(e)) }
 }
 /* A new kid gets every job the other kids all share (with no other kids, every job). */
@@ -1312,7 +1312,8 @@ function pSettings() {
       <div class="field"><label class="label" for="sFam">Family name</label><input id="sFam" maxlength="60" autocapitalize="words" value="${esc(F.name)}"></div>
       <div class="field"><label class="label" for="sTz">Time zone (weeks reset Monday here)</label><select id="sTz">${tzOptions(F.timezone)}</select></div>
       <button class="save" id="saveFam" type="button">Save</button>
-      <button class="pill soft" id="changePin" type="button" style="justify-self:start">Change parent/guardian PIN</button></section>
+      <button class="pill soft" id="changePin" type="button" style="justify-self:start">Change parent/guardian PIN</button>
+      <button class="pill soft" id="replayTour" type="button" style="justify-self:start">Take the tour again</button></section>
     <section class="card"><span class="label">Parents and guardians</span>
       <div class="people">${S.members.map(m => `<div class="person"><span class="t"><b>${esc(m.email || 'Parent/guardian')}</b><span>${m.user_id === S.user.id ? 'You' : 'Can sign in'}</span></span>${m.user_id === S.user.id ? '' : `<button class="pill no" type="button" data-rmmember="${m.user_id}" data-email="${esc(m.email || '')}">Remove</button>`}</div>`).join('')}
       ${S.invites.map(i => `<div class="person"><span class="t"><b>${esc(i.email)}</b><span>Invited, hasn't joined yet</span></span><span class="ptools"><button class="pill soft" type="button" data-reinvite="${esc(i.email)}">Send again</button><button class="pill no" type="button" data-rminvite="${esc(i.email)}">Cancel</button></span></div>`).join('')}</div>
@@ -1376,6 +1377,7 @@ function bindAll() {
   each('[data-bonus]', el => bonusSheet(kidById(el.dataset.bonus)));
   each('[data-more]', el => kidMoreSheet(kidById(el.dataset.more)));
   each('[data-pen]', el => { const [id, m] = el.dataset.pen.split('|'); const k = kidById(id); penaltySheet(k); if (m === 'minutes') layer.querySelector('[data-pm="minutes"]')?.click() });
+  on('replayTour', () => { S.ptab = 'kids'; render(); window.scrollTo(0, 0); tourStart() });
   on('savLock', () => { const v = $('savLock').getAttribute('aria-pressed') !== 'true'; $('savLock').setAttribute('aria-pressed', v);
     act(() => q(sb.from('families').update({ savings_locked: v }).eq('id', S.family.id)), v ? 'Savings locked' : 'Savings unlocked') });
   on('penTog', () => { const b = $('penTog'), v = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', v); $('penMore').hidden = !v });
@@ -1847,6 +1849,84 @@ async function sendInvite(email) {
     no_invite: 'That invite was canceled. Add them again.', too_many: 'Too many open invites. Cancel some first.',
     send_failed: `The email didn’t send: ${j.detail || 'the email service refused it'}.` })[j.error] || `The email didn’t send (error ${r.status}). Try again in a minute.`;
 }
+/* ---------- guided tour ----------
+   Runs once after setup (and again from Settings): highlights one thing at a time on the grown-up side,
+   then has the parent switch to a kid and shows that side. Progress is kept per sign-in on this device. */
+const TOUR_KEY = () => 'tour-' + (S.user?.id || 'x');
+function tourGet() { try { return JSON.parse(store.get(TOUR_KEY()) || 'null') } catch (e) { return null } }
+function tourSet(t) { store.set(TOUR_KEY(), t ? JSON.stringify(t) : null) }
+function tourStart() { tourSet({ i: 0 }); tourShown = -1; tourTick() }
+function tourEnd() { tourSet({ done: true }); tourHide() }
+function tourSteps() {
+  const n = esc(S.kids[0]?.name || 'your kid');
+  return [
+    { view: 'parent', title: 'Welcome to Paper Pig!', text: 'Here’s a quick tour, about a minute. You’re on the grown-up side, where you run things.', next: 'Show me around' },
+    { view: 'parent', sel: '.kcard', title: `${n}’s card`, text: 'Their bank, this week’s money, and screen and reading time, all at a glance.' },
+    { view: 'parent', sel: '.kcard .kact', title: 'Quick actions', text: 'Log a job they did, give a bonus, or record something you bought with their money.' },
+    { view: 'parent', sel: '.kcard .saveline', title: 'Savings goals', text: `${n} can save up for things. Tap here any time to see or manage their goals.` },
+    { view: 'parent', sel: '.tabbar [data-tab="jobs"]', title: 'Jobs', text: 'Your family’s job list. Change prices, add jobs, and choose which kid can do each one.' },
+    { view: 'parent', sel: '.tabbar [data-tab="pay"]', title: 'Ledger', text: 'Every dollar and every minute, with the reason. Tap any entry to fix a mistake.' },
+    { view: 'parent', sel: '.tabbar [data-tab="settings"]', title: 'Settings', text: 'Allowance and screen time, invite another parent or guardian, and lock savings.' },
+    { view: 'parent', sel: '#swapBtn', title: `Now see it as ${n}`, text: `Kids use the same app. Tap <b>Switch</b> to open their side.`, act: 'switch', next: 'Switch' },
+    { view: 'who', sel: '.kidtile', title: 'Who’s here?', text: `This is where kids start. Tap <b>${n}</b>.`, act: 'pick', next: `Open ${n}` },
+    { view: 'kid', sel: '.hero.bank', title: `${n}’s bank`, text: 'The first thing they see. Allowance lands every Monday, and jobs and bonuses add to it.' },
+    { view: 'kid', sel: '.earn', title: 'Earn more', text: 'They pick a job, tap <b>I did it</b>, and it waits for your OK.' },
+    { view: 'kid', sel: '#startRead', title: 'Reading earns screen time', text: 'Every minute they read adds a minute of screen time, up to the weekly limit you set.' },
+    { view: 'kid', sel: '#startScr', title: 'Screen time', text: 'It runs on a timer. When it rings, screens are done, so the app is the bad guy, not you.' },
+    { view: 'kid', sel: '#savings', title: 'Savings goals', text: 'They pick something, set the price, and move money in with <b>Move money</b>. The bar under the bank shows all their goals together.' },
+    { view: 'kid', sel: '.tabbar [data-tab="ledger"]', title: 'Their ledger', text: 'Every entry and the reason for it, so there’s nothing to argue about.' },
+    { view: 'kid', sel: '#swapBtn', title: 'Back to the grown-up side', text: 'Tap <b>Switch</b> and enter your PIN. That’s the tour. Have fun!', next: 'Done' },
+  ];
+}
+let tourShown = -1;
+function tourHide() { $('tour')?.remove() }
+function tourTick() {
+  const t = tourGet(); if (!t || t.done || t.i == null || !S.family) return tourHide();
+  const steps = tourSteps(), st = steps[t.i]; if (!st) return tourEnd();
+  if (st.view !== S.view) {
+    // The parent did the step's action themselves (tapped Switch, or a kid): carry on from there.
+    const j = steps.findIndex((x, k) => k > t.i && x.view === S.view);
+    if (st.act && j > 0) { tourSet({ i: j }); return tourTick() }
+    return tourHide();
+  }
+  if (S.view === 'parent' && S.ptab !== 'kids') { S.ptab = 'kids'; render(); return }
+  if (S.view === 'kid' && S.tab !== 'home') { S.tab = 'home'; render(); return }
+  if ($('scrim')) return tourHide();                       // wait until a sheet or celebration is closed
+  const el = st.sel ? app.querySelector(st.sel) : null;
+  if (st.sel && !el) { tourSet({ i: t.i + 1 }); return tourTick() }   // not on screen right now (say, screens already running)
+  if (tourShown !== t.i) { tourShown = t.i; if (el) el.scrollIntoView({ block: 'center', behavior: reduceMotion() ? 'auto' : 'smooth' }); setTimeout(tourTick, 420); }
+  tourDraw(st, el, t.i, steps.length);
+}
+function tourDraw(st, el, i, n) {
+  let box = $('tour'); if (!box) { box = document.createElement('div'); box.id = 'tour'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-live', 'polite'); document.body.appendChild(box) }
+  const W = innerWidth, H = innerHeight, pad = 8, r = el ? el.getBoundingClientRect() : null;
+  const hole = r ? { x: Math.max(4, r.left - pad), y: Math.max(4, r.top - pad), w: Math.min(W - 8, r.width + pad * 2), h: Math.min(H - 8, r.height + pad * 2) } : null;
+  const key = `${i}|${hole ? [hole.x, hole.y, hole.w, hole.h].map(Math.round).join(',') : 'c'}|${W}x${H}`;
+  if (box.dataset.key === key) return; box.dataset.key = key;
+  const tipW = Math.min(340, W - 32), below = !hole || hole.y + hole.h / 2 < H * 0.52;
+  const left = hole ? Math.min(W - tipW - 16, Math.max(16, hole.x + hole.w / 2 - tipW / 2)) : (W - tipW) / 2;
+  const pos = !hole ? `top:${Math.max(16, Math.round(H / 2 - 120))}px` : below ? `top:${Math.min(H - 220, hole.y + hole.h + 14)}px` : `bottom:${Math.min(H - 220, H - hole.y + 14)}px`;
+  const block = (x, y, w, h) => `<i class="tour-block" style="left:${x}px;top:${y}px;width:${Math.max(0, w)}px;height:${Math.max(0, h)}px"></i>`;
+  box.innerHTML = (hole ? `<div class="tour-hole" style="left:${hole.x}px;top:${hole.y}px;width:${hole.w}px;height:${hole.h}px"></div>
+      ${block(0, 0, W, hole.y)}${block(0, hole.y + hole.h, W, H - hole.y - hole.h)}${block(0, hole.y, hole.x, hole.h)}${block(hole.x + hole.w, hole.y, W - hole.x - hole.w, hole.h)}
+      ${st.act ? '' : block(hole.x, hole.y, hole.w, hole.h)}` : '<div class="tour-dim"></div>') +
+    `<div class="tour-tip" style="left:${left}px;width:${tipW}px;${pos}">
+      <div class="tour-top"><span class="label">${i + 1} of ${n}</span><button class="link quiet" type="button" id="tourSkip">${i === n - 1 ? 'Close' : 'Skip tour'}</button></div>
+      <h3>${st.title}</h3><p>${st.text}</p>
+      <div class="tour-btns">${i > 0 && !st.act && tourSteps()[i - 1].view === st.view ? '<button class="pill soft" type="button" id="tourBack">Back</button>' : '<span></span>'}<button class="pill" type="button" id="tourNext">${st.next || 'Next'}</button></div></div>`;
+  $('tourSkip').onclick = tourEnd;
+  if ($('tourBack')) $('tourBack').onclick = () => { tourSet({ i: i - 1 }); tourTick() };
+  $('tourNext').onclick = () => {
+    if (st.act === 'switch') return switchProfile();
+    if (st.act === 'pick') return chooseProfile(S.kids[0].id);
+    if (i === n - 1) { tourEnd(); return celebrate('You’re all set!', 'Have fun with Paper Pig.', { power: .8, icon: 'star' }) }
+    tourSet({ i: i + 1 }); tourTick();
+  };
+}
+setInterval(tourTick, 300);
+addEventListener('resize', () => { const b = $('tour'); if (b) b.dataset.key = ''; });
+addEventListener('keydown', e => { if (e.key === 'Escape' && $('tour')) tourEnd() });
+
 /* ---------- boot ---------- */
 async function enter(session) {
   S.user = session.user;

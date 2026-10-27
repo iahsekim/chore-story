@@ -706,3 +706,18 @@ body[data-side="kid"] .pr.p,body[data-side="kid"] .pr.b{color:color-mix(in srgb,
 .ag-see svg{width:14px;height:14px;transform:rotate(90deg)}
 #savings{scroll-margin-top:14px}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+
+/* ---------- guided tour ---------- */
+#tour{position:fixed;inset:0;z-index:80;pointer-events:none}
+.tour-dim{position:fixed;inset:0;background:rgba(8,12,34,.62);pointer-events:auto}
+.tour-hole{position:fixed;border-radius:20px;box-shadow:0 0 0 4px var(--gold),0 0 0 9999px rgba(8,12,34,.62);pointer-events:none;transition:left .25s,top .25s,width .25s,height .25s}
+.tour-block{position:fixed;pointer-events:auto;background:transparent}
+.tour-tip{position:fixed;pointer-events:auto;display:grid;gap:8px;padding:16px 16px 14px;border-radius:20px;background:var(--paper);color:var(--text);border:var(--line-w) solid var(--edge);box-shadow:var(--pop-lg);animation:tourIn .22s ease-out}
+.tour-tip h3{font:400 22px/1.1 var(--display)}
+.tour-tip p{margin:0;font-size:15px;line-height:1.45}
+.tour-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tour-top .link{min-height:32px}
+.tour-btns{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:4px}
+.tour-btns .pill{min-height:42px}
+@keyframes tourIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.tour-tip{animation:none}.tour-hole{transition:none}}
