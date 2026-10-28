@@ -14,6 +14,13 @@ const TYPES = ['Report a bug', 'Request a feature', 'Say hi'];
 const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify(body) });
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clip = (s, n) => String(s ?? '').trim().slice(0, n);
+// "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) ... Safari/604.1" -> "iPhone, Safari"
+const device = ua => {
+  if (!ua) return '—';
+  const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /CrOS/.test(ua) ? 'Chromebook' : /Linux/.test(ua) ? 'Linux' : 'Unknown device';
+  const br = /Instagram/.test(ua) ? 'Instagram in-app browser' : /FBAN|FBAV/.test(ua) ? 'Facebook in-app browser' : /EdgiOS|Edg\//.test(ua) ? 'Edge' : /CriOS|Chrome\//.test(ua) ? 'Chrome' : /FxiOS|Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : /AppleWebKit/.test(ua) ? 'home-screen app' : 'browser';
+  return `${os}, ${br}`;
+};
 const isEmail = s => /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+\.[^\s@<>(),;:"]{2,}$/.test(s);
 
 exports.handler = async (event) => {
@@ -47,9 +54,9 @@ async function run(event) {
   if (!to.length || !env.RESEND_API_KEY) { console.error('feedback: email is not set up (NOTIFY_EMAIL / RESEND_API_KEY)'); return json(503, { error: 'not set up' }) }
 
   const when = new Date().toLocaleString('en-US', { timeZone: 'America/Denver', dateStyle: 'medium', timeStyle: 'short' }) + ' (Mountain)';
-  const first = p.message.split('\n')[0].slice(0, 60);
-  const subject = `Paper Pig ${p.type === 'Report a bug' ? 'bug' : p.type === 'Request a feature' ? 'feature idea' : 'message'}: ${first}${p.message.length > first.length ? '…' : ''}`;
-  const rows = [['From', reply || (p.email ? `${p.email} (not a valid email)` : 'No email given')], ['Screen', p.page || '—'], ['Sent', when], ['Device', p.app || '—']];
+  const kind = p.type === 'Report a bug' ? 'bug report' : p.type === 'Request a feature' ? 'feature idea' : 'message';
+  const subject = `New Paper Pig ${kind}${reply ? ` from ${reply}` : ''}`;
+  const rows = [['From', reply || (p.email ? `${p.email} (not a valid email)` : 'No email given')], ['Screen', p.page || '—'], ['Sent', when], ['Device', device(p.app)]];
   const text = `${p.type}\n\n${p.message}\n\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n')}${reply ? '\n\nReply to this email to answer them.' : ''}`;
   const html = `<!doctype html><html><body style="margin:0;background:#FFF0F3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#14101A">
   <div style="max-width:520px;margin:0 auto;padding:32px 20px">

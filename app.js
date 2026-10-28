@@ -1798,6 +1798,13 @@ function kidSheet(kid) {
     if (kid) $('kDel').onclick = () => confirmSheet(`Remove ${kid.name}?`, 'This deletes their earnings history, reading and screen time, and takes them off every job. It can’t be undone.', 'Remove for good', () => q(sb.from('kids').delete().eq('id', kid.id)), 'Removed');
   });
 }
+/** where feedback was sent from, in words (for the feedback email) */
+function screenName() {
+  const tab = (list, id) => (list.find(t => t[0] === id) || [, id])[1];
+  if (S.view === 'parent') return `Grown-up side: ${tab(PTABS, S.ptab)} tab`;
+  if (S.view === 'kid') return `Kid side: ${tab(KTABS, S.tab)} tab`;
+  return ({ who: 'Who’s here? (picking a profile)', auth: 'Sign-in screen', onboard: 'Setting up a new family', loading: 'Loading screen' })[S.view] || S.view;
+}
 const FB = { bug: ['Report a bug', 'What happened, and what did you expect? Which screen were you on?'], idea: ['Request a feature', 'What would make this more useful for your family?'], hi: ['Say hi', 'Questions, thanks, anything.'] };
 function feedbackSheet(kind) {
   let K = FB[kind] ? kind : 'hi';
@@ -1811,7 +1818,7 @@ function feedbackSheet(kind) {
     $('fbGo').onclick = async () => {
       keep(); const msg = draw.msg.trim(); if (msg.length < 3) { toast('Write a short message first.'); return $('fbMsg').focus() }
       const b = $('fbGo'); b.disabled = true; b.textContent = 'Sending\u2026';
-      const fb = { type: FB[K][0], message: msg, email: draw.email.trim(), page: S.view + (S.view === 'parent' ? '/' + S.ptab : S.view === 'kid' ? '/' + S.tab : ''), app: navigator.userAgent.slice(0, 200) };
+      const fb = { type: FB[K][0], message: msg, email: draw.email.trim(), page: screenName(), app: navigator.userAgent.slice(0, 200) };
       // emailed straight to the owner (netlify/functions/feedback.js); Netlify Forms is the backup
       const viaEmail = () => fetch('/.netlify/functions/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...fb, website: '' }) });
       const viaForm = () => fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ 'form-name': 'feedback', 'bot-field': '', ...fb }).toString() });
