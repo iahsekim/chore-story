@@ -407,3 +407,54 @@ drop policy if exists cr_update on public.credits;
 drop policy if exists cr_update on public.transactions;
 create policy cr_update on public.credits for update to authenticated using (family_id in (select public.my_family_ids())) with check (family_id in (select public.my_family_ids()));
 create policy cr_update on public.transactions for update to authenticated using (family_id in (select public.my_family_ids())) with check (family_id in (select public.my_family_ids()));
+
+-- ---------------------------------------------------------------- new member alerts
+-- Whenever someone joins (a new family, or a parent/guardian accepting an invite), the database posts the
+-- new member to the Netlify function /.netlify/functions/joined, which emails the owner and adds a row to
+-- the members Google Sheet. Nothing leaves the database until the shared secret is saved in Supabase Vault
+-- (it is never written in this file). Run once in the SQL editor, with the same secret as Netlify's
+-- JOINED_HOOK_SECRET:
+--   select vault.create_secret('<the secret>', 'pp_hook_secret');
+-- To add the people who joined before this existed to the sheet (no emails are sent for them):
+--   select public.pp_announce_member(family_id, user_id, true) from public.family_members order by created_at;
+do $$ begin create extension if not exists pg_net; exception when others then raise notice 'pg_net is not available here: %', sqlerrm; end $$;
+
+create or replace function public.pp_announce_member(p_family uuid, p_user uuid, p_backfill boolean default false)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  sec text; fam public.families%rowtype; mem public.family_members%rowtype; n int;
+begin
+  select decrypted_secret into sec from vault.decrypted_secrets where name = 'pp_hook_secret' limit 1;
+  if sec is null or sec = '' then return; end if;
+  select * into fam from public.families where id = p_family;
+  select * into mem from public.family_members where family_id = p_family and user_id = p_user;
+  if mem.user_id is null then return; end if;
+  -- the first member of a family made it; anyone after that joined through an invite
+  select count(*) into n from public.family_members where family_id = p_family and created_at <= mem.created_at;
+  perform net.http_post(
+    url := 'https://paperpig.app/.netlify/functions/joined',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-pp-hook', sec),
+    body := jsonb_build_object(
+      'kind', case when n <= 1 then 'new family' else 'joined a family' end,
+      'email', mem.email, 'user_id', mem.user_id, 'family', fam.name, 'family_id', fam.id,
+      'members', n, 'timezone', fam.timezone, 'joined_at', mem.created_at, 'backfill', p_backfill),
+    timeout_milliseconds := 5000);
+exception when others then
+  -- an alert must never stop anyone from signing up
+  raise warning 'pp_announce_member: %', sqlerrm;
+end $$;
+
+create or replace function public.family_members_announce()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  perform public.pp_announce_member(new.family_id, new.user_id, false);
+  return new;
+end $$;
+
+drop trigger if exists family_members_announce on public.family_members;
+create trigger family_members_announce after insert on public.family_members
+  for each row execute function public.family_members_announce();
+
+-- only the database itself (and you, in the SQL editor) can send an alert
+revoke all on function public.pp_announce_member(uuid, uuid, boolean) from public, anon, authenticated;
+revoke all on function public.family_members_announce() from public, anon, authenticated;

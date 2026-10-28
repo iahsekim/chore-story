@@ -61,6 +61,14 @@ Feedback (Settings → Contact & feedback) uses **Netlify Forms**, so there's no
 
 That's it. Visit the site, sign in with your email, and set up your family.
 
+### 5. Optional: get an email and a sheet row when someone joins
+
+1. Make up a long random secret (one is enough for everything below).
+2. **Google Sheet:** make a sheet, then **Extensions → Apps Script**, paste [`tools/members-sheet.gs`](tools/members-sheet.gs), Save. **Project Settings → Script properties → Add**: `SECRET` = your secret. **Deploy → New deployment → Web app**, Execute as **Me**, Who has access **Anyone** → Deploy → copy the Web app URL.
+3. **Netlify → Environment variables** (scope: Functions): `JOINED_HOOK_SECRET` = your secret, `NOTIFY_EMAIL` = where the alerts go, `SHEET_WEBHOOK_URL` = the Web app URL, and optionally `SHEET_URL` = the sheet's link (a button in the email). Redeploy. Visiting `/.netlify/functions/joined` shows what's set.
+4. **Supabase → SQL Editor:** run `schema.sql` again (it adds the trigger), then `select vault.create_secret('your secret', 'pp_hook_secret');`
+5. Optional, to list the people who joined before: `select public.pp_announce_member(family_id, user_id, true) from public.family_members order by created_at;` (sheet rows only, no emails).
+
 ---
 
 ## How it works
@@ -88,6 +96,7 @@ That's it. Visit the site, sign in with your email, and set up your family.
 | Parent PIN | Kids share the parent's sign-in, so parent tools sit behind a 4-digit PIN. After signing in fresh with the email code, a parent can reset a forgotten PIN. |
 | Second parent | Settings → **Parents and guardians → Send invite** emails them a link (via a Netlify function and Resend). They sign in with that email and join automatically. **Send again** re-sends it. Needs `RESEND_API_KEY` set in Netlify's environment variables. |
 | Delete | Settings → **Delete account and all data** removes the family and the login. |
+| Member alerts | When anyone joins (a new family, or a parent accepting an invite), the database posts them to the Netlify function `joined`, which emails the owner and adds a row to the members Google Sheet. Setup: below. |
 | Feedback | Settings → **Report a bug / Request a feature / Say hi**, or **Contact** on the sign-in screen. Sent through Netlify Forms. |
 
 ## Files
@@ -101,6 +110,8 @@ config.js             your Supabase URL/key, app name, Venmo + Cash App handles
 privacy.html          privacy page
 supabase/schema.sql   database tables, security rules and functions
 netlify.toml          Netlify settings and security headers
+netlify/functions/    invite.js (invite emails), joined.js (new member alerts)
+tools/members-sheet.gs  Apps Script for the members Google Sheet
 ```
 
 To rename the app, change `appName` in `config.js` and the `<title>`/manifest text. To change the donation handles, edit `venmo`, `cashapp` and `paypal` in `config.js`.
