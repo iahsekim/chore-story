@@ -51,7 +51,7 @@ Supabase's built-in email is for testing only: it sends just a few emails per ho
 
 ### 4. Deploy on Netlify
 
-Feedback (Settings → Contact & feedback) uses **Netlify Forms**, so there's nothing to set up beyond deploying. After the first deploy, turn on email alerts in Netlify: **Site → Forms → Form notifications → Add notification → Email** and enter your address. Messages also show under **Forms → feedback**.
+Feedback (Settings → Contact & feedback, the chat button, or Feedback on the sign-in screen) is emailed to `NOTIFY_EMAIL` through Resend by the Netlify function `feedback`, so it works once invites and member alerts are set up. Reply to the email to answer the sender (when they typed their address). To send feedback somewhere else, set `FEEDBACK_EMAIL`. Check it at `/.netlify/functions/feedback`: it should say `{"email":true}`. If the email ever fails, the app falls back to **Netlify Forms** (messages under **Forms → feedback**).
 
 
 1. Push this repo to GitHub.
@@ -97,7 +97,7 @@ That's it. Visit the site, sign in with your email, and set up your family.
 | Second parent | Settings → **Parents and guardians → Send invite** emails them a link (via a Netlify function and Resend). They sign in with that email and join automatically. **Send again** re-sends it. Needs `RESEND_API_KEY` set in Netlify's environment variables. |
 | Delete | Settings → **Delete account and all data** removes the family and the login. |
 | Member alerts | When anyone joins (a new family, or a parent accepting an invite), the database posts them to the Netlify function `joined`, which emails the owner and updates the members Google Sheet: one row per family on a Families tab, with every parent on that row. Setup: below. |
-| Feedback | Settings → **Report a bug / Request a feature / Say hi**, or **Contact** on the sign-in screen. Sent through Netlify Forms. |
+| Feedback | Settings → **Report a bug / Request a feature / Say hi**, or **Contact** on the sign-in screen. Emailed to the owner (function `feedback`, Resend), with Netlify Forms as the backup. |
 
 ## Files
 

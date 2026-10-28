@@ -1811,9 +1811,16 @@ function feedbackSheet(kind) {
     $('fbGo').onclick = async () => {
       keep(); const msg = draw.msg.trim(); if (msg.length < 3) { toast('Write a short message first.'); return $('fbMsg').focus() }
       const b = $('fbGo'); b.disabled = true; b.textContent = 'Sending\u2026';
-      const body = new URLSearchParams({ 'form-name': 'feedback', 'bot-field': '', type: FB[K][0], message: msg, email: draw.email.trim(), page: S.view + (S.view === 'parent' ? '/' + S.ptab : S.view === 'kid' ? '/' + S.tab : ''), app: navigator.userAgent.slice(0, 200) });
-      try { const r = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() }); if (!r.ok) throw new Error(r.status); draw.msg = ''; closeSheet(); toast('Sent. Thank you!') }
-      catch (e) { b.disabled = false; b.textContent = 'Send'; toast(CFG.contactEmail ? `Couldn\u2019t send. Email ${CFG.contactEmail} instead.` : 'Couldn\u2019t send. Try again in a minute.') }
+      const fb = { type: FB[K][0], message: msg, email: draw.email.trim(), page: S.view + (S.view === 'parent' ? '/' + S.ptab : S.view === 'kid' ? '/' + S.tab : ''), app: navigator.userAgent.slice(0, 200) };
+      // emailed straight to the owner (netlify/functions/feedback.js); Netlify Forms is the backup
+      const viaEmail = () => fetch('/.netlify/functions/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...fb, website: '' }) });
+      const viaForm = () => fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ 'form-name': 'feedback', 'bot-field': '', ...fb }).toString() });
+      try {
+        let r = await viaEmail().catch(() => null);
+        if (!r || !r.ok) r = await viaForm();
+        if (!r.ok) throw new Error(r.status);
+        draw.msg = ''; closeSheet(); toast('Sent. Thank you!');
+      } catch (e) { b.disabled = false; b.textContent = 'Send'; toast(CFG.contactEmail ? `Couldn\u2019t send. Email ${CFG.contactEmail} instead.` : 'Couldn\u2019t send. Try again in a minute.') }
     };
   });
   draw.msg = ''; draw.email = undefined; draw();
