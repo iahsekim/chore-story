@@ -96,7 +96,7 @@ That's it. Visit the site, sign in with your email, and set up your family.
 | Parent PIN | Kids share the parent's sign-in, so parent tools sit behind a 4-digit PIN. After signing in fresh with the email code, a parent can reset a forgotten PIN. |
 | Second parent | Settings → **Parents and guardians → Send invite** emails them a link (via a Netlify function and Resend). They sign in with that email and join automatically. **Send again** re-sends it. Needs `RESEND_API_KEY` set in Netlify's environment variables. |
 | Delete | Settings → **Delete account and all data** removes the family and the login. |
-| Member alerts | When anyone joins (a new family, or a parent accepting an invite), the database posts them to the Netlify function `joined`, which emails the owner and adds a row to the members Google Sheet. Setup: below. |
+| Member alerts | When anyone joins (a new family, or a parent accepting an invite), the database posts them to the Netlify function `joined`, which emails the owner and updates the members Google Sheet: one row per family on a Families tab, with every parent on that row. Setup: below. |
 | Feedback | Settings → **Report a bug / Request a feature / Say hi**, or **Contact** on the sign-in screen. Sent through Netlify Forms. |
 
 ## Files
